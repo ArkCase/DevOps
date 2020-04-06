@@ -10,7 +10,7 @@ Parameters:
     Type: String
     Description: Type of environment to provision
     Default: prod
-    AllowedValues: [staging, prod]
+    AllowedValues: [staging, prod, dev, test, load-test]
 
   Project:
     Type: String
