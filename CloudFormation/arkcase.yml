@@ -246,6 +246,8 @@ Resources:
     Properties:
       VpcId: !Ref Vpc
       Tags:
+        - Key: Name
+          Value: PublicRouteTable
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -311,6 +313,8 @@ Resources:
     Properties:
       VpcId: !Ref Vpc
       Tags:
+        - Key: Name
+          Value: PrivateRouteTable
         - Key: Env
           Value: !Ref Env
         - Key: Project
