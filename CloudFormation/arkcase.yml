@@ -10,7 +10,7 @@ Parameters:
     Type: String
     Description: Type of environment to provision
     Default: prod
-    AllowedValues: [staging, prod]
+    AllowedValues: [staging, prod, dev, test, load-test]
 
   Project:
     Type: String
@@ -246,6 +246,8 @@ Resources:
     Properties:
       VpcId: !Ref Vpc
       Tags:
+        - Key: Name
+          Value: PublicRouteTable
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -311,6 +313,8 @@ Resources:
     Properties:
       VpcId: !Ref Vpc
       Tags:
+        - Key: Name
+          Value: PrivateRouteTable
         - Key: Env
           Value: !Ref Env
         - Key: Project
