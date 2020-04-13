@@ -383,9 +383,8 @@ Resources:
       Edition: !Ref DsEdition
       VpcSettings: 
         SubnetIds: 
-          - Ref: PrivateSubnetA
-          - Ref: PrivateSubnetB
-        VpcId: 
-          Ref: Vpc
+          - !Ref PrivateSubnetA 
+          - !Ref PrivateSubnetB
+        VpcId: !Ref Vpc
       # AWS::DirectoryService::MicrosoftAD doesn't support Tags :-(
 
