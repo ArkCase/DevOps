@@ -459,3 +459,16 @@ Resources:
       FunctionName: !Ref RotationLambda
       Action: lambda:InvokeFunction
       Principal: secretsmanager.amazonaws.com
+
+Outputs:
+  UserSecretArn:
+    Description: ARN of the user secret
+    Value: !Ref UserSecret
+
+  RdsEndpoint:
+    Description: RDS instance host name
+    Value: !GetAtt RdsInstance.Endpoint.Address
+
+  RdsPort:
+    Description: RDS instance port number
+    Value: !GetAtt RdsInstance.Endpoint.Port
