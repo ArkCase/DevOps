@@ -1,0 +1,474 @@
+# Copyright (c) 2020 Armedia, LLC
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >
+  Deploy a MariaDB RDS instance with the help of SecretsManager to manage
+  credentials and secret rotation
+
+Parameters:
+  Env:
+    Type: String
+    Description: Type of environment to provision
+    Default: prod
+    MinLength: 1
+    MaxLength: 30
+    AllowedPattern: ^[-_.a-zA-Z0-9]*$
+    ConstraintDescription: >
+      Up to 30 alpha-numeric characters; can use underscores,
+      dots and dashes
+
+  Project:
+    Type: String
+    Description: Project or product name
+    Default: arkcase
+    MinLength: 1
+    MaxLength: 30
+    AllowedPattern: ^[-_.a-zA-Z0-9]*$
+    ConstraintDescription: >
+      Up to 30 alpha-numeric characters; can use underscores,
+      dots and dashes
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The VPC where the RDS instance will live
+
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: IDs of the subnets where the RDS instance should be placed
+
+  AllowedSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: >
+      ID of the security group allowed to access the MariaDB instance;
+      typically, your application would run inside that security group
+
+  MariadbVersion:
+    Type: String
+    Description: >
+      The version of MariaDB to use. It must be a version supported by RDS. The
+      versions supported by RDS can be found here:
+      https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_MariaDB.html#MariaDB.Concepts.VersionMgmt
+    Default: "10.4.8"
+    MinLength: 1
+
+  DatabaseName:
+    Type: String
+    Description: Database name
+    Default: main
+    MinLength: 1
+    MaxLength: 60
+    AllowedPattern: ^[_a-zA-Z0-9]*$
+    ConstraintDescription: >
+      Up to 60 alpha-numeric characters; can use underscores
+
+  InstanceClass:
+    Type: String
+    Description: Instance class for the MariaDB RDS instance
+    MinLength: 1
+    MaxLength: 20
+    Default: db.t3.micro
+
+  DiskSizeGB:
+    Type: Number
+    MinValue: 20
+    MaxValue: 3000
+    Default: 50
+
+  EnableMultiAZ:
+    Type: String
+    Description: Enable multi-AZ
+    Default: true
+    AllowedValues: [ true, false ]
+
+  BackupWindow:
+    Type: String
+    Description: >
+      Daily backup window for MariaDB; must be in the
+      format "HH:MM-HH:MM" and must be in UTC time; must not conflict
+      with the maintenance window; must be at least 30 minutes
+    Default: "08:00-08:30"
+    AllowedPattern: "^[0-2][0-9]:[0-5][0-9]-[0-2][0-9]:[0-5][0-9]$"
+    ConstraintDescription: Must be in the format "HH:MM-HH:MM"
+
+  MaintenanceWindow:
+    Type: String
+    Description: >
+      Weekly maintenance window for MariaDB; must be in the
+      format "DDD:HH:MM-DDD:HH:MM" and must be in UTC time; must not
+      conflict with the backup window; must be at least 30 minutes
+    Default: "Sun:08:30-Sun:09:00"
+    AllowedPattern: "^[a-zA-Z]{3}:[0-2][0-9]:[0-5][0-9]-[a-zA-Z]{3}:[0-2][0-9]:[0-5][0-9]$"
+    ConstraintDescription: Must be in the format "DDD:HH:MM-DDD:HH:MM"
+
+  AutoMinorUpgrade:
+    Type: String
+    Description: Automatically upgrade MariaDB minor versions
+    Default: true
+    AllowedValues: [ true, false ]
+
+  PasswordLength:
+    Type: Number
+    Description: How long database passwords should be
+    Default: 20
+    MinValue: 8
+    MaxValue: 80
+
+  RotationInDays:
+    Type: Number
+    Description: How often to rotate database passwords, in days
+    Default: 30
+    MinValue: 1
+    MaxValue: 1000
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: { default: Definition }
+        Parameters:
+          - Env
+          - Project
+
+      - Label: { default: Network configuration }
+        Parameters:
+          - VpcId
+          - SubnetIds
+          - AllowedSecurityGroupId
+
+      - Label: { default: Database configuration }
+        Parameters:
+          - MariadbVersion
+          - DatabaseName
+          - InstanceClass
+          - DiskSizeGB
+          - EnableMultiAZ
+          - BackupWindow
+          - MaintenanceWindow
+          - AutoMinorUpgrade
+
+      - Label: { default: Secret management }
+        Parameters:
+          - PasswordLength
+          - RotationInDays
+
+    ParameterLabels:
+      Env: { default: Environment }
+      VpcId: { default: VPC ID }
+      SubnetIds: { default: Subnet IDs }
+      AllowedSecurityGroupId: { default: Allowed security group ID }
+      MariadbVersion: { default: MariaDB version }
+      DatabaseName: { default: Database name }
+      InstanceClass: { default: MariaDB instance class }
+      DiskSizeGB: { default: "MariaDB disk size, in GB" }
+      EnableMultiAZ: { default: Enable multi-AZ for MariaDB }
+      BackupWindow: { default: MariaDB backup window }
+      MaintenanceWindow: { default: MariaDB maintenance window }
+      PasswordLength: { default: Password length }
+      RotationInDays: { default: "Password rotation, in days" }
+
+Rules:
+  SubnetsInVpc:
+    Assertions:
+      - AssertDescription: All subnets must be in the VPC
+        Assert:
+          Fn::EachMemberIn:
+            - Fn::ValueOfAll: [ "AWS::EC2::Subnet::Id", VpcId ]
+            - Fn::RefAll: AWS::EC2::VPC::Id
+
+Resources:
+
+  ###################
+  # Security groups #
+  ###################
+
+  RotationLambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for the Lambda rotation function
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for MariaDB RDS instance
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - Description: Allow traffic from Lambda rotation function
+          IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !GetAtt RotationLambdaSecurityGroup.GroupId
+        - Description: Allow traffic from authorized security group
+          IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref AllowedSecurityGroupId
+      Tags:
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ###########
+  # Secrets #
+  ###########
+
+  MasterSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: Master credentials to manage user credentials
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "admin"}'
+        GenerateStringKey: password
+        PasswordLength: 20
+        ExcludeCharacters: "/@\"'\\%"
+      Tags:
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: secretsmanager
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  UserSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: User credentials to connect to the database
+      GenerateSecretString:
+        SecretStringTemplate: !Sub '{"username": "user", "masterarn": "${MasterSecret}", "dbname": "${DatabaseName}"}'
+        GenerateStringKey: password
+        PasswordLength: 20
+        ExcludeCharacters: "/@\"'\\%"
+      Tags:
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: secretsmanager
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  UserSecretRotationSchedule:
+    Type: AWS::SecretsManager::RotationSchedule
+    # NB: When creating this resource, SecretsManager will initate a secret
+    #     rotation. So it's better to ensure everything is in place beforehand.
+    #     SecretsManager will perform retries otherwise, but it's cleaner this
+    #     way.
+    DependsOn: [ UserSecretAttachment, LambdaInvokePermission ]
+    Properties:
+      SecretId: !Ref UserSecret
+      RotationLambdaARN: !GetAtt RotationLambda.Arn
+      RotationRules:
+        AutomaticallyAfterDays: !Ref RotationInDays
+
+  MasterSecretPolicy:
+    Type: AWS::SecretsManager::ResourcePolicy
+    Properties:
+      SecretId: !Ref MasterSecret
+      ResourcePolicy:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Deny
+            Principal:
+              AWS: !Ref AWS::AccountId
+            Action: secretsmanager:DeleteSecret
+            Resource: "*"
+
+  UserSecretPolicy:
+    Type: AWS::SecretsManager::ResourcePolicy
+    Properties:
+      SecretId: !Ref UserSecret
+      ResourcePolicy:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Deny
+            Principal:
+              AWS: !Ref AWS::AccountId
+            Action: secretsmanager:DeleteSecret
+            Resource: "*"
+
+  #######
+  # RDS #
+  #######
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet for the RDS instance
+      SubnetIds: !Ref SubnetIds
+      Tags:
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: rds
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  RdsInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    Properties:
+      DBInstanceClass: !Ref InstanceClass
+      Engine: mariadb
+      EngineVersion: !Ref MariadbVersion
+      DBName: !Ref DatabaseName
+      AutoMinorVersionUpgrade: !Ref AutoMinorUpgrade
+      StorageType: gp2
+      AllocatedStorage: !Ref DiskSizeGB
+      BackupRetentionPeriod: 35
+      VPCSecurityGroups: [ !GetAtt DbSecurityGroup.GroupId ]
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      MultiAZ: !Ref EnableMultiAZ
+      PubliclyAccessible: false
+      PreferredBackupWindow: !Ref BackupWindow
+      PreferredMaintenanceWindow: !Ref MaintenanceWindow
+      MasterUsername: !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:username}}"
+      MasterUserPassword: !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:password}}"
+      Tags:
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: rds
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  UserSecretAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref UserSecret
+      TargetType: AWS::RDS::DBInstance
+      TargetId: !Ref RdsInstance
+
+  ###################
+  # Rotation Lambda #
+  ###################
+
+  RotationLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: SecretsManagerRotationPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:DescribeSecret
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:PutSecretValue
+                  - secretsmanager:UpdateSecretVersionStage
+                Resource: !Ref UserSecret
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref MasterSecret
+              - Effect: Allow
+                Action: secretsmanager:GetRandomPassword
+                Resource: "*"
+      Tags:
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  RotationLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Rotate MariaDB password
+      Runtime: python3.7
+      Role: !GetAtt RotationLambdaExecutionRole.Arn
+      Handler: mariadb_rotation_lambda.handler
+      Timeout: 30
+      VpcConfig:
+        SecurityGroupIds: [ !GetAtt RotationLambdaSecurityGroup.GroupId ]
+        SubnetIds: !Ref SubnetIds
+      Environment:
+        Variables:
+          SECRETS_MANAGER_ENDPOINT: !Sub https://secretsmanager.${AWS::Region}.amazonaws.com
+          GRANTS: >
+            SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES,
+            INDEX, ALTER, CREATE TEMPORARY TABLES, LOCK TABLES,
+            EXECUTE, CREATE VIEW, SHOW VIEW, CREATE ROUTINE,
+            ALTER ROUTINE, EVENT, TRIGGER
+      Code:
+        S3Bucket: arkcase-public-us-west-1
+        S3Key: DevOps/mariadb_rotation_lambda/mariadb_rotation_lambda.zip
+      Tags:
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref RotationLambda
+      Action: lambda:InvokeFunction
+      Principal: secretsmanager.amazonaws.com
+
+Outputs:
+  UserSecretArn:
+    Description: ARN of the user secret
+    Value: !Ref UserSecret
+
+  RdsEndpoint:
+    Description: RDS instance host name
+    Value: !GetAtt RdsInstance.Endpoint.Address
+
+  RdsPort:
+    Description: RDS instance port number
+    Value: !GetAtt RdsInstance.Endpoint.Port
