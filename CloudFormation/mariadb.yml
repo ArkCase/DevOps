@@ -439,7 +439,7 @@ Resources:
             EXECUTE, CREATE VIEW, SHOW VIEW, CREATE ROUTINE,
             ALTER ROUTINE, EVENT, TRIGGER
       Code:
-        S3Bucket: arkcase-public-us-west-1
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
         S3Key: DevOps/mariadb_rotation_lambda/mariadb_rotation_lambda.zip
       Tags:
         - Key: Env
