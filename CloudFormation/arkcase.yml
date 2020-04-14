@@ -29,21 +29,88 @@ Parameters:
     ConstraintDescription: Must be a valid CIDR range like "10.10.0.0/16"
     Default: 10.210.0.0/16
 
+  RdsBackupWindow:
+    Type: String
+    Description: >
+      Daily backup window for RDS instances; must be in the
+      format "HH:MM-HH:MM" and must be in UTC time; must not conflict
+      with the maintenance window; must be at least 30 minutes
+    Default: "08:00-08:30"
+    AllowedPattern: "^[0-2][0-9]:[0-5][0-9]-[0-2][0-9]:[0-5][0-9]$"
+    ConstraintDescription: Must be in the format "HH:MM-HH:MM"
+
+  RdsMaintenanceWindow:
+    Type: String
+    Description: >
+      Weekly maintenance window for RDS instances; must be in the
+      format "DDD:HH:MM-DDD:HH:MM" and must be in UTC time; must not
+      conflict with the backup window; must be at least 30 minutes
+    Default: "Sun:08:30-Sun:09:00"
+    AllowedPattern: "^[a-zA-Z]{3}:[0-2][0-9]:[0-5][0-9]-[a-zA-Z]{3}:[0-2][0-9]:[0-5][0-9]$"
+    ConstraintDescription: Must be in the format "DDD:HH:MM-DDD:HH:MM"
+
+  RdsPasswordLength:
+    Type: Number
+    Description: How long database passwords should be
+    Default: 20
+    MinValue: 8
+    MaxValue: 80
+
+  RdsPasswordRotationInDays:
+    Type: Number
+    Description: How often to rotate database passwords, in days
+    Default: 30
+    MinValue: 1
+    MaxValue: 1000
+
+  AlfrescoRdsInstanceClass:
+    Type: String
+    Description: >
+      RDS instance class for the Alfresco database; for more detail, refer to
+      the official AWS documentation here:
+      https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.DBInstanceClass.html
+    MinLength: 1
+    MaxLength: 20
+    Default: db.t3.small
+
+  AlfrescoRdsDiskSizeGB:
+    Type: Number
+    MinValue: 20
+    Default: 50
+
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
-      - Label: { default: Definition }
+      - Label: { default: IMPORTANT PARAMETERS }
         Parameters:
           - Env
+          - VpcCidr
+
+      - Label: { default: "Definition (this and the following sections are less important)" }
+        Parameters:
           - Project
 
-      - Label: { default: Network configuration }
+      - Label: { default: General database configuration }
         Parameters:
-          - VpcCidr
+          - RdsBackupWindow
+          - RdsMaintenanceWindow
+          - RdsPasswordLength
+          - RdsPasswordRotationInDays
+
+      - Label: { default: Alfresco configuration }
+        Parameters:
+          - AlfrescoRdsInstanceClass
+          - AlfrescoRdsDiskSizeGB
 
     ParameterLabels:
       Env: { default: Environment }
       VpcCidr: { default: VPC CIDR block }
+      RdsBackupWindow: { default: RDS daily backup window }
+      RdsMaintenanceWindow: { default: RDS weekly maintenance window }
+      RdsPasswordLength: { default: RDS password length }
+      RdsPasswordRotationInDays: { default: "RDS password rotation, in days" }
+      AlfrescoRdsInstanceClass: { default: Alfresco RDS instance class }
+      AlfrescoRdsDiskSizeGB: { default: "Alfresco RDS disk size, in GB" }
 
 Resources:
 
@@ -338,3 +405,64 @@ Resources:
     Properties:
       SubnetId: !Ref PrivateSubnetB
       RouteTableId: !Ref PrivateRouteTableB
+
+  ############
+  # Alfresco #
+  ############
+
+  AlfrescoSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Alfresco containers
+      VpcId: !Ref Vpc
+      #SecurityGroupIngress:
+      #  - Description: Allow traffic from ArkCase containers
+      #    IpProtocol: tcp
+      #    FromPort: 443
+      #    ToPort: 443
+      #    SourceSecurityGroupId: !GetAtt ArkcaseSecurityGroup.GroupId
+      Tags:
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: alfresco
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  AlfrescoDatabase:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/CloudFormation/mariadb.yml
+      TimeoutInMinutes: 30
+      Parameters:
+        Env: !Ref Env
+        Project: !Ref Project
+        VpcId: !Ref Vpc
+        # NB: We can't use lists when creating a nested stack, we have to
+        #     expand it into a comma-separated list.
+        SubnetIds: !Join [ ",", [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ] ]
+        AllowedSecurityGroupId: !GetAtt AlfrescoSecurityGroup.GroupId
+        DatabaseName: alfresco
+        InstanceClass: !Ref AlfrescoRdsInstanceClass
+        DiskSizeGB: !Ref AlfrescoRdsDiskSizeGB
+        EnableMultiAZ: true
+        BackupWindow: !Ref RdsBackupWindow
+        MaintenanceWindow: !Ref RdsMaintenanceWindow
+        AutoMinorUpgrade: true
+        PasswordLength: !Ref RdsPasswordLength
+        RotationInDays: !Ref RdsPasswordRotationInDays
+      Tags:
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: alfresco
+        - Key: Component
+          Value: cfn
+        - Key: ManagedBy
+          Value: CloudFormation
