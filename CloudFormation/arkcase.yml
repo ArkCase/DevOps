@@ -29,6 +29,31 @@ Parameters:
     ConstraintDescription: Must be a valid CIDR range like "10.10.0.0/16"
     Default: 10.210.0.0/16
 
+  DsEdition:
+    Type: String
+    Description: Whether Directory Services is Enterprise or Standard
+    Default: Standard
+    AllowedValues: [Enterprise, Standard]
+
+  DsName:
+    Type: String
+    Description: |
+      The fully qualified domain name for the AWS Managed Microsoft AD directory, such as
+      corp.example.com. This name will resolve inside your VPC only. It does not need to be 
+      publicly resolvable. 
+    AllowedPattern: ^([a-zA-Z0-9]+[\\.-])+([a-zA-Z0-9])+$
+    ConstraintDescription: Must be a valid fully qualified domain name.
+    Default: ecmontap.com
+
+  DsPassword:
+    Type: String
+    Description: |
+      The password for the default administrative user named Admin. 
+    MinLength: 12
+    MaxLength: 64
+    AllowedPattern: (?=^.{12,64}$)((?=.*\d)(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[^A-Za-z0-9\s])(?=.*[a-z])|(?=.*[^A-Za-z0-9\s])(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[A-Z])(?=.*[^A-Za-z0-9\s]))^.*
+    ConstraintDescription: 12-64 characters; must have digits, lower case characters, upper case characters, and special characters.
+
   RdsBackupWindow:
     Type: String
     Description: >
@@ -102,9 +127,18 @@ Metadata:
           - AlfrescoRdsInstanceClass
           - AlfrescoRdsDiskSizeGB
 
+      - Label: { default: Directory Services Configuration }
+        Parameters:
+          - DsEdition
+          - DsName
+          - DsPassword
+
     ParameterLabels:
       Env: { default: Environment }
       VpcCidr: { default: VPC CIDR block }
+      DsEdition: { default: Directory Services Edition }
+      DsName: { default: Domain Name }
+      DsPassword: { default: Admin User Password }
       RdsBackupWindow: { default: RDS daily backup window }
       RdsMaintenanceWindow: { default: RDS weekly maintenance window }
       RdsPasswordLength: { default: RDS password length }
@@ -405,6 +439,19 @@ Resources:
     Properties:
       SubnetId: !Ref PrivateSubnetB
       RouteTableId: !Ref PrivateRouteTableB
+
+  DirectoryService:
+    Type: AWS::DirectoryService::MicrosoftAD
+    Properties: 
+      Name: !Ref DsName
+      Password: !Ref DsPassword
+      Edition: !Ref DsEdition
+      VpcSettings: 
+        SubnetIds: 
+          - !Ref PrivateSubnetA 
+          - !Ref PrivateSubnetB
+        VpcId: !Ref Vpc
+      # AWS::DirectoryService::MicrosoftAD doesn't support Tags :-(
 
   ############
   # Alfresco #
