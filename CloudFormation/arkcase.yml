@@ -48,11 +48,15 @@ Parameters:
   DsPassword:
     Type: String
     Description: |
-      The password for the default administrative user named Admin. 
+      The password for the default administrative user named Admin. The
+      password must be between 12 and 64 characters, not contain the
+      word "admin", and must have at least one character from three of these
+      four categories: lowercase, uppercase, numeric and special characters
+    NoEcho: true
     MinLength: 12
     MaxLength: 64
     AllowedPattern: (?=^.{12,64}$)((?=.*\d)(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[^A-Za-z0-9\s])(?=.*[a-z])|(?=.*[^A-Za-z0-9\s])(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[A-Z])(?=.*[^A-Za-z0-9\s]))^.*
-    ConstraintDescription: 12-64 characters; must have digits, lower case characters, upper case characters, and special characters.
+    ConstraintDescription: "12-64 characters; must have at least one character from three of these four categories: lowercase, uppercase, numeric and special characters"
 
   RdsBackupWindow:
     Type: String
