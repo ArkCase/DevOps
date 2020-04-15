@@ -11,19 +11,23 @@ import binascii
 # Preliminaries
 
 ap = argparse.ArgumentParser(description="Push public files to ArkCase S3 public buckets")
+ap.add_argument("-m", "--skip-mariadb-rotation-lambda",
+    default=False, action="store_true",
+    help="Skip the MariaDB Rotation Lambda function package")
 args = ap.parse_args()
+print(dir(args))
 
 if 'AWS_PROFILE' not in os.environ and not 'AWS_DEFAULT_REGION' in os.environ:
     print(f"ERROR: You must set either the `AWS_PROFILE` or the `AWS_DEFAULT_REGION` environment variable")
     sys.exit(1)
 
-# Build MariaDB Lambda rotation function package
-
-this_path = os.path.abspath(__file__)
-this_dir = os.path.dirname(this_path)
-os.chdir(this_dir)
-print(f"Building MariaDB rotation Lambda function package")
-subprocess.check_call(["./mariadb_rotation_lambda/package.sh"])
+if not args.skip_mariadb_rotation_lambda:
+    # Build MariaDB Lambda rotation function package
+    this_path = os.path.abspath(__file__)
+    this_dir = os.path.dirname(this_path)
+    os.chdir(this_dir)
+    print(f"Building MariaDB rotation Lambda function package")
+    subprocess.check_call(["./mariadb_rotation_lambda/package.sh"])
 
 # Push public files to public S3 buckets
 
@@ -47,9 +51,11 @@ regions = [
 ]
 
 public_files = [
-  "mariadb_rotation_lambda/mariadb_rotation_lambda.zip",
   "CloudFormation/mariadb.yml"
 ]
+
+if not args.skip_mariadb_rotation_lambda:
+    public_files.append("mariadb_rotation_lambda/mariadb_rotation_lambda.zip")
 
 s3 = boto3.client("s3")
 
