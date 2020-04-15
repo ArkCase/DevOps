@@ -342,6 +342,7 @@ Resources:
       DBName: !Ref DatabaseName
       AutoMinorVersionUpgrade: !Ref AutoMinorUpgrade
       StorageType: gp2
+      StorageEncrypted: true
       AllocatedStorage: !Ref DiskSizeGB
       BackupRetentionPeriod: 35
       VPCSecurityGroups: [ !GetAtt DbSecurityGroup.GroupId ]
