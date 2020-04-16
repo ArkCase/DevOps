@@ -353,6 +353,7 @@ Resources:
       PreferredMaintenanceWindow: !Ref MaintenanceWindow
       MasterUsername: !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:username}}"
       MasterUserPassword: !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:password}}"
+      CACertificateIdentifier: rds-ca-2019
       Tags:
         - Key: Env
           Value: !Ref Env
