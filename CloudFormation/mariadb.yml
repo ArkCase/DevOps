@@ -340,7 +340,7 @@ Resources:
       Engine: mariadb
       EngineVersion: !Ref MariadbVersion
       DBName: !Ref DatabaseName
-      AutoMinorVersionUpgrade: !Ref AutoMinorUpgrade
+      AutoMinorVersionUpgrade: !Ref AutoMinorUpgrade  # Ravi said on M$ Teams on 20200414 that it's OK to enable auto minor upgrade
       StorageType: gp2
       StorageEncrypted: true
       AllocatedStorage: !Ref DiskSizeGB
