@@ -85,15 +85,26 @@ def set_secret(client, arn, version_id):
     print(f"set_secret: Successfully retrieved master secret {master_arn}")
     master_secret['host'] = pending_secret['host']
     cnx = get_cnx(master_secret)
+    if not cnx:
+        raise ValueError(f"set_secret: Failed to connect to database using master credentials")
     print(f"set_secret: Successfully connected to the database using the master secret")
 
-    # Update/create database with the new (i.e. AWSPENDING) secret
+    # RDS, by default, allows unsecure connections to MariaDB instances. So we
+    # need to secure the master user, which is created by CloudFormation.
+    # NB: We only need to do this once, but doing it every time doesn't hurt
+    user = master_secret['username']
+    sql = f"ALTER USER '{user}' REQUIRE SSL;"
+    print(f"set_secret: Executing SQL to require SSL for master user: {user}")
+    cnx.cursor().execute(sql)
+    print(f"set_secret: Successfully enforced SSL for master user: {user}")
+
+    # Update/create database user with the new (i.e. AWSPENDING) secret
     grants = os.environ['GRANTS'].replace("\n", " ")
     dbname = pending_secret['dbname']
     username = pending_secret['username']
     password = pending_secret['password']
-    sql = f"GRANT {grants} ON {dbname}.* TO '{username}' IDENTIFIED BY '{password}';"
-    print(f"set_secret: Executing SQL to grant privileges and modify password for user '{username}'")
+    sql = f"GRANT {grants} ON {dbname}.* TO '{username}' IDENTIFIED BY '{password}' REQUIRE SSL;"
+    print(f"set_secret: Executing SQL to grant privileges, modify password and enforce SSL for user '{username}'")
     cnx.cursor().execute(sql)
     print(f"set_secret: Successfully set username '{username}' and password in database for secret {arn}")
     cnx.close()
@@ -197,9 +208,14 @@ def get_cnx(secret):
     port = int(secret.get('port', 3306))
     dbname = secret.get('dbname')
     try:
-        # TODO: Make sure we use SSL
         print(f"get_cnx: Trying host={host}, user={username}, port={port}, db={dbname})")
-        cnx = pymysql.connect(host, user=username, passwd=password, port=port, db=dbname, connect_timeout=5)
+        # NB: We want to connect using SSL. PyMySQL checks the `ssl` argument
+        #     and enables SSL if it's not empty. PyMySQL docs says that the
+        #     `ssl` argument should look like `mysql_ssl_set()`, but we don't
+        #     need any of the items it sets. So I just used a random key,
+        #     `enabled`, such that the `ssl` argument is a non-empty
+        #     dictionary to fool PyMySQL. It looks like it's working fine.
+        cnx = pymysql.connect(host=host, user=username, passwd=password, port=port, db=dbname, connect_timeout=5, ssl={'enabled': True})
         print(f"get_cnx: Successfully connected")
         return cnx
     except pymysql.OperationalError as e:

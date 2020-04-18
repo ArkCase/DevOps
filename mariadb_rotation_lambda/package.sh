@@ -2,14 +2,6 @@
 
 # Preliminaries
 
-usage() {
-    echo "Usage: $0"
-    echo
-    echo "Create a package for the MariaDB Lambda rotation function"
-    echo "in the form of a zip file."
-    exit 1
-}
-
 set -eu -o pipefail
 
 tmp=$(realpath "$0")

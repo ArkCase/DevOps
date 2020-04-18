@@ -340,8 +340,9 @@ Resources:
       Engine: mariadb
       EngineVersion: !Ref MariadbVersion
       DBName: !Ref DatabaseName
-      AutoMinorVersionUpgrade: !Ref AutoMinorUpgrade
+      AutoMinorVersionUpgrade: !Ref AutoMinorUpgrade  # Ravi said on M$ Teams on 20200414 that it's OK to enable auto minor upgrade
       StorageType: gp2
+      StorageEncrypted: true
       AllocatedStorage: !Ref DiskSizeGB
       BackupRetentionPeriod: 35
       VPCSecurityGroups: [ !GetAtt DbSecurityGroup.GroupId ]
@@ -352,6 +353,7 @@ Resources:
       PreferredMaintenanceWindow: !Ref MaintenanceWindow
       MasterUsername: !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:username}}"
       MasterUserPassword: !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:password}}"
+      CACertificateIdentifier: rds-ca-2019
       Tags:
         - Key: Env
           Value: !Ref Env
