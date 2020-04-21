@@ -1,3 +1,4 @@
 *.orig
 .*.swp
 *.zip
+__pycache__
