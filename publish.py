@@ -28,7 +28,7 @@ if 'AWS_PROFILE' not in os.environ and not 'AWS_DEFAULT_REGION' in os.environ:
     print(f"ERROR: You must set either the `AWS_PROFILE` or the `AWS_DEFAULT_REGION` environment variable")
     sys.exit(1)
 
-ts = datetime.datetime.now().strftime("%Y%m%d-%H%M")
+package_version = datetime.datetime.now().strftime("%Y%m%d-%H%M")
 
 # Build packages as necessary
 
@@ -39,6 +39,28 @@ if not args.skip_mariadb_rotation_lambda:
 if not args.skip_maintenance_windows_lambda:
     print(f"Building Maintenance Windows Lambda function package")
     subprocess.check_call(["./maintenance_windows_lambda/package.sh"])
+
+# Modify the CloudFormation templates so that pointers to external resources
+# (other CloudFormation templates, Lambda packages, etc.) point to the correct
+# package version.
+
+processed_extension = ".processed"
+
+def replace_package_version(filepath):
+    newfilepath = filepath + processed_extension
+    with open(filepath) as input_file:
+        with open(newfilepath, "w") as output_file:
+            for line in input_file:
+                line = line.replace("PACKAGE_VERSION", package_version)
+                output_file.write(line)
+    return newfilepath
+
+templates = [
+    "CloudFormation/arkcase.yml",
+    "CloudFormation/mariadb.yml"
+]
+
+processed_templates = [replace_package_version(i) for i in templates]
 
 # Push public files to public S3 buckets
 
@@ -61,10 +83,7 @@ regions = [
   "ap-northeast-2"
 ]
 
-public_files = [
-  "CloudFormation/arkcase.yml",
-  "CloudFormation/mariadb.yml"
-]
+public_files = processed_templates
 
 if not args.skip_mariadb_rotation_lambda:
     public_files.append("mariadb_rotation_lambda/mariadb_rotation_lambda.zip")
@@ -87,7 +106,13 @@ for f in public_files:
     for region in regions:
         # Get MD5 of S3 file
         bucket = "arkcase-public-" + region
-        key = "DevOps/" + ts + "/" + f
+        if f.endswith(processed_extension):
+            # Strip ".processed" extension when uploading
+            n = len(processed_extension)
+            key = "DevOps/" + package_version + "/" + f[:-n]
+        else:
+            key = "DevOps/" + package_version + "/" + f
+
         try:
             response = s3.head_object(Bucket=bucket, Key=key)
             # NB: The ETag is the MD5 checksum, except when the file has been
@@ -109,11 +134,11 @@ for f in public_files:
             print(f"Uploading file: {bucket}/{key}")
             s3.put_object(Bucket=bucket, Key=key, Body=data)
 
-    # Delete any created zip file
-    if f.endswith(".zip"):
+    # Delete temporary files
+    if f.endswith(".zip") or f.endswith(processed_extension):
         try:
             os.unlink(f)
         except Exception as e:
-            print(f"Failed to deleting dangling zip file [{f}]: {str(e)}; ignored")
+            print(f"Failed to delete temporary file [{f}]: {str(e)}; ignored")
 
-print(f"Files uploaded to: arkcase-public-REGION/DevOps/{ts}/")
+print(f"Files uploaded to: arkcase-public-REGION/DevOps/{package_version}/")
