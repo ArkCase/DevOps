@@ -443,7 +443,7 @@ Resources:
             ALTER ROUTINE, EVENT, TRIGGER
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/PACKAGE_VERSION/mariadb_rotation_lambda/mariadb_rotation_lambda.zip
+        S3Key: DevOps/ACM-DEV-20200422-1649/mariadb_rotation_lambda/mariadb_rotation_lambda.zip
       Tags:
         - Key: Env
           Value: !Ref Env
