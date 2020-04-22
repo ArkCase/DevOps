@@ -22,6 +22,9 @@ ap.add_argument("-m", "--skip-mariadb-rotation-lambda",
 ap.add_argument("-w", "--skip-maintenance-windows-lambda",
     default=False, action="store_true",
     help="Skip the Maintenance Windows Lambda function package")
+ap.add_argument("-k", "--keep-temporary",
+    default=False, action="store_true",
+    help="Don't delete temporary and intermediate files")
 args = ap.parse_args()
 
 if 'AWS_PROFILE' not in os.environ and not 'AWS_DEFAULT_REGION' in os.environ:
@@ -124,7 +127,7 @@ for f in public_files:
         except Exception as e:
             sum2 = ""
 
-        # Upload file only if it is different
+        # Upload file only if it had changed
         # NB: If we upload the file every time, S3 will create a new version,
         #     even if the file is exactly the same, and we will be billed for
         #     storing identical versions.
@@ -134,11 +137,12 @@ for f in public_files:
             print(f"Uploading file: {bucket}/{key}")
             s3.put_object(Bucket=bucket, Key=key, Body=data)
 
-    # Delete temporary files
-    if f.endswith(".zip") or f.endswith(processed_extension):
-        try:
-            os.unlink(f)
-        except Exception as e:
-            print(f"Failed to delete temporary file [{f}]: {str(e)}; ignored")
+    if not args.keep_temporary:
+        # Delete temporary files
+        if f.endswith(".zip") or f.endswith(processed_extension):
+            try:
+                os.unlink(f)
+            except Exception as e:
+                print(f"Failed to delete temporary file [{f}]: {str(e)}; ignored")
 
 print(f"Files uploaded to: arkcase-public-REGION/DevOps/{package_version}/")
