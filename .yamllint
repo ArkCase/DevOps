@@ -1,0 +1,77 @@
+yaml-files:
+  - "*.yml"
+  - "*.yaml"
+  - .yamllint
+
+rules:
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+    min-spaces-inside-empty: 0
+    max-spaces-inside-empty: 1
+    level: error
+  brackets:
+    min-spaces-inside: 1
+    max-spaces-inside: 1
+    min-spaces-inside-empty: 0
+    max-spaces-inside-empty: 1
+    level: error
+  colons:
+    max-spaces-before: 0
+    max-spaces-after: -1
+    level: error
+  commas:
+    max-spaces-before: 0
+    min-spaces-after: 1
+    max-spaces-after: -1
+    level: warning
+  comments:
+    require-starting-space: true
+    min-spaces-from-content: 2
+    level: error
+  comments-indentation:
+    level: warning
+  document-start: disable
+  empty-lines:
+    max: 2
+    max-start: 1
+    max-end: 1
+    level: warning
+  hyphens:
+    max-spaces-after: 1
+    level: error
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: true
+    level: error
+  key-duplicates:
+    level: warning
+  line-length:
+    max: 120
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true
+    level: warning
+  new-line-at-end-of-file:
+    level: error
+  new-lines:
+    type: unix
+    level: warning
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: false
+    level: warning
+  quoted-strings:
+    quote-type: any
+    required: only-when-needed
+    extra-allowed:
+      # Strings containing commas must be quoted when using the short
+      # dictionary form. In the following example, quotes are necessary,
+      # otherwise the comma is interpreted as separating another key/value
+      # pair: `dict: { key: "hello, world!" }`
+      - ^.*,.*$
+      # The CloudFormation YAML parser doesn't like strings containing colons
+      - ^.*:.*$
+    level: error
+  trailing-spaces:
+    level: error

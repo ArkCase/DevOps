@@ -10,7 +10,7 @@ Parameters:
     Type: String
     Description: Type of environment to provision
     Default: prod
-    AllowedValues: [staging, prod, dev, test, load-test]
+    AllowedValues: [ staging, prod, dev, test, load-test ]
 
   Project:
     Type: String
@@ -37,22 +37,22 @@ Parameters:
       of the week (eg: "Sun"); "HH" is the hour in 24h format; "MM" is the
       minutes. We strongly recommend you use Sunday early morning in your own
       time zone. The maintenance would typically take a couple of hours.
-    Default: "Sun:08:00"
-    AllowedPattern: "^[a-zA-Z]{3}:[0-2][0-9]:[0-5][0-9]$"
+    Default: Sun:08:00
+    AllowedPattern: ^[a-zA-Z]{3}:[0-2][0-9]:[0-5][0-9]$
     ConstraintDescription: Must be in the format "DDD:HH:MM"
 
   DsEdition:
     Type: String
     Description: Whether Directory Services is Enterprise or Standard
     Default: Standard
-    AllowedValues: [Enterprise, Standard]
+    AllowedValues: [ Enterprise, Standard ]
 
   DsName:
     Type: String
     Description: |
       The fully qualified domain name for the AWS Managed Microsoft AD directory, such as
-      corp.example.com. This name will resolve inside your VPC only. It does not need to be 
-      publicly resolvable. 
+      corp.example.com. This name will resolve inside your VPC only. It does not need to be
+      publicly resolvable.
     AllowedPattern: ^([a-zA-Z0-9]+[\\.-])+([a-zA-Z0-9])+$
     ConstraintDescription: Must be a valid fully qualified domain name.
     Default: ecmontap.com
@@ -68,7 +68,9 @@ Parameters:
     MinLength: 12
     MaxLength: 64
     AllowedPattern: (?=^.{12,64}$)((?=.*\d)(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[^A-Za-z0-9\s])(?=.*[a-z])|(?=.*[^A-Za-z0-9\s])(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[A-Z])(?=.*[^A-Za-z0-9\s]))^.*
-    ConstraintDescription: "12-64 characters; must have at least one character from three of these four categories: lowercase, uppercase, numeric and special characters"
+    ConstraintDescription: >
+      12-64 characters; must have at least one character from three of these
+      four categories: lowercase, uppercase, numeric and special characters
 
   RdsPasswordLength:
     Type: Number
@@ -108,7 +110,7 @@ Metadata:
           - VpcCidr
           - MaintenanceWindowStart
 
-      - Label: { default: "Definition (this and the following sections are less important)" }
+      - Label: { default: Definition (this and the following sections are less important) }
         Parameters:
           - Project
 
@@ -472,7 +474,7 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/20200421-1916/maintenance_windows_lambda/maintenance_windows_lambda.zip
+        S3Key: DevOps/20200422-0957/maintenance_windows_lambda/maintenance_windows_lambda.zip
       Tags:
         - Key: Env
           Value: !Ref Env
@@ -517,12 +519,12 @@ Resources:
     Properties:
       GroupDescription: Security group for Alfresco containers
       VpcId: !Ref Vpc
-      #SecurityGroupIngress:
-      #  - Description: Allow traffic from ArkCase containers
-      #    IpProtocol: tcp
-      #    FromPort: 443
-      #    ToPort: 443
-      #    SourceSecurityGroupId: !GetAtt ArkcaseSecurityGroup.GroupId
+      # SecurityGroupIngress:
+      #   - Description: Allow traffic from ArkCase containers
+      #     IpProtocol: tcp
+      #     FromPort: 443
+      #     ToPort: 443
+      #     SourceSecurityGroupId: !GetAtt ArkcaseSecurityGroup.GroupId
       Tags:
         - Key: Env
           Value: !Ref Env
@@ -538,7 +540,7 @@ Resources:
   AlfrescoDatabase:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/20200421-1916/CloudFormation/mariadb.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/20200422-0957/CloudFormation/mariadb.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -553,7 +555,8 @@ Resources:
         DiskSizeGB: !Ref AlfrescoRdsDiskSizeGB
         EnableMultiAZ: true
         BackupWindow: !Sub ${MaintenanceWindows.StartRdsBackup}-${MaintenanceWindows.EndRdsBackup}
-        MaintenanceWindow: !Sub ${MaintenanceWindows.StartAlfrescoRdsMaintenance}-${MaintenanceWindows.EndAlfrescoRdsMaintenance}
+        MaintenanceWindow:
+          !Sub ${MaintenanceWindows.StartAlfrescoRdsMaintenance}-${MaintenanceWindows.EndAlfrescoRdsMaintenance}
         AutoMinorUpgrade: true
         PasswordLength: !Ref RdsPasswordLength
         RotationInDays: !Ref RdsPasswordRotationInDays

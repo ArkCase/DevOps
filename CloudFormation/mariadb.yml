@@ -49,7 +49,7 @@ Parameters:
       The version of MariaDB to use. It must be a version supported by RDS. The
       versions supported by RDS can be found here:
       https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_MariaDB.html#MariaDB.Concepts.VersionMgmt
-    Default: "10.4.8"
+    Default: 10.4.8
     MinLength: 1
 
   DatabaseName:
@@ -87,8 +87,8 @@ Parameters:
       Daily backup window for MariaDB; must be in the
       format "HH:MM-HH:MM" and must be in UTC time; must not conflict
       with the maintenance window; must be at least 30 minutes
-    Default: "08:00-08:30"
-    AllowedPattern: "^[0-2][0-9]:[0-5][0-9]-[0-2][0-9]:[0-5][0-9]$"
+    Default: 08:00-08:30
+    AllowedPattern: ^[0-2][0-9]:[0-5][0-9]-[0-2][0-9]:[0-5][0-9]$
     ConstraintDescription: Must be in the format "HH:MM-HH:MM"
 
   MaintenanceWindow:
@@ -97,8 +97,8 @@ Parameters:
       Weekly maintenance window for MariaDB; must be in the
       format "DDD:HH:MM-DDD:HH:MM" and must be in UTC time; must not
       conflict with the backup window; must be at least 30 minutes
-    Default: "Sun:08:30-Sun:09:00"
-    AllowedPattern: "^[a-zA-Z]{3}:[0-2][0-9]:[0-5][0-9]-[a-zA-Z]{3}:[0-2][0-9]:[0-5][0-9]$"
+    Default: Sun:08:30-Sun:09:00
+    AllowedPattern: ^[a-zA-Z]{3}:[0-2][0-9]:[0-5][0-9]-[a-zA-Z]{3}:[0-2][0-9]:[0-5][0-9]$
     ConstraintDescription: Must be in the format "DDD:HH:MM-DDD:HH:MM"
 
   AutoMinorUpgrade:
@@ -238,7 +238,7 @@ Resources:
         SecretStringTemplate: '{"username": "admin"}'
         GenerateStringKey: password
         PasswordLength: 20
-        ExcludeCharacters: "/@\"'\\%"
+        ExcludeCharacters: "'/@\"\\%"
       Tags:
         - Key: Env
           Value: !Ref Env
@@ -259,7 +259,7 @@ Resources:
         SecretStringTemplate: !Sub '{"username": "user", "masterarn": "${MasterSecret}", "dbname": "${DatabaseName}"}'
         GenerateStringKey: password
         PasswordLength: 20
-        ExcludeCharacters: "/@\"'\\%"
+        ExcludeCharacters: "'/@\"\\%"
       Tags:
         - Key: Env
           Value: !Ref Env
@@ -340,7 +340,8 @@ Resources:
       Engine: mariadb
       EngineVersion: !Ref MariadbVersion
       DBName: !Ref DatabaseName
-      AutoMinorVersionUpgrade: !Ref AutoMinorUpgrade  # Ravi said on M$ Teams on 20200414 that it's OK to enable auto minor upgrade
+      # Ravi said on M$ Teams on 20200414 that it's OK to enable auto minor upgrade
+      AutoMinorVersionUpgrade: !Ref AutoMinorUpgrade
       StorageType: gp2
       StorageEncrypted: true
       AllocatedStorage: !Ref DiskSizeGB
