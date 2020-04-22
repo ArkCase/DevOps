@@ -5,6 +5,7 @@ import sys
 import datetime
 import os
 import subprocess
+import re
 import boto3
 import hashlib
 import binascii
@@ -16,29 +17,57 @@ this_dir = os.path.dirname(this_path)
 os.chdir(this_dir)
 
 ap = argparse.ArgumentParser(description="Push public files to ArkCase S3 public buckets")
-ap.add_argument("-m", "--skip-mariadb-rotation-lambda",
+ap.add_argument("TAG", default="dev",
+    help="Package tag (dev, prod, staging, etc.); letters and numbers only")
+ap.add_argument("-k", "--keep-temporary",
     default=False, action="store_true",
-    help="Skip the MariaDB Rotation Lambda function package")
-ap.add_argument("-w", "--skip-maintenance-windows-lambda",
-    default=False, action="store_true",
-    help="Skip the Maintenance Windows Lambda function package")
+    help="Don't delete temporary and intermediate files")
 args = ap.parse_args()
 
 if 'AWS_PROFILE' not in os.environ and not 'AWS_DEFAULT_REGION' in os.environ:
     print(f"ERROR: You must set either the `AWS_PROFILE` or the `AWS_DEFAULT_REGION` environment variable")
     sys.exit(1)
 
-ts = datetime.datetime.now().strftime("%Y%m%d-%H%M")
+tag = args.TAG
+regex = re.compile("^[0-9a-zA-Z]+$")
+if not regex.match(tag):
+    print(f"ERROR: Invalid tag: '{tag}'; must be alphanumeric only")
+    sys.exit(1)
 
-# Build packages as necessary
+package_version = "ACM-" + tag + "-" + datetime.datetime.utcnow().strftime("%Y%m%d-%H%M")
 
-if not args.skip_mariadb_rotation_lambda:
-    print(f"Building MariaDB rotation Lambda function package")
-    subprocess.check_call(["./mariadb_rotation_lambda/package.sh"])
+# Build Lambda packages
 
-if not args.skip_maintenance_windows_lambda:
-    print(f"Building Maintenance Windows Lambda function package")
-    subprocess.check_call(["./maintenance_windows_lambda/package.sh"])
+print(f"Building MariaDB rotation Lambda function package")
+subprocess.check_call(["./mariadb_rotation_lambda/package.sh"])
+
+print(f"Building Maintenance Windows Lambda function package")
+subprocess.check_call(["./maintenance_windows_lambda/package.sh"])
+
+# Modify the CloudFormation templates so that references to external resources
+# (other CloudFormation templates, Lambda packages, etc.) point to the correct
+# package version.
+
+regex = re.compile(r"ACM-[0-9a-zA-Z]*-[0-9]{8}-[0-9]{4}")
+
+def replace_package_version(filepath):
+    tmpfilepath = filepath + ".tmp"
+    with open(filepath) as input_file:
+        with open(tmpfilepath, "w") as output_file:
+            for line in input_file:
+                line = regex.sub(package_version, line)
+                output_file.write(line)
+    os.rename(filepath, filepath + ".original")
+    os.rename(tmpfilepath, filepath)
+    os.unlink(filepath + ".original")
+
+templates = [
+    "CloudFormation/arkcase.yml",
+    "CloudFormation/mariadb.yml"
+]
+
+for i in templates:
+    replace_package_version(i)
 
 # Push public files to public S3 buckets
 
@@ -61,16 +90,11 @@ regions = [
   "ap-northeast-2"
 ]
 
-public_files = [
-  "CloudFormation/arkcase.yml",
-  "CloudFormation/mariadb.yml"
+public_files = templates
+public_files += [
+    "mariadb_rotation_lambda/mariadb_rotation_lambda.zip",
+    "maintenance_windows_lambda/maintenance_windows_lambda.zip"
 ]
-
-if not args.skip_mariadb_rotation_lambda:
-    public_files.append("mariadb_rotation_lambda/mariadb_rotation_lambda.zip")
-
-if not args.skip_maintenance_windows_lambda:
-    public_files.append("maintenance_windows_lambda/maintenance_windows_lambda.zip")
 
 s3 = boto3.client("s3")
 
@@ -87,7 +111,8 @@ for f in public_files:
     for region in regions:
         # Get MD5 of S3 file
         bucket = "arkcase-public-" + region
-        key = "DevOps/" + ts + "/" + f
+        key = "DevOps/" + package_version + "/" + f
+
         try:
             response = s3.head_object(Bucket=bucket, Key=key)
             # NB: The ETag is the MD5 checksum, except when the file has been
@@ -99,7 +124,7 @@ for f in public_files:
         except Exception as e:
             sum2 = ""
 
-        # Upload file only if it is different
+        # Upload file only if it had changed
         # NB: If we upload the file every time, S3 will create a new version,
         #     even if the file is exactly the same, and we will be billed for
         #     storing identical versions.
@@ -109,11 +134,12 @@ for f in public_files:
             print(f"Uploading file: {bucket}/{key}")
             s3.put_object(Bucket=bucket, Key=key, Body=data)
 
-    # Delete any created zip file
-    if f.endswith(".zip"):
-        try:
-            os.unlink(f)
-        except Exception as e:
-            print(f"Failed to deleting dangling zip file [{f}]: {str(e)}; ignored")
+    if not args.keep_temporary:
+        # Delete temporary files
+        if f.endswith(".zip"):
+            try:
+                os.unlink(f)
+            except Exception as e:
+                print(f"Failed to delete temporary file [{f}]: {str(e)}; ignored")
 
-print(f"Files uploaded to: arkcase-public-REGION/DevOps/{ts}/")
+print(f"Files uploaded to: arkcase-public-REGION/DevOps/{package_version}/")
