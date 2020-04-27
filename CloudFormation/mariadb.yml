@@ -37,12 +37,6 @@ Parameters:
     Type: List<AWS::EC2::Subnet::Id>
     Description: IDs of the subnets where the RDS instance should be placed
 
-  AllowedSecurityGroupId:
-    Type: AWS::EC2::SecurityGroup::Id
-    Description: >
-      ID of the security group allowed to access the MariaDB instance;
-      typically, your application would run inside that security group
-
   MariadbVersion:
     Type: String
     Description: >
@@ -101,25 +95,12 @@ Parameters:
     AllowedPattern: ^[a-zA-Z]{3}:[0-2][0-9]:[0-5][0-9]-[a-zA-Z]{3}:[0-2][0-9]:[0-5][0-9]$
     ConstraintDescription: Must be in the format "DDD:HH:MM-DDD:HH:MM"
 
-  AutoMinorUpgrade:
-    Type: String
-    Description: Automatically upgrade MariaDB minor versions
-    Default: true
-    AllowedValues: [ true, false ]
-
   PasswordLength:
     Type: Number
     Description: How long database passwords should be
     Default: 20
     MinValue: 8
     MaxValue: 80
-
-  RotationInDays:
-    Type: Number
-    Description: How often to rotate database passwords, in days
-    Default: 30
-    MinValue: 1
-    MaxValue: 1000
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -133,7 +114,6 @@ Metadata:
         Parameters:
           - VpcId
           - SubnetIds
-          - AllowedSecurityGroupId
 
       - Label: { default: Database configuration }
         Parameters:
@@ -144,18 +124,12 @@ Metadata:
           - EnableMultiAZ
           - BackupWindow
           - MaintenanceWindow
-          - AutoMinorUpgrade
-
-      - Label: { default: Secret management }
-        Parameters:
           - PasswordLength
-          - RotationInDays
 
     ParameterLabels:
       Env: { default: Environment }
       VpcId: { default: VPC ID }
       SubnetIds: { default: Subnet IDs }
-      AllowedSecurityGroupId: { default: Allowed security group ID }
       MariadbVersion: { default: MariaDB version }
       DatabaseName: { default: Database name }
       InstanceClass: { default: MariaDB instance class }
@@ -164,7 +138,6 @@ Metadata:
       BackupWindow: { default: MariaDB backup window }
       MaintenanceWindow: { default: MariaDB maintenance window }
       PasswordLength: { default: Password length }
-      RotationInDays: { default: "Password rotation, in days" }
 
 Rules:
   SubnetsInVpc:
@@ -198,6 +171,23 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
+  AllowedSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group that can access the MariaDB RDS instance
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
   DbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -213,7 +203,7 @@ Resources:
           IpProtocol: tcp
           FromPort: 3306
           ToPort: 3306
-          SourceSecurityGroupId: !Ref AllowedSecurityGroupId
+          SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
       Tags:
         - Key: Env
           Value: !Ref Env
@@ -283,7 +273,9 @@ Resources:
       SecretId: !Ref UserSecret
       RotationLambdaARN: !GetAtt RotationLambda.Arn
       RotationRules:
-        AutomaticallyAfterDays: !Ref RotationInDays
+        # NB: Password rotation will be triggered by a CloudWatch event during
+        #     the weekly maintenance.
+        AutomaticallyAfterDays: 1000
 
   MasterSecretPolicy:
     Type: AWS::SecretsManager::ResourcePolicy
@@ -341,7 +333,7 @@ Resources:
       EngineVersion: !Ref MariadbVersion
       DBName: !Ref DatabaseName
       # Ravi said on M$ Teams on 20200414 that it's OK to enable auto minor upgrade
-      AutoMinorVersionUpgrade: !Ref AutoMinorUpgrade
+      AutoMinorVersionUpgrade: true
       StorageType: gp2
       StorageEncrypted: true
       AllocatedStorage: !Ref DiskSizeGB
@@ -443,7 +435,7 @@ Resources:
             ALTER ROUTINE, EVENT, TRIGGER
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200427-1325/mariadb_rotation_lambda/mariadb_rotation_lambda.zip
+        S3Key: DevOps/ACM-TMP-20200427-1730/mariadb_rotation_lambda/mariadb_rotation_lambda.zip
       Tags:
         - Key: Env
           Value: !Ref Env
@@ -475,3 +467,8 @@ Outputs:
   RdsPort:
     Description: RDS instance port number
     Value: !GetAtt RdsInstance.Endpoint.Port
+
+  AllowedSecurityGroupId:
+    Description: >
+      ID of the security group allowed to connect to the MariaDB instance
+    Value: !GetAtt AllowedSecurityGroup.GroupId

@@ -98,19 +98,13 @@ Parameters:
     Default: false
     AllowedValues: [ true, false ]
 
-  RdsPasswordLength:
+  PasswordsLength:
     Type: Number
-    Description: How long database passwords should be
+    Description: >
+      How long passwords should be for various AWS services
     Default: 20
-    MinValue: 8
+    MinValue: 12
     MaxValue: 80
-
-  RdsPasswordRotationInDays:
-    Type: Number
-    Description: How often to rotate database passwords, in days
-    Default: 30
-    MinValue: 1
-    MaxValue: 1000
 
   AlfrescoRdsInstanceClass:
     Type: String
@@ -140,10 +134,9 @@ Metadata:
         Parameters:
           - Project
 
-      - Label: { default: General database configuration }
+      - Label: { default: General security }
         Parameters:
-          - RdsPasswordLength
-          - RdsPasswordRotationInDays
+          - PasswordsLength
 
       - Label: { default: Alfresco configuration }
         Parameters:
@@ -172,8 +165,7 @@ Metadata:
       AmazonmqInstanceType: { default: AmazonMQ instance type }
       ActivemqVersion: { default: ActiveMQ version }
       AmazonmqEnableAuditLogs: { default: Enable AmazonMQ audit logs }
-      RdsPasswordLength: { default: RDS password length }
-      RdsPasswordRotationInDays: { default: "RDS password rotation, in days" }
+      PasswordsLength: { default: Passwords length }
       AlfrescoRdsInstanceClass: { default: Alfresco RDS instance class }
       AlfrescoRdsDiskSizeGB: { default: "Alfresco RDS disk size, in GB" }
 
@@ -509,7 +501,7 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200427-1325/maintenance_windows_lambda/maintenance_windows_lambda.zip
+        S3Key: DevOps/ACM-TMP-20200427-1730/maintenance_windows_lambda/maintenance_windows_lambda.zip
       Tags:
         - Key: Env
           Value: !Ref Env
@@ -552,7 +544,7 @@ Resources:
   Amazonmq:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200427-1325/CloudFormation/amazonmq.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200427-1730/CloudFormation/amazonmq.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -561,7 +553,7 @@ Resources:
         SubnetIdA: !Ref PrivateSubnetA
         SubnetIdB: !Ref PrivateSubnetB
         InstanceType: !Ref AmazonmqInstanceType
-        PasswordLength: !Ref RdsPasswordLength
+        PasswordLength: !Ref PasswordsLength
         ActivemqVersion: !Ref ActivemqVersion
         MaintenanceDayOfWeek: !GetAtt MaintenanceWindows.StartAmazonmqMaintenanceDayOfWeek
         MaintenanceTimeOfDay: !GetAtt MaintenanceWindows.StartAmazonmqMaintenanceTimeOfDay
@@ -608,7 +600,7 @@ Resources:
   AlfrescoDatabase:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200427-1325/CloudFormation/mariadb.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200427-1730/CloudFormation/mariadb.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -617,7 +609,6 @@ Resources:
         # NB: We can't use lists when creating a nested stack, we have to
         #     expand it into a comma-separated list.
         SubnetIds: !Join [ ",", [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ] ]
-        AllowedSecurityGroupId: !GetAtt AlfrescoSecurityGroup.GroupId
         DatabaseName: alfresco
         InstanceClass: !Ref AlfrescoRdsInstanceClass
         DiskSizeGB: !Ref AlfrescoRdsDiskSizeGB
@@ -625,9 +616,7 @@ Resources:
         BackupWindow: !Sub ${MaintenanceWindows.StartRdsBackup}-${MaintenanceWindows.EndRdsBackup}
         MaintenanceWindow:
           !Sub ${MaintenanceWindows.StartAlfrescoRdsMaintenance}-${MaintenanceWindows.EndAlfrescoRdsMaintenance}
-        AutoMinorUpgrade: true
-        PasswordLength: !Ref RdsPasswordLength
-        RotationInDays: !Ref RdsPasswordRotationInDays
+        PasswordLength: !Ref PasswordsLength
       Tags:
         - Key: Env
           Value: !Ref Env
