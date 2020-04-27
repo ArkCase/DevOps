@@ -17,8 +17,11 @@ Parameters:
     Description: Name of the project (or product)
     Default: arkcase
     MinLength: 1
-    MaxLength: 50
-    AllowedPattern: ^[-a-zA-Z0-9_.]*$
+    MaxLength: 30
+    AllowedPattern: ^[-_.a-zA-Z0-9]*$
+    ConstraintDescription: >
+      Up to 30 alpha-numeric characters; can use underscores,
+      dots and dashes
 
   VpcCidr:
     Type: String
@@ -71,6 +74,29 @@ Parameters:
     ConstraintDescription: >
       12-64 characters; must have at least one character from three of these
       four categories: lowercase, uppercase, numeric and special characters
+
+  AmazonmqInstanceType:
+    Type: String
+    Description: The instance type to use for the AmazonMQ broker
+    Default: mq.m5.large
+    AllowedValues:
+      - mq.t2.micro
+      - mq.m5.large
+      - mq.m5.xlarge
+      - mq.m5.2xlarge
+      - mq.m5.4xlarge
+
+  ActivemqVersion:
+    Type: String
+    Description: ActiveMQ version to use
+    Default: 5.15.10
+    AllowedValues: [ 5.15.10, 5.15.9, 5.15.8, 5.15.6, 5.15.0 ]
+
+  AmazonmqEnableAuditLogs:
+    Type: String
+    Description: Whether to enable audit logs for the AmazonMQ broker
+    Default: false
+    AllowedValues: [ true, false ]
 
   RdsPasswordLength:
     Type: Number
@@ -130,6 +156,12 @@ Metadata:
           - DsName
           - DsPassword
 
+      - Label: { default: Amazon MQ }
+        Parameters:
+          - AmazonmqInstanceType
+          - ActivemqVersion
+          - AmazonmqEnableAuditLogs
+
     ParameterLabels:
       Env: { default: Environment }
       VpcCidr: { default: VPC CIDR block }
@@ -137,6 +169,9 @@ Metadata:
       DsEdition: { default: Directory Services Edition }
       DsName: { default: Domain Name }
       DsPassword: { default: Admin User Password }
+      AmazonmqInstanceType: { default: AmazonMQ instance type }
+      ActivemqVersion: { default: ActiveMQ version }
+      AmazonmqEnableAuditLogs: { default: Enable AmazonMQ audit logs }
       RdsPasswordLength: { default: RDS password length }
       RdsPasswordRotationInDays: { default: "RDS password rotation, in days" }
       AlfrescoRdsInstanceClass: { default: Alfresco RDS instance class }
@@ -474,7 +509,7 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-DEV-20200422-1649/maintenance_windows_lambda/maintenance_windows_lambda.zip
+        S3Key: DevOps/ACM-TMP-20200427-1325/maintenance_windows_lambda/maintenance_windows_lambda.zip
       Tags:
         - Key: Env
           Value: !Ref Env
@@ -511,6 +546,39 @@ Resources:
       # AWS::DirectoryService::MicrosoftAD doesn't support Tags :-(
 
   ############
+  # AmazonMQ #
+  ############
+
+  Amazonmq:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200427-1325/CloudFormation/amazonmq.yml
+      TimeoutInMinutes: 30
+      Parameters:
+        Env: !Ref Env
+        Project: !Ref Project
+        VpcId: !Ref Vpc
+        SubnetIdA: !Ref PrivateSubnetA
+        SubnetIdB: !Ref PrivateSubnetB
+        InstanceType: !Ref AmazonmqInstanceType
+        PasswordLength: !Ref RdsPasswordLength
+        ActivemqVersion: !Ref ActivemqVersion
+        MaintenanceDayOfWeek: !GetAtt MaintenanceWindows.StartAmazonmqMaintenanceDayOfWeek
+        MaintenanceTimeOfDay: !GetAtt MaintenanceWindows.StartAmazonmqMaintenanceTimeOfDay
+        EnableAuditLogs: !Ref AmazonmqEnableAuditLogs
+      Tags:
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: alfresco
+        - Key: Component
+          Value: cfn
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ############
   # Alfresco #
   ############
 
@@ -540,7 +608,7 @@ Resources:
   AlfrescoDatabase:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-DEV-20200422-1649/CloudFormation/mariadb.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200427-1325/CloudFormation/mariadb.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
