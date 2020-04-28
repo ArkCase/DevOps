@@ -22,6 +22,9 @@ ap.add_argument("TAG", default="dev",
 ap.add_argument("-k", "--keep-temporary",
     default=False, action="store_true",
     help="Don't delete temporary and intermediate files")
+ap.add_argument("-r", "--region",
+    default=[], action="append",
+    help="Publish to the given region(s) instead of the default ones; can be specified multiple times")
 args = ap.parse_args()
 
 if 'AWS_PROFILE' not in os.environ and not 'AWS_DEFAULT_REGION' in os.environ:
@@ -40,6 +43,7 @@ package_version = "ACM-" + tag + "-" + datetime.datetime.utcnow().strftime("%Y%m
 
 lambda_functions = [
   "mariadb_rotation_lambda",
+  "mariadb_master_rotation_lambda",
   "amazonmq_rotation_lambda",
   "maintenance_windows_lambda",
 ]
@@ -76,7 +80,7 @@ for i in templates:
 
 # Push public files to public S3 buckets
 
-regions = [
+default_regions = [
   "us-east-1",
   "us-east-2",
   "us-west-1",
@@ -95,12 +99,12 @@ regions = [
   "ap-northeast-2"
 ]
 
+regions = args.region if args.region else default_regions
+
 public_files = templates
-public_files += [
-    "mariadb_rotation_lambda/mariadb_rotation_lambda.zip",
-    "amazonmq_rotation_lambda/amazonmq_rotation_lambda.zip",
-    "maintenance_windows_lambda/maintenance_windows_lambda.zip",
-]
+for i in lambda_functions:
+    path = f"{i}/{i}.zip"
+    public_files.append(path)
 
 s3 = boto3.client("s3")
 

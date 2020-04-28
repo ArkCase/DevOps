@@ -2,7 +2,9 @@
 
 # Required environment variables:
 #   - PASSWORD_LENGTH
-#   - GRANTS
+#
+# This Lambda function assumes that the admin user (whose credentials are
+# stored in the master secret) has been created by CloudFormation.
 
 import boto3
 import botocore
@@ -62,7 +64,6 @@ def create_secret(client, arn, version_id):
 
     # Use the current secret as a template to create the new secret
     secret = get_secret(client, arn, "AWSCURRENT")
-    secret['username'] = alternate_username(secret['username'])
     random_password = client.get_random_password(
             PasswordLength=int(os.environ['PASSWORD_LENGTH']),
             ExcludeCharacters="/@\"'\\%")
@@ -77,22 +78,19 @@ def create_secret(client, arn, version_id):
 
 def set_secret(client, arn, version_id):
     # Check whether this step has been done already
-    pending_secret = get_secret(client, arn, "AWSPENDING", version_id)
-    cnx = get_cnx(pending_secret)
+    secret = get_secret(client, arn, "AWSPENDING", version_id)
+    cnx = get_cnx(secret)
     if cnx:
         cnx.close()
         print(f"set_secret: The AWSPENDING stage of secret '{arn}' has already been applied to the database; nothing to do")
         return
 
-    # Connect to the database using the master credentials
-    master_arn = pending_secret['masterarn']
-    master_secret = get_secret(client, master_arn, "AWSCURRENT", is_master=True)
-    print(f"set_secret: Successfully retrieved master secret '{master_arn}'")
-    master_secret['host'] = pending_secret['host']
-    cnx = get_cnx(master_secret)
+    # Connect to the database using the current credentials
+    current_secret = get_secret(client, arn, "AWSCURRENT")
+    cnx = get_cnx(current_secret)
     if not cnx:
-        raise ValueError(f"Failed to connect to database using master secret")
-    print(f"set_secret: Successfully connected to the database using the master secret")
+        raise ValueError(f"Failed to connect to database using the current secret")
+    print(f"set_secret: Successfully connected to the database using the current secret")
 
     # Update/create database user with the new (i.e. AWSPENDING) secret
     # NB: RDS, by default, allows unsecure connections to MariaDB instances.
@@ -100,14 +98,12 @@ def set_secret(client, arn, version_id):
     #     non-SSL connections for that user (it is unfortunately not possible
     #     with RDS to have a global option requiring SSL for all
     #     connections...)
-    grants = os.environ['GRANTS'].replace("\n", " ")
-    dbname = pending_secret['dbname']
-    username = pending_secret['username']
-    password = pending_secret['password']
-    sql = f"GRANT {grants} ON {dbname}.* TO '{username}' IDENTIFIED BY '{password}' REQUIRE SSL;"
-    print(f"set_secret: Executing SQL to grant privileges, modify password and enforce SSL for user '{username}'")
+    username = secret['username']
+    password = secret['password']
+    print(f"set_secret: Executing SQL to modify password and enforce SSL for user '{username}'")
+    sql = f"ALTER USER '{username}'@'%' IDENTIFIED BY '{password}' REQUIRE SSL;"
     cnx.cursor().execute(sql)
-    print(f"set_secret: Successfully set username '{username}' and password in database for secret '{arn}'")
+    print(f"set_secret: Successfully changed password for user '{username}', secret '{arn}'")
     cnx.close()
 
 
@@ -143,7 +139,7 @@ class SecretValueNotFoundError(ValueError):
     pass
 
 
-def get_secret(client, arn, stage, version_id=None, is_master=False):
+def get_secret(client, arn, stage, version_id=None):
     # Get the secret
     #
     # NB: We can use the `version_id` if specified. Contrary to what the boto3
@@ -168,33 +164,13 @@ def get_secret(client, arn, stage, version_id=None, is_master=False):
     secret = json.loads(response['SecretString'])
 
     # Sanity checks
-    if is_master:
-        for field in ['username', 'password']:
-            if field not in secret:
-                raise KeyError(f"Invalid master secret '{arn}': field '{field}' must be present")
-    else:
-        for field in ['engine', 'host', 'username', 'password', 'dbname', 'masterarn']:
-            if field not in secret:
-                raise KeyError(f"Invalid secret '{arn}': field '{field}' must be present")
-        if secret['engine'] != "mariadb":
-            raise KeyError(f"Secret '{arn}' engine must be 'mariadb', not '{secrets['engine']}'")
+    for field in ['engine', 'host', 'username', 'password']:
+        if field not in secret:
+            raise KeyError(f"Invalid secret '{arn}': field '{field}' must be present")
+    if secret['engine'] != "mariadb":
+        raise KeyError(f"Secret '{arn}' engine must be 'mariadb', not '{secrets['engine']}'")
 
     return secret
-
-
-def alternate_username(username):
-    # Alternate between USERNAME1 and USERNAME2
-    n = len(username)
-    if n == 0 or username[n-1] not in "0123456789":
-        username = username + "1"
-        n = len(username)
-    if n > 80:
-        raise ValueError(f"User name is too long (> 80 characters): '{username}'")
-    if username[n-1] == "1":
-        username = username[:n-1] + "2"
-    else:
-        username = username[:n-1] + "1"
-    return username
 
 
 def get_cnx(secret):

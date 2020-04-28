@@ -246,7 +246,7 @@ Resources:
     Properties:
       Description: User credentials to connect to the database
       GenerateSecretString:
-        SecretStringTemplate: !Sub '{"username": "user", "masterarn": "${MasterSecret}", "dbname": "${DatabaseName}"}'
+        SecretStringTemplate: !Sub '{"username": "user", "masterarn": "${MasterSecret}"}'
         GenerateStringKey: password
         PasswordLength: 20
         ExcludeCharacters: "'/@\"\\%"
@@ -262,21 +262,6 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  UserSecretRotationSchedule:
-    Type: AWS::SecretsManager::RotationSchedule
-    # NB: When creating this resource, SecretsManager will initate a secret
-    #     rotation. So it's better to ensure everything is in place beforehand.
-    #     SecretsManager will perform retries otherwise, but it's cleaner this
-    #     way.
-    DependsOn: [ UserSecretAttachment, LambdaInvokePermission ]
-    Properties:
-      SecretId: !Ref UserSecret
-      RotationLambdaARN: !GetAtt RotationLambda.Arn
-      RotationRules:
-        # NB: Password rotation will be triggered by a CloudWatch event during
-        #     the weekly maintenance.
-        AutomaticallyAfterDays: 1000
-
   MasterSecretPolicy:
     Type: AWS::SecretsManager::ResourcePolicy
     Properties:
@@ -290,6 +275,21 @@ Resources:
             Action: secretsmanager:DeleteSecret
             Resource: "*"
 
+  MasterSecretRotationSchedule:
+    Type: AWS::SecretsManager::RotationSchedule
+    # NB: When creating this resource, SecretsManager will initate a secret
+    #     rotation. So it's better to ensure everything is in place beforehand.
+    #     SecretsManager will perform retries otherwise, but it's cleaner this
+    #     way.
+    DependsOn: [ MasterSecretAttachment, MasterRotationLambdaInvokePermission ]
+    Properties:
+      SecretId: !Ref MasterSecret
+      RotationLambdaARN: !GetAtt MasterRotationLambda.Arn
+      RotationRules:
+        # NB: Password rotation will be triggered by a CloudWatch event during
+        #     the weekly maintenance.
+        AutomaticallyAfterDays: 1000
+
   UserSecretPolicy:
     Type: AWS::SecretsManager::ResourcePolicy
     Properties:
@@ -302,6 +302,21 @@ Resources:
               AWS: !Ref AWS::AccountId
             Action: secretsmanager:DeleteSecret
             Resource: "*"
+
+  UserSecretRotationSchedule:
+    Type: AWS::SecretsManager::RotationSchedule
+    # NB: When creating this resource, SecretsManager will initate a secret
+    #     rotation. So it's better to ensure everything is in place beforehand.
+    #     SecretsManager will perform retries otherwise, but it's cleaner this
+    #     way.
+    DependsOn: [ UserSecretAttachment, UserLambdaInvokePermission ]
+    Properties:
+      SecretId: !Ref UserSecret
+      RotationLambdaARN: !GetAtt UserRotationLambda.Arn
+      RotationRules:
+        # NB: Password rotation will be triggered by a CloudWatch event during
+        #     the weekly maintenance.
+        AutomaticallyAfterDays: 1000
 
   #######
   # RDS #
@@ -359,6 +374,13 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
+  MasterSecretAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref MasterSecret
+      TargetType: AWS::RDS::DBInstance
+      TargetId: !Ref RdsInstance
+
   UserSecretAttachment:
     Type: AWS::SecretsManager::SecretTargetAttachment
     Properties:
@@ -366,11 +388,91 @@ Resources:
       TargetType: AWS::RDS::DBInstance
       TargetId: !Ref RdsInstance
 
-  ###################
-  # Rotation Lambda #
-  ###################
+  ##########################
+  # Master Rotation Lambda #
+  ##########################
 
-  RotationLambdaExecutionRole:
+  MasterRotationLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: SecretsManagerRotationPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:DescribeSecret
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:PutSecretValue
+                  - secretsmanager:UpdateSecretVersionStage
+                Resource: !Ref MasterSecret
+              - Effect: Allow
+                Action: secretsmanager:GetRandomPassword
+                Resource: "*"
+      Tags:
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  MasterRotationLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Rotate MariaDB master password
+      Runtime: python3.7
+      Role: !GetAtt MasterRotationLambdaExecutionRole.Arn
+      Handler: mariadb_master_rotation_lambda.handler
+      Timeout: 30
+      VpcConfig:
+        SecurityGroupIds: [ !GetAtt RotationLambdaSecurityGroup.GroupId ]
+        SubnetIds: !Ref SubnetIds
+      Environment:
+        Variables:
+          PASSWORD_LENGTH: !Ref PasswordLength
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20200428-1418/mariadb_master_rotation_lambda/mariadb_master_rotation_lambda.zip
+      Tags:
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  MasterRotationLambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref MasterRotationLambda
+      Action: lambda:InvokeFunction
+      Principal: secretsmanager.amazonaws.com
+
+  ########################
+  # User Rotation Lambda #
+  ########################
+
+  UserRotationLambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -414,12 +516,12 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  RotationLambda:
+  UserRotationLambda:
     Type: AWS::Lambda::Function
     Properties:
-      Description: Rotate MariaDB password
+      Description: Rotate MariaDB user password
       Runtime: python3.7
-      Role: !GetAtt RotationLambdaExecutionRole.Arn
+      Role: !GetAtt UserRotationLambdaExecutionRole.Arn
       Handler: mariadb_rotation_lambda.handler
       Timeout: 30
       VpcConfig:
@@ -435,7 +537,7 @@ Resources:
             ALTER ROUTINE, EVENT, TRIGGER
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200428-0734/mariadb_rotation_lambda/mariadb_rotation_lambda.zip
+        S3Key: DevOps/ACM-TMP-20200428-1418/mariadb_rotation_lambda/mariadb_rotation_lambda.zip
       Tags:
         - Key: Env
           Value: !Ref Env
@@ -448,10 +550,10 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  LambdaInvokePermission:
+  UserLambdaInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: !Ref RotationLambda
+      FunctionName: !Ref UserRotationLambda
       Action: lambda:InvokeFunction
       Principal: secretsmanager.amazonaws.com
 
