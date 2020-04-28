@@ -501,7 +501,7 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200427-1730/maintenance_windows_lambda/maintenance_windows_lambda.zip
+        S3Key: DevOps/ACM-TMP-20200428-0734/maintenance_windows_lambda/maintenance_windows_lambda.zip
       Tags:
         - Key: Env
           Value: !Ref Env
@@ -544,7 +544,7 @@ Resources:
   Amazonmq:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200427-1730/CloudFormation/amazonmq.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200428-0734/CloudFormation/amazonmq.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -600,7 +600,7 @@ Resources:
   AlfrescoDatabase:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200427-1730/CloudFormation/mariadb.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200428-0734/CloudFormation/mariadb.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env

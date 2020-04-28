@@ -427,7 +427,7 @@ Resources:
         SubnetIds: !Ref SubnetIds
       Environment:
         Variables:
-          SECRETS_MANAGER_ENDPOINT: !Sub https://secretsmanager.${AWS::Region}.amazonaws.com
+          PASSWORD_LENGTH: !Ref PasswordLength
           GRANTS: >
             SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES,
             INDEX, ALTER, CREATE TEMPORARY TABLES, LOCK TABLES,
@@ -435,7 +435,7 @@ Resources:
             ALTER ROUTINE, EVENT, TRIGGER
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200427-1730/mariadb_rotation_lambda/mariadb_rotation_lambda.zip
+        S3Key: DevOps/ACM-TMP-20200428-0734/mariadb_rotation_lambda/mariadb_rotation_lambda.zip
       Tags:
         - Key: Env
           Value: !Ref Env

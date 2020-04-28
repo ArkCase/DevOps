@@ -151,20 +151,20 @@ def get_secret(client, arn, stage, version_id=None):
         try:
             response = client.get_secret_value(SecretId=arn, VersionStage=stage, VersionId=version_id)
         except client.exceptions.InvalidRequestException:
-            raise SecretValueNotFoundError(f"get_secret: Combination (stage '{stage}' & version '{version_id}') doesn't exist for secret '{arn}'")
+            raise SecretValueNotFoundError(f"Combination (stage '{stage}' & version '{version_id}') doesn't exist for secret '{arn}'")
         except client.exceptions.ResourceNotFoundException:
-            raise SecretValueNotFoundError(f"get_secret: No secret value for stage '{stage}' and version '{version_id}' for secret '{arn}'")
+            raise SecretValueNotFoundError(f"No secret value for stage '{stage}' and version '{version_id}' for secret '{arn}'")
     else:
         try:
             response = client.get_secret_value(SecretId=arn, VersionStage=stage)
         except client.exceptions.ResourceNotFoundException:
-            raise SecretValueNotFoundError(f"get_secret: No secret value for stage '{stage}' for secret '{arn}'")
+            raise SecretValueNotFoundError(f"No secret value for stage '{stage}' for secret '{arn}'")
     secret = json.loads(response['SecretString'])
 
     # Sanity checks
     for field in ['username', 'password']:
         if field not in secret:
-            raise KeyError(f"get_secret: Invalid secret '{arn}': field '{field}' must be present")
+            raise KeyError(f"Invalid secret '{arn}': field '{field}' must be present")
 
     return secret
 
