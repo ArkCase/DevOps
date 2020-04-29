@@ -7,8 +7,6 @@ import os
 import subprocess
 import re
 import boto3
-import hashlib
-import binascii
 
 # Preliminaries
 
@@ -112,37 +110,11 @@ for f in public_files:
     # Read file content
     data = open(f, "rb").read()
 
-    # Compute MD5 of local file
-    md5 = hashlib.md5()
-    md5.update(data)
-    binsum = md5.digest()
-    sum1 = binascii.hexlify(binsum).decode("ascii")
-
     for region in regions:
-        # Get MD5 of S3 file
         bucket = "arkcase-public-" + region
         key = "DevOps/" + package_version + "/" + f
-
-        try:
-            response = s3.head_object(Bucket=bucket, Key=key)
-            # NB: The ETag is the MD5 checksum, except when the file has been
-            #     uploaded in multi-parts, which we don't do in this script.
-            #     Worst case scenario is that the file gets uploaded again,
-            #     anyway... Also, strangely, the ETag comes surrounded by
-            #     double quotes, so we have to get rid of those first.
-            sum2 = response['ETag'].strip('"')
-        except Exception as e:
-            sum2 = ""
-
-        # Upload file only if it had changed
-        # NB: If we upload the file every time, S3 will create a new version,
-        #     even if the file is exactly the same, and we will be billed for
-        #     storing identical versions.
-        if sum1 == sum2:
-            print(f"Same MD5 checksum, not uploading: {bucket}/{key}")
-        else:
-            print(f"Uploading file: {bucket}/{key}")
-            s3.put_object(Bucket=bucket, Key=key, Body=data)
+        print(f"Uploading file: {bucket}/{key}")
+        s3.put_object(Bucket=bucket, Key=key, Body=data)
 
     if not args.keep_temporary:
         # Delete temporary files
@@ -150,6 +122,6 @@ for f in public_files:
             try:
                 os.unlink(f)
             except Exception as e:
-                print(f"Failed to delete temporary file [{f}]: {str(e)}; ignored")
+                print(f"Failed to delete temporary file '{f}': {str(e)}; ignored")
 
 print(f"Files uploaded to: arkcase-public-REGION/DevOps/{package_version}/")
