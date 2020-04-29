@@ -318,7 +318,7 @@ Resources:
       Description: Rotate AmazonMQ secrets
       Runtime: python3.7
       Role: !GetAtt RotationLambdaExecutionRole.Arn
-      Handler: amazonmq_rotation_lambda.handler
+      Handler: amazonmq_rotation.handler
       Timeout: 30
       VpcConfig:
         SecurityGroupIds: [ !GetAtt RotationLambdaSecurityGroup.GroupId ]
@@ -329,7 +329,7 @@ Resources:
           AMAZONMQ_BROKER_ID: !Ref Broker
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200429-1410/LambdaFunctions/amazonmq_rotation_lambda/amazonmq_rotation_lambda.zip
+        S3Key: DevOps/ACM-TMP-20200429-1636/LambdaFunctions/amazonmq_rotation/amazonmq_rotation.zip
       Tags:
         - Key: Env
           Value: !Ref Env

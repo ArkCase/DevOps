@@ -44,7 +44,7 @@ lambda_functions = [i for i in os.listdir(lambda_dir) if os.path.isdir(os.path.j
 
 for i in lambda_functions:
     print(f"Building Lambda package for {i}")
-    subprocess.check_call([f"./{lambda_dir}/{i}/package.sh"])
+    subprocess.check_call([f"./{lambda_dir}/package.sh", i])
 
 # Modify the CloudFormation templates so that references to external resources
 # (other CloudFormation templates, Lambda packages, etc.) point to the correct

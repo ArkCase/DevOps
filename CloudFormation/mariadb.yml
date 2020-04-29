@@ -438,7 +438,7 @@ Resources:
       Description: Rotate MariaDB master password
       Runtime: python3.7
       Role: !GetAtt MasterRotationLambdaExecutionRole.Arn
-      Handler: mariadb_master_rotation_lambda.handler
+      Handler: mariadb_master_rotation.handler
       Timeout: 30
       VpcConfig:
         SecurityGroupIds: [ !GetAtt RotationLambdaSecurityGroup.GroupId ]
@@ -448,7 +448,7 @@ Resources:
           PASSWORD_LENGTH: !Ref PasswordLength
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200429-1410/LambdaFunctions/mariadb_master_rotation_lambda/mariadb_master_rotation_lambda.zip
+        S3Key: DevOps/ACM-TMP-20200429-1636/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
       Tags:
         - Key: Env
           Value: !Ref Env
@@ -522,7 +522,7 @@ Resources:
       Description: Rotate MariaDB user password
       Runtime: python3.7
       Role: !GetAtt UserRotationLambdaExecutionRole.Arn
-      Handler: mariadb_rotation_lambda.handler
+      Handler: mariadb_rotation.handler
       Timeout: 30
       VpcConfig:
         SecurityGroupIds: [ !GetAtt RotationLambdaSecurityGroup.GroupId ]
@@ -537,7 +537,7 @@ Resources:
             ALTER ROUTINE, EVENT, TRIGGER
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200429-1410/LambdaFunctions/mariadb_rotation_lambda/mariadb_rotation_lambda.zip
+        S3Key: DevOps/ACM-TMP-20200429-1636/LambdaFunctions/mariadb_rotation/mariadb_rotation.zip
       Tags:
         - Key: Env
           Value: !Ref Env
