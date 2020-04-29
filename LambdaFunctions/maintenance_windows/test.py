@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from maintenance_windows_lambda import Timestamp
+from maintenance_windows import Timestamp
 
 t1 = Timestamp("Wed", "08", "45")
 t2 = t1.next(30)
