@@ -39,16 +39,12 @@ package_version = "ACM-" + tag + "-" + datetime.datetime.utcnow().strftime("%Y%m
 
 # Build Lambda packages
 
-lambda_functions = [
-  "mariadb_rotation_lambda",
-  "mariadb_master_rotation_lambda",
-  "amazonmq_rotation_lambda",
-  "maintenance_windows_lambda",
-]
+lambda_dir = "LambdaFunctions"
+lambda_functions = [i for i in os.listdir(lambda_dir) if os.path.isdir(os.path.join(lambda_dir, i)) and i[0] != "."]
 
 for i in lambda_functions:
     print(f"Building Lambda package for {i}")
-    subprocess.check_call([f"./{i}/package.sh"])
+    subprocess.check_call([f"./{lambda_dir}/{i}/package.sh"])
 
 # Modify the CloudFormation templates so that references to external resources
 # (other CloudFormation templates, Lambda packages, etc.) point to the correct
@@ -98,12 +94,7 @@ default_regions = [
 ]
 
 regions = args.region if args.region else default_regions
-
-public_files = templates
-for i in lambda_functions:
-    path = f"{i}/{i}.zip"
-    public_files.append(path)
-
+public_files = templates + [f"{lambda_dir}/{i}/{i}.zip" for i in lambda_functions]
 s3 = boto3.client("s3")
 
 for f in public_files:

@@ -329,7 +329,7 @@ Resources:
           AMAZONMQ_BROKER_ID: !Ref Broker
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200429-1256/amazonmq_rotation_lambda/amazonmq_rotation_lambda.zip
+        S3Key: DevOps/ACM-TMP-20200429-1410/LambdaFunctions/amazonmq_rotation_lambda/amazonmq_rotation_lambda.zip
       Tags:
         - Key: Env
           Value: !Ref Env
