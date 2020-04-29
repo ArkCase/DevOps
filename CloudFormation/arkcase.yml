@@ -501,7 +501,7 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200429-0939/maintenance_windows_lambda/maintenance_windows_lambda.zip
+        S3Key: DevOps/ACM-TMP-20200429-1256/maintenance_windows_lambda/maintenance_windows_lambda.zip
       Tags:
         - Key: Env
           Value: !Ref Env
@@ -519,6 +519,12 @@ Resources:
     Properties:
       ServiceToken: !GetAtt MaintenanceWindowsLambda.Arn
       Start: !Ref MaintenanceWindowStart
+      # The following random token is not used by the Lambda function; its
+      # only purpose is to force the Lambda function to be called every time
+      # the stack is updated. The reason is that CloudFormation doesn't call
+      # the Lambda function during an update unless there is a change in the
+      # input parameters.
+      RandomToken: ACM-TMP-20200429-1256
 
   ######################################
   # Microsoft Active Directory Service #
@@ -544,7 +550,7 @@ Resources:
   Amazonmq:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200429-0939/CloudFormation/amazonmq.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200429-1256/CloudFormation/amazonmq.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -600,7 +606,7 @@ Resources:
   AlfrescoDatabase:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200429-0939/CloudFormation/mariadb.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200429-1256/CloudFormation/mariadb.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -633,24 +639,30 @@ Outputs:
   StartBlockTraffic:
     Description: Begin weekly maintenance window
     Value: !GetAtt MaintenanceWindows.StartBlockTraffic
+
+  StartRotateMasterPasswords:
+    Description: When to start rotating master passwords
+    Value: !GetAtt MaintenanceWindows.StartRotateMasterPasswords
+
+  StartRotateUserPasswords:
+    Description: When to start rotating user passwords
+    Value: !GetAtt MaintenanceWindows.StartRotateUserPasswords
+
   StartRdsBackup:
     Description: When to start backing up RDS instances
     Value: !GetAtt MaintenanceWindows.StartRdsBackup
-  EndRdsBackup:
-    Description: When to end backing up RDS instances
-    Value: !GetAtt MaintenanceWindows.EndRdsBackup
+
   StartAlfrescoRdsMaintenance:
     Description: When to start maintenance of the Alfresco RDS instance
     Value: !GetAtt MaintenanceWindows.StartAlfrescoRdsMaintenance
-  EndAlfrescoRdsMaintenance:
-    Description: When to end maintenance of the Alfresco RDS instance
-    Value: !GetAtt MaintenanceWindows.EndAlfrescoRdsMaintenance
+
   StartAmazonmqMaintenanceDayOfWeek:
     Description: When to start maintenance of AmazonMQ (day of week)
     Value: !GetAtt MaintenanceWindows.StartAmazonmqMaintenanceDayOfWeek
   StartAmazonmqMaintenanceTimeOfDay:
     Description: When to start maintenance of AmazonMQ (time of day)
     Value: !GetAtt MaintenanceWindows.StartAmazonmqMaintenanceTimeOfDay
-  EndBlockTraffic:
+
+  StartAllowTraffic:
     Description: End weekly maintenance window
-    Value: !GetAtt MaintenanceWindows.EndBlockTraffic
+    Value: !GetAtt MaintenanceWindows.StartAllowTraffic
