@@ -77,6 +77,8 @@ def set_secret(client, arn, version_id):
     # Get the pending secret
     pending_secret = get_secret(client, arn, "AWSPENDING", version_id)
     username = pending_secret['username']
+    groups = pending_secret['groups'].split(",")
+    password = pending_secret['password']
 
     # Check whether the user exist already
     mq_client = boto3.client("mq")
@@ -95,18 +97,19 @@ def set_secret(client, arn, version_id):
                 BrokerId=broker_id,
                 ConsoleAccess=False,
                 Username=username,
-                Password=pending_secret['password'])
-        print(f"set_secret: Successfully changed the password of AmazonMQ user '{username}'")
-        print(f"set_secret: **IMPORTANT**: Changes will be effective after the next maintenance window")
+                Groups=groups,
+                Password=password)
+        print(f"set_secret: Successfully changed the password of AmazonMQ user '{username}', groups: '{groups}'")
     else:
         print(f"set_secret: Creating AmazonMQ user '{username}'...")
         mq_client.create_user(
                 BrokerId=broker_id,
                 ConsoleAccess=False,
                 Username=username,
-                Password=pending_secret['password'])
-        print(f"set_secret: Successfully created AmazonMQ user '{username}'")
-        print(f"set_secret: **IMPORTANT**: Changes will be effective after the next maintenance window")
+                Groups=groups,
+                Password=password)
+        print(f"set_secret: Successfully created AmazonMQ user '{username}', groups: '{groups}'")
+    print(f"set_secret: **IMPORTANT**: Changes will be effective after the next maintenance window")
 
 
 def test_secret(client, arn, version_id):
@@ -162,7 +165,7 @@ def get_secret(client, arn, stage, version_id=None):
     secret = json.loads(response['SecretString'])
 
     # Sanity checks
-    for field in ['username', 'password']:
+    for field in ['username', 'groups', 'password']:
         if field not in secret:
             raise KeyError(f"Invalid secret '{arn}': field '{field}' must be present")
 
