@@ -448,7 +448,7 @@ Resources:
           PASSWORD_LENGTH: !Ref PasswordLength
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200429-1636/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200501-0800/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
       Tags:
         - Key: Env
           Value: !Ref Env
@@ -537,7 +537,7 @@ Resources:
             ALTER ROUTINE, EVENT, TRIGGER
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200429-1636/LambdaFunctions/mariadb_rotation/mariadb_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200501-0800/LambdaFunctions/mariadb_rotation/mariadb_rotation.zip
       Tags:
         - Key: Env
           Value: !Ref Env
