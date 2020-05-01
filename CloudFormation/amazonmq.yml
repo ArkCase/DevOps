@@ -147,7 +147,7 @@ Resources:
     Properties:
       Description: Master credentials to connect to the AmazonMQ broker
       GenerateSecretString:
-        SecretStringTemplate: !Sub '{"username": "admin1"}'
+        SecretStringTemplate: '{"username": "admin1"}'
         GenerateStringKey: password
         PasswordLength: !Ref PasswordLength
         ExcludePunctuation: true
