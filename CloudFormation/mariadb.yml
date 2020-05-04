@@ -105,6 +105,22 @@ Parameters:
     MinValue: 8
     MaxValue: 80
 
+  MasterSecretRotationCron:
+    Type: String
+    Description: >
+      Cron specification of when to trigger a rotation of the master secret.
+      This must be specified using the AWS cron format and in UTC only.
+    Default: 0 8 ? * SUN *
+    MinLength: 11
+
+  UserSecretRotationCron:
+    Type: String
+    Description: >
+      Cron specification of when to trigger a rotation of the user secret.
+      This must be specified using the AWS cron format and in UTC only.
+    Default: 5 8 ? * SUN *
+    MinLength: 11
+
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -127,7 +143,12 @@ Metadata:
           - EnableMultiAZ
           - BackupWindow
           - MaintenanceWindow
+
+      - Label: { default: Secrets configuration }
+        Parameters:
           - PasswordLength
+          - MasterSecretRotationCron
+          - UserSecretRotationCron
 
     ParameterLabels:
       Env: { default: Environment }
@@ -141,6 +162,8 @@ Metadata:
       BackupWindow: { default: MariaDB backup window }
       MaintenanceWindow: { default: MariaDB maintenance window }
       PasswordLength: { default: Password length }
+      MasterSecretRotationCron: { default: Master secret rotation cron }
+      UserSecretRotationCron: { default: User secret rotation cron }
 
 Rules:
   SubnetsInVpc:
@@ -182,6 +205,8 @@ Resources:
       GroupDescription: Security group that can access the MariaDB RDS instance
       VpcId: !Ref VpcId
       Tags:
+        - Key: Name
+          Value: !Sub mariadb-allowed-security-group-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -223,9 +248,9 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  ###########
-  # Secrets #
-  ###########
+  #################
+  # Master Secret #
+  #################
 
   MasterSecret:
     Type: AWS::SecretsManager::Secret
@@ -234,30 +259,7 @@ Resources:
       GenerateSecretString:
         SecretStringTemplate: '{"username": "admin"}'
         GenerateStringKey: password
-        PasswordLength: 20
-        ExcludeCharacters: "'/@\"\\%"
-      Tags:
-        - Key: Name
-          Value: !Sub mariadb-master-secret-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: database
-        - Key: Component
-          Value: secretsmanager
-        - Key: ManagedBy
-          Value: CloudFormation
-
-  UserSecret:
-    Type: AWS::SecretsManager::Secret
-    Properties:
-      Description: User credentials to connect to the database
-      GenerateSecretString:
-        SecretStringTemplate: !Sub '{"username": "user", "masterarn": "${MasterSecret}"}'
-        GenerateStringKey: password
-        PasswordLength: 20
+        PasswordLength: !Ref PasswordLength
         ExcludeCharacters: "'/@\"\\%"
       Tags:
         - Key: Name
@@ -285,123 +287,6 @@ Resources:
               AWS: !Ref AWS::AccountId
             Action: secretsmanager:DeleteSecret
             Resource: "*"
-
-  MasterSecretRotationSchedule:
-    Type: AWS::SecretsManager::RotationSchedule
-    # NB: When creating this resource, SecretsManager will initate a secret
-    #     rotation. So it's better to ensure everything is in place beforehand.
-    #     SecretsManager will perform retries otherwise, but it's cleaner this
-    #     way.
-    DependsOn: [ MasterSecretAttachment, MasterRotationLambdaInvokePermission ]
-    Properties:
-      SecretId: !Ref MasterSecret
-      RotationLambdaARN: !GetAtt MasterRotationLambda.Arn
-      RotationRules:
-        # NB: Password rotation will be triggered by a CloudWatch event during
-        #     the weekly maintenance.
-        AutomaticallyAfterDays: 1000
-
-  UserSecretPolicy:
-    Type: AWS::SecretsManager::ResourcePolicy
-    Properties:
-      SecretId: !Ref UserSecret
-      ResourcePolicy:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Deny
-            Principal:
-              AWS: !Ref AWS::AccountId
-            Action: secretsmanager:DeleteSecret
-            Resource: "*"
-
-  UserSecretRotationSchedule:
-    Type: AWS::SecretsManager::RotationSchedule
-    # NB: When creating this resource, SecretsManager will initate a secret
-    #     rotation. So it's better to ensure everything is in place beforehand.
-    #     SecretsManager will perform retries otherwise, but it's cleaner this
-    #     way.
-    DependsOn: [ UserSecretAttachment, UserLambdaInvokePermission ]
-    Properties:
-      SecretId: !Ref UserSecret
-      RotationLambdaARN: !GetAtt UserRotationLambda.Arn
-      RotationRules:
-        # NB: Password rotation will be triggered by a CloudWatch event during
-        #     the weekly maintenance.
-        AutomaticallyAfterDays: 1000
-
-  #######
-  # RDS #
-  #######
-
-  DbSubnetGroup:
-    Type: AWS::RDS::DBSubnetGroup
-    Properties:
-      DBSubnetGroupDescription: Subnet for the RDS instance
-      SubnetIds: !Ref SubnetIds
-      Tags:
-        - Key: Name
-          Value: !Sub mariadb-subnet-group-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: database
-        - Key: Component
-          Value: rds
-        - Key: ManagedBy
-          Value: CloudFormation
-
-  RdsInstance:
-    Type: AWS::RDS::DBInstance
-    DeletionPolicy: Snapshot
-    Properties:
-      DBInstanceClass: !Ref InstanceClass
-      Engine: mariadb
-      EngineVersion: !Ref MariadbVersion
-      DBName: !Ref DatabaseName
-      # Ravi said on M$ Teams on 20200414 that it's OK to enable auto minor upgrade
-      AutoMinorVersionUpgrade: true
-      StorageType: gp2
-      StorageEncrypted: true
-      AllocatedStorage: !Ref DiskSizeGB
-      BackupRetentionPeriod: 35
-      VPCSecurityGroups: [ !GetAtt DbSecurityGroup.GroupId ]
-      DBSubnetGroupName: !Ref DbSubnetGroup
-      MultiAZ: !Ref EnableMultiAZ
-      PubliclyAccessible: false
-      PreferredBackupWindow: !Ref BackupWindow
-      PreferredMaintenanceWindow: !Ref MaintenanceWindow
-      MasterUsername: !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:username}}"
-      MasterUserPassword: !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:password}}"
-      CACertificateIdentifier: rds-ca-2019
-      Tags:
-        - Key: Name
-          Value: !Sub mariadb-instance-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: database
-        - Key: Component
-          Value: rds
-        - Key: ManagedBy
-          Value: CloudFormation
-
-  MasterSecretAttachment:
-    Type: AWS::SecretsManager::SecretTargetAttachment
-    Properties:
-      SecretId: !Ref MasterSecret
-      TargetType: AWS::RDS::DBInstance
-      TargetId: !Ref RdsInstance
-
-  UserSecretAttachment:
-    Type: AWS::SecretsManager::SecretTargetAttachment
-    Properties:
-      SecretId: !Ref UserSecret
-      TargetType: AWS::RDS::DBInstance
-      TargetId: !Ref RdsInstance
 
   ##########################
   # Master Rotation Lambda #
@@ -432,10 +317,13 @@ Resources:
                   - secretsmanager:PutSecretValue
                   - secretsmanager:UpdateSecretVersionStage
                 Resource: !Ref MasterSecret
+
               - Effect: Allow
                 Action: secretsmanager:GetRandomPassword
                 Resource: "*"
       Tags:
+        - Key: Name
+          Value: !Sub mariadb-subnet-group-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -463,8 +351,10 @@ Resources:
           PASSWORD_LENGTH: !Ref PasswordLength
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200504-1602/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200504-1925/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
       Tags:
+        - Key: Name
+          Value: !Sub mariadb-instance-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -482,6 +372,143 @@ Resources:
       FunctionName: !Ref MasterRotationLambda
       Action: lambda:InvokeFunction
       Principal: secretsmanager.amazonaws.com
+
+  ###################################
+  # Master Secret Rotation Schedule #
+  ###################################
+
+  MasterSecretRotationSchedule:
+    Type: AWS::SecretsManager::RotationSchedule
+    # NB: When creating this resource, SecretsManager will initate a secret
+    #     rotation. So it's better to ensure everything is in place beforehand.
+    #     SecretsManager will perform retries otherwise, but it's cleaner this
+    #     way.
+    DependsOn: [ MasterSecretAttachment, MasterRotationLambdaInvokePermission ]
+    Properties:
+      SecretId: !Ref MasterSecret
+      RotationLambdaARN: !GetAtt MasterRotationLambda.Arn
+      RotationRules:
+        # NB: Password rotation will be triggered by a CloudWatch event, check
+        #     the `MasterTriggerRule` resource.
+        AutomaticallyAfterDays: 1000
+
+  MasterTriggerLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: TriggerPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:RotateSecret
+                Resource: !Ref MasterSecret
+      Tags:
+        - Key: Name
+          Value: !Sub mariadb-master-trigger-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  MasterTriggerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Trigger a master secret rotation
+      Runtime: python3.7
+      Role: !GetAtt MasterTriggerLambdaExecutionRole.Arn
+      Handler: rotation_trigger.handler
+      Timeout: 10
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20200504-1925/LambdaFunctions/rotation_trigger/rotation_trigger.zip
+      Tags:
+        - Key: Name
+          Value: !Sub mariadb-master-trigger-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  MasterTriggerRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Periodically trigger a master secret rotation
+      ScheduleExpression: !Sub cron(${MasterSecretRotationCron})
+      State: ENABLED
+      Targets:
+        - Id: MasterTriggerLambda
+          Arn: !GetAtt MasterTriggerLambda.Arn
+          Input: !Sub '{"SecretArn": "${MasterSecret}"}'
+
+  MasterTriggerInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref MasterTriggerLambda
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt MasterTriggerRule.Arn
+
+  ###############
+  # User Secret #
+  ###############
+
+  UserSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: User credentials to connect to the database
+      GenerateSecretString:
+        SecretStringTemplate: !Sub '{"username": "user", "masterarn": "${MasterSecret}"}'
+        GenerateStringKey: password
+        PasswordLength: !Ref PasswordLength
+        ExcludeCharacters: "'/@\"\\%"
+      Tags:
+        - Key: Name
+          Value: !Sub mariadb-user-secret-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: secretsmanager
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  UserSecretPolicy:
+    Type: AWS::SecretsManager::ResourcePolicy
+    Properties:
+      SecretId: !Ref UserSecret
+      ResourcePolicy:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Deny
+            Principal:
+              AWS: !Ref AWS::AccountId
+            Action: secretsmanager:DeleteSecret
+            Resource: "*"
 
   ########################
   # User Rotation Lambda #
@@ -512,10 +539,12 @@ Resources:
                   - secretsmanager:PutSecretValue
                   - secretsmanager:UpdateSecretVersionStage
                 Resource: !Ref UserSecret
+
               - Effect: Allow
                 Action:
                   - secretsmanager:GetSecretValue
                 Resource: !Ref MasterSecret
+
               - Effect: Allow
                 Action: secretsmanager:GetRandomPassword
                 Resource: "*"
@@ -554,7 +583,7 @@ Resources:
             ALTER ROUTINE, EVENT, TRIGGER
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200504-1602/LambdaFunctions/mariadb_rotation/mariadb_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200504-1925/LambdaFunctions/mariadb_rotation/mariadb_rotation.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-rotation-lambda-${Project}-${Env}
@@ -569,12 +598,183 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  UserLambdaInvokePermission:
+  UserRotationLambdaInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref UserRotationLambda
       Action: lambda:InvokeFunction
       Principal: secretsmanager.amazonaws.com
+
+  #################################
+  # User Secret Rotation Schedule #
+  #################################
+
+  UserSecretRotationSchedule:
+    Type: AWS::SecretsManager::RotationSchedule
+    # NB: When creating this resource, SecretsManager will initate a secret
+    #     rotation. So it's better to ensure everything is in place beforehand.
+    #     SecretsManager will perform retries otherwise, but it's cleaner this
+    #     way.
+    DependsOn: [ UserSecretAttachment, UserRotationLambdaInvokePermission ]
+    Properties:
+      SecretId: !Ref UserSecret
+      RotationLambdaARN: !GetAtt UserRotationLambda.Arn
+      RotationRules:
+        # NB: Password rotation will be triggered by a CloudWatch event, check
+        #     the `UserTriggerRule` resource.
+        AutomaticallyAfterDays: 1000
+
+  UserTriggerLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: TriggerPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:RotateSecret
+                Resource: !Ref UserSecret
+      Tags:
+        - Key: Name
+          Value: !Sub mariadb-user-trigger-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  UserTriggerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Trigger a user secret rotation
+      Runtime: python3.7
+      Role: !GetAtt UserTriggerLambdaExecutionRole.Arn
+      Handler: rotation_trigger.handler
+      Timeout: 10
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20200504-1925/LambdaFunctions/rotation_trigger/rotation_trigger.zip
+      Tags:
+        - Key: Name
+          Value: !Sub mariadb-user-trigger-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  UserTriggerRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Periodically trigger a user secret rotation
+      ScheduleExpression: !Sub cron(${UserSecretRotationCron})
+      State: ENABLED
+      Targets:
+        - Id: UserTriggerLambda
+          Arn: !GetAtt UserTriggerLambda.Arn
+          Input: !Sub '{"SecretArn": "${UserSecret}"}'
+
+  UserTriggerInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref UserTriggerLambda
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt UserTriggerRule.Arn
+
+  #######
+  # RDS #
+  #######
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet for the RDS instance
+      SubnetIds: !Ref SubnetIds
+      Tags:
+        - Key: Name
+          Value: !Sub mariadb-db-subnet-group-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: rds
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  RdsInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    Properties:
+      DBInstanceClass: !Ref InstanceClass
+      Engine: mariadb
+      EngineVersion: !Ref MariadbVersion
+      DBName: !Ref DatabaseName
+      # Ravi said on M$ Teams on 20200414 that it's OK to enable auto minor upgrade
+      AutoMinorVersionUpgrade: true
+      StorageType: gp2
+      StorageEncrypted: true
+      AllocatedStorage: !Ref DiskSizeGB
+      BackupRetentionPeriod: 35
+      VPCSecurityGroups: [ !GetAtt DbSecurityGroup.GroupId ]
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      MultiAZ: !Ref EnableMultiAZ
+      PubliclyAccessible: false
+      PreferredBackupWindow: !Ref BackupWindow
+      PreferredMaintenanceWindow: !Ref MaintenanceWindow
+      MasterUsername: !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:username}}"
+      MasterUserPassword: !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:password}}"
+      CACertificateIdentifier: rds-ca-2019
+      Tags:
+        - Key: Name
+          Value: !Sub mariadb-rds-instance-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: rds
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  MasterSecretAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref MasterSecret
+      TargetType: AWS::RDS::DBInstance
+      TargetId: !Ref RdsInstance
+
+  UserSecretAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref UserSecret
+      TargetType: AWS::RDS::DBInstance
+      TargetId: !Ref RdsInstance
 
 Outputs:
   UserSecretArn:

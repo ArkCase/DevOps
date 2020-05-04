@@ -30,7 +30,7 @@ if 'AWS_PROFILE' not in os.environ and not 'AWS_DEFAULT_REGION' in os.environ:
     sys.exit(1)
 
 tag = args.TAG
-regex = re.compile("^[0-9a-zA-Z]+$")
+regex = re.compile(r"^\w+$")
 if not regex.match(tag):
     print(f"ERROR: Invalid tag: '{tag}'; must be alphanumeric only")
     sys.exit(1)
@@ -67,6 +67,7 @@ templates = [
     "CloudFormation/arkcase.yml",
     "CloudFormation/mariadb.yml",
     "CloudFormation/amazonmq.yml",
+    "CloudFormation/amqsecretcfg.yml",
 ]
 
 for i in templates:
