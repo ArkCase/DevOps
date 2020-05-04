@@ -1,4 +1,7 @@
 # Copyright (c) 2020 Armedia, LLC
+#
+# Please note this CloudFormation template has been written with the
+# expectation that it will "called" from another CloudFormation template.
 ---
 AWSTemplateFormatVersion: 2010-09-09
 
@@ -147,11 +150,13 @@ Resources:
     Properties:
       Description: Master credentials to connect to the AmazonMQ broker
       GenerateSecretString:
-        SecretStringTemplate: !Sub '{"username": "admin1"}'
+        SecretStringTemplate: '{"username": "admin1"}'
         GenerateStringKey: password
         PasswordLength: !Ref PasswordLength
         ExcludePunctuation: true
       Tags:
+        - Key: Name
+          Value: !Sub amazonmq-master-secret-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -204,6 +209,8 @@ Resources:
         PasswordLength: !Ref PasswordLength
         ExcludePunctuation: true
       Tags:
+        - Key: Name
+          Value: !Sub amazonmq-alfresco-user-secret-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -280,6 +287,8 @@ Resources:
                   - mq:UpdateUser
                 Resource: !GetAtt Broker.Arn
       Tags:
+        - Key: Name
+          Value: !Sub amazonmq-rotation-lambda-execution-role-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -301,6 +310,8 @@ Resources:
       GroupDescription: Security group for the AmazonMQ Lambda rotation function
       VpcId: !Ref VpcId
       Tags:
+        - Key: Name
+          Value: !Sub rotation-lambda-security-group-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -329,8 +340,10 @@ Resources:
           AMAZONMQ_BROKER_ID: !Ref Broker
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200429-1636/LambdaFunctions/amazonmq_rotation/amazonmq_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200504-1602/LambdaFunctions/amazonmq_rotation/amazonmq_rotation.zip
       Tags:
+        - Key: Name
+          Value: !Sub amazonmq-rotation-lambda-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -359,6 +372,8 @@ Resources:
       GroupDescription: Security group that can access the AmazonMQ broker
       VpcId: !Ref VpcId
       Tags:
+        - Key: Name
+          Value: !Sub amazonmq-allowed-security-group-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -387,11 +402,6 @@ Resources:
           FromPort: 8883
           ToPort: 8883
           SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
-        - Description: Allow traffic from ArkCase containers for MQTT
-          IpProtocol: tcp
-          FromPort: 8883
-          ToPort: 8883
-          SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
         - Description: Allow traffic from ArkCase containers for OpenWire
           IpProtocol: tcp
           FromPort: 61617
@@ -399,8 +409,6 @@ Resources:
           SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
         - Description: Allow traffic from ArkCase containers for STOMP
           IpProtocol: tcp
-          # NB: Keep the STOMP port open, the SecretsManager rotation lambda
-          #     needs it.
           FromPort: 61614
           ToPort: 61614
           SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
@@ -410,6 +418,8 @@ Resources:
           ToPort: 61619
           SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
       Tags:
+        - Key: Name
+          Value: !Sub amazonmq-broker-security-group-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -447,6 +457,8 @@ Resources:
         General: true
       AutoMinorVersionUpgrade: true
       Tags:
+        - Key: Name
+          Value: !Sub amazonmq-broker-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -463,6 +475,7 @@ Outputs:
     Description: >
       ID of the security group allowed to connect to the AmazonMQ broker
     Value: !GetAtt AllowedSecurityGroup.GroupId
+
   AlfrescoUserSecretArn:
     Description: ARN of the credential secret to be used by Alfresco
     Value: !Ref AlfrescoUserSecret

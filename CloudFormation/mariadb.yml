@@ -1,4 +1,7 @@
 # Copyright (c) 2020 Armedia, LLC
+#
+# Please note this CloudFormation template has been written with the
+# expectation that it will "called" from another CloudFormation template.
 ---
 AWSTemplateFormatVersion: 2010-09-09
 
@@ -160,6 +163,8 @@ Resources:
       GroupDescription: Security group for the Lambda rotation function
       VpcId: !Ref VpcId
       Tags:
+        - Key: Name
+          Value: !Sub mariadb-rotation-lambda-security-group-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -205,6 +210,8 @@ Resources:
           ToPort: 3306
           SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
       Tags:
+        - Key: Name
+          Value: !Sub mariadb-security-group-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -230,6 +237,8 @@ Resources:
         PasswordLength: 20
         ExcludeCharacters: "'/@\"\\%"
       Tags:
+        - Key: Name
+          Value: !Sub mariadb-master-secret-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -251,6 +260,8 @@ Resources:
         PasswordLength: 20
         ExcludeCharacters: "'/@\"\\%"
       Tags:
+        - Key: Name
+          Value: !Sub mariadb-user-secret-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -328,6 +339,8 @@ Resources:
       DBSubnetGroupDescription: Subnet for the RDS instance
       SubnetIds: !Ref SubnetIds
       Tags:
+        - Key: Name
+          Value: !Sub mariadb-subnet-group-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -363,6 +376,8 @@ Resources:
       MasterUserPassword: !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:password}}"
       CACertificateIdentifier: rds-ca-2019
       Tags:
+        - Key: Name
+          Value: !Sub mariadb-instance-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -448,7 +463,7 @@ Resources:
           PASSWORD_LENGTH: !Ref PasswordLength
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200429-1636/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200504-1602/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
       Tags:
         - Key: Env
           Value: !Ref Env
@@ -505,6 +520,8 @@ Resources:
                 Action: secretsmanager:GetRandomPassword
                 Resource: "*"
       Tags:
+        - Key: Name
+          Value: !Sub rotation-lambda-execution-role-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -537,8 +554,10 @@ Resources:
             ALTER ROUTINE, EVENT, TRIGGER
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200429-1636/LambdaFunctions/mariadb_rotation/mariadb_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200504-1602/LambdaFunctions/mariadb_rotation/mariadb_rotation.zip
       Tags:
+        - Key: Name
+          Value: !Sub mariadb-rotation-lambda-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project

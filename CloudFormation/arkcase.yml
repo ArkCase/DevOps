@@ -199,6 +199,8 @@ Resources:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
+        - Key: Name
+          Value: !Sub internet-gateway-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -303,6 +305,8 @@ Resources:
     Properties:
       Domain: vpc
       Tags:
+        - Key: Name
+          Value: !Sub elastic-ip-for-nat-gateway-A-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -320,6 +324,8 @@ Resources:
       AllocationId: !GetAtt ElasticIpForNatGatewayA.AllocationId
       SubnetId: !Ref PublicSubnetA
       Tags:
+        - Key: Name
+          Value: !Sub nat-gateway-A-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -337,6 +343,8 @@ Resources:
     Properties:
       Domain: vpc
       Tags:
+        - Key: Name
+          Value: !Sub elastic-ip-for-nat-gateway-B-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -354,6 +362,8 @@ Resources:
       AllocationId: !GetAtt ElasticIpForNatGatewayB.AllocationId
       SubnetId: !Ref PublicSubnetB
       Tags:
+        - Key: Name
+          Value: !Sub nat-gateway-B-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -371,7 +381,7 @@ Resources:
       VpcId: !Ref Vpc
       Tags:
         - Key: Name
-          Value: PublicRouteTable
+          Value: !Sub public-route-table-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -408,6 +418,8 @@ Resources:
     Properties:
       VpcId: !Ref Vpc
       Tags:
+        - Key: Name
+          Value: !Sub private-route-table-A-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -438,7 +450,7 @@ Resources:
       VpcId: !Ref Vpc
       Tags:
         - Key: Name
-          Value: PrivateRouteTable
+          Value: !Sub private-route-table-B-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -480,6 +492,8 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Tags:
+        - Key: Name
+          Value: !Sub maintenance-windows-lambda-execution-role-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -501,8 +515,10 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200429-1636/LambdaFunctions/maintenance_windows/maintenance_windows.zip
+        S3Key: DevOps/ACM-TMP-20200504-1602/LambdaFunctions/maintenance_windows/maintenance_windows.zip
       Tags:
+        - Key: Name
+          Value: !Sub maintenance-windows-lambda-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -524,7 +540,7 @@ Resources:
       # the stack is updated. The reason is that CloudFormation doesn't call
       # the Lambda function during an update unless there is a change in the
       # input parameters.
-      RandomToken: ACM-TMP-20200429-1636
+      RandomToken: ACM-TMP-20200504-1602
 
   ######################################
   # Microsoft Active Directory Service #
@@ -550,7 +566,7 @@ Resources:
   Amazonmq:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200429-1636/CloudFormation/amazonmq.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200504-1602/CloudFormation/amazonmq.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -565,6 +581,8 @@ Resources:
         MaintenanceTimeOfDay: !GetAtt MaintenanceWindows.StartAmazonmqMaintenanceTimeOfDay
         EnableAuditLogs: !Ref AmazonmqEnableAuditLogs
       Tags:
+        - Key: Name
+          Value: !Sub amazonmq-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -592,6 +610,8 @@ Resources:
       #     ToPort: 443
       #     SourceSecurityGroupId: !GetAtt ArkcaseSecurityGroup.GroupId
       Tags:
+        - Key: Name
+          Value: !Sub alfresco-security-group-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -606,7 +626,7 @@ Resources:
   AlfrescoDatabase:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200429-1636/CloudFormation/mariadb.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200504-1602/CloudFormation/mariadb.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -624,6 +644,8 @@ Resources:
           !Sub ${MaintenanceWindows.StartAlfrescoRdsMaintenance}-${MaintenanceWindows.EndAlfrescoRdsMaintenance}
         PasswordLength: !Ref PasswordsLength
       Tags:
+        - Key: Name
+          Value: !Sub mariadb-for-alfresco-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -652,13 +674,22 @@ Outputs:
     Description: When to start backing up RDS instances
     Value: !GetAtt MaintenanceWindows.StartRdsBackup
 
+  EndRdsBackup:
+    Description: When to end backing up RDS instances
+    Value: !GetAtt MaintenanceWindows.EndRdsBackup
+
   StartAlfrescoRdsMaintenance:
     Description: When to start maintenance of the Alfresco RDS instance
     Value: !GetAtt MaintenanceWindows.StartAlfrescoRdsMaintenance
 
+  EndAlfrescoRdsMaintenance:
+    Description: When to end maintenance of the Alfresco RDS instance
+    Value: !GetAtt MaintenanceWindows.EndAlfrescoRdsMaintenance
+
   StartAmazonmqMaintenanceDayOfWeek:
     Description: When to start maintenance of AmazonMQ (day of week)
     Value: !GetAtt MaintenanceWindows.StartAmazonmqMaintenanceDayOfWeek
+
   StartAmazonmqMaintenanceTimeOfDay:
     Description: When to start maintenance of AmazonMQ (time of day)
     Value: !GetAtt MaintenanceWindows.StartAmazonmqMaintenanceTimeOfDay
