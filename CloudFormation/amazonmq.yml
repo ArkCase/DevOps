@@ -145,7 +145,7 @@ Resources:
   # Secrets #
   ###########
 
-  MasterUserSecret:
+  MasterSecret:
     Type: AWS::SecretsManager::Secret
     Properties:
       Description: Master credentials to connect to the AmazonMQ broker
@@ -168,10 +168,10 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  MasterUserSecretPolicy:
+  MasterSecretPolicy:
     Type: AWS::SecretsManager::ResourcePolicy
     Properties:
-      SecretId: !Ref MasterUserSecret
+      SecretId: !Ref MasterSecret
       ResourcePolicy:
         Version: 2012-10-17
         Statement:
@@ -181,7 +181,7 @@ Resources:
             Action: secretsmanager:DeleteSecret
             Resource: "*"
 
-  MasterUserSecretRotationSchedule:
+  MasterSecretRotationSchedule:
     Type: AWS::SecretsManager::RotationSchedule
     # NB: When creating this resource, SecretsManager will initate a secret
     #     rotation. So it's better to ensure everything is in place beforehand.
@@ -189,7 +189,7 @@ Resources:
     #     way.
     DependsOn: RotationLambdaInvokePermission
     Properties:
-      SecretId: !Ref MasterUserSecret
+      SecretId: !Ref MasterSecret
       RotationLambdaARN: !GetAtt RotationLambda.Arn
       RotationRules:
         AutomaticallyAfterDays: 1000
@@ -275,7 +275,7 @@ Resources:
                   - secretsmanager:PutSecretValue
                   - secretsmanager:UpdateSecretVersionStage
                 Resource:
-                  - !Ref MasterUserSecret
+                  - !Ref MasterSecret
                   - !Ref AlfrescoUserSecret
               - Effect: Allow
                 Action: secretsmanager:GetRandomPassword
@@ -329,7 +329,7 @@ Resources:
       Description: Rotate AmazonMQ secrets
       Runtime: python3.7
       Role: !GetAtt RotationLambdaExecutionRole.Arn
-      Handler: amazonmq_rotation_lambda.handler
+      Handler: amazonmq_rotation.handler
       Timeout: 30
       VpcConfig:
         SecurityGroupIds: [ !GetAtt RotationLambdaSecurityGroup.GroupId ]
@@ -340,7 +340,7 @@ Resources:
           AMAZONMQ_BROKER_ID: !Ref Broker
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200501-1228/amazonmq_rotation_lambda/amazonmq_rotation_lambda.zip
+        S3Key: DevOps/ACM-TMP-20200504-1602/LambdaFunctions/amazonmq_rotation/amazonmq_rotation.zip
       Tags:
         - Key: Name
           Value: !Sub amazonmq-rotation-lambda-${Project}-${Env}
@@ -433,6 +433,7 @@ Resources:
 
   Broker:
     Type: AWS::AmazonMQ::Broker
+    DependsOn: MasterSecret
     Properties:
       BrokerName: !Sub AmazonMQ-${AWS::StackName}
       DeploymentMode: ACTIVE_STANDBY_MULTI_AZ
@@ -445,8 +446,8 @@ Resources:
       SubnetIds: [ !Ref SubnetIdA, !Ref SubnetIdB ]
       PubliclyAccessible: false
       Users:
-        - Username: !Sub "{{resolve:secretsmanager:${MasterUserSecret}:SecretString:username}}"
-          Password: !Sub "{{resolve:secretsmanager:${MasterUserSecret}:SecretString:password}}"
+        - Username: !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:username}}"
+          Password: !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:password}}"
       MaintenanceWindowStartTime:
         DayOfWeek: !Ref MaintenanceDayOfWeek
         TimeOfDay: !Ref MaintenanceTimeOfDay

@@ -2,7 +2,7 @@
 
 import uuid
 import json
-import requests
+from botocore.vendored import requests
 
 
 def handler(event, context):
@@ -51,8 +51,21 @@ def compute_maintenance_windows(event):
     # 5' window to block incoming traffic to ArkCase
     start = Timestamp(start_day, start_hour, start_min)
     data = {}
-    data['StartBlockTraffic'] = start.get_day_and_time()  # TODO: cron?
+    data['StartBlockTraffic'] = start.get_cron()
     end = start.next(5)
+    data['EndBlockTraffic'] = end.get_cron()
+
+    # 5' window to rotate master passwords
+    start = end
+    data['StartRotateMasterPasswords'] = start.get_cron()
+    end = start.next(5)
+    data['EndRotateMasterPasswords'] = end.get_cron()
+
+    # 5' window to rotate user passwords
+    start = end
+    data['StartRotateUserPasswords'] = start.get_cron()
+    end = start.next(5)
+    data['EndRotateUserPasswords'] = end.get_cron()
 
     # 30' window to perform backups on all RDS instances
     start = end
@@ -71,9 +84,14 @@ def compute_maintenance_windows(event):
     data['StartAmazonmqMaintenanceDayOfWeek'] = start.get_day_name()
     data['StartAmazonmqMaintenanceTimeOfDay'] = start.get_time()
     end = start.next(30)
+    data['SendAmazonmqMaintenanceDayOfWeek'] = end.get_day_name()
+    data['SendAmazonmqMaintenanceTimeOfDay'] = end.get_time()
 
-    # End of maintenance
-    data['EndBlockTraffic'] = end.get_day_and_time()  # TODO: cron?
+    # 5' to allow traffic back; end of maintenance
+    start = end
+    data['StartAllowTraffic'] = start.get_cron()
+    end = start.next(5)
+    data['EndAllowTraffic'] = end.get_cron()
 
     return data
 
@@ -123,6 +141,11 @@ class Timestamp:
 
     def get_day_name(self):
         return full_days[self.day]
+
+    def get_cron(self):
+        # AWS cron format: min hour day_of_month month day_of_week year
+        day = days[self.day].upper()
+        return f"{self.min} {self.hour} ? * {day} *"
 
 
 def send_response(event, success: bool, msg="", data={}):

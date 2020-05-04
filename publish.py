@@ -7,8 +7,6 @@ import os
 import subprocess
 import re
 import boto3
-import hashlib
-import binascii
 
 # Preliminaries
 
@@ -22,6 +20,9 @@ ap.add_argument("TAG", default="dev",
 ap.add_argument("-k", "--keep-temporary",
     default=False, action="store_true",
     help="Don't delete temporary and intermediate files")
+ap.add_argument("-r", "--region",
+    default=[], action="append",
+    help="Publish to the given region(s) instead of the default ones; can be specified multiple times")
 args = ap.parse_args()
 
 if 'AWS_PROFILE' not in os.environ and not 'AWS_DEFAULT_REGION' in os.environ:
@@ -38,15 +39,12 @@ package_version = "ACM-" + tag + "-" + datetime.datetime.utcnow().strftime("%Y%m
 
 # Build Lambda packages
 
-lambda_functions = [
-  "mariadb_rotation_lambda",
-  "amazonmq_rotation_lambda",
-  "maintenance_windows_lambda",
-]
+lambda_dir = "LambdaFunctions"
+lambda_functions = [i for i in os.listdir(lambda_dir) if os.path.isdir(os.path.join(lambda_dir, i)) and i[0] != "."]
 
 for i in lambda_functions:
     print(f"Building Lambda package for {i}")
-    subprocess.check_call([f"./{i}/package.sh"])
+    subprocess.check_call([f"./{lambda_dir}/package.sh", i])
 
 # Modify the CloudFormation templates so that references to external resources
 # (other CloudFormation templates, Lambda packages, etc.) point to the correct
@@ -76,7 +74,7 @@ for i in templates:
 
 # Push public files to public S3 buckets
 
-regions = [
+default_regions = [
   "us-east-1",
   "us-east-2",
   "us-west-1",
@@ -95,50 +93,19 @@ regions = [
   "ap-northeast-2"
 ]
 
-public_files = templates
-public_files += [
-    "mariadb_rotation_lambda/mariadb_rotation_lambda.zip",
-    "amazonmq_rotation_lambda/amazonmq_rotation_lambda.zip",
-    "maintenance_windows_lambda/maintenance_windows_lambda.zip",
-]
-
+regions = args.region if args.region else default_regions
+public_files = templates + [f"{lambda_dir}/{i}/{i}.zip" for i in lambda_functions]
 s3 = boto3.client("s3")
 
 for f in public_files:
     # Read file content
     data = open(f, "rb").read()
 
-    # Compute MD5 of local file
-    md5 = hashlib.md5()
-    md5.update(data)
-    binsum = md5.digest()
-    sum1 = binascii.hexlify(binsum).decode("ascii")
-
     for region in regions:
-        # Get MD5 of S3 file
         bucket = "arkcase-public-" + region
         key = "DevOps/" + package_version + "/" + f
-
-        try:
-            response = s3.head_object(Bucket=bucket, Key=key)
-            # NB: The ETag is the MD5 checksum, except when the file has been
-            #     uploaded in multi-parts, which we don't do in this script.
-            #     Worst case scenario is that the file gets uploaded again,
-            #     anyway... Also, strangely, the ETag comes surrounded by
-            #     double quotes, so we have to get rid of those first.
-            sum2 = response['ETag'].strip('"')
-        except Exception as e:
-            sum2 = ""
-
-        # Upload file only if it had changed
-        # NB: If we upload the file every time, S3 will create a new version,
-        #     even if the file is exactly the same, and we will be billed for
-        #     storing identical versions.
-        if sum1 == sum2:
-            print(f"Same MD5 checksum, not uploading: {bucket}/{key}")
-        else:
-            print(f"Uploading file: {bucket}/{key}")
-            s3.put_object(Bucket=bucket, Key=key, Body=data)
+        print(f"Uploading file: {bucket}/{key}")
+        s3.put_object(Bucket=bucket, Key=key, Body=data)
 
     if not args.keep_temporary:
         # Delete temporary files
@@ -146,6 +113,6 @@ for f in public_files:
             try:
                 os.unlink(f)
             except Exception as e:
-                print(f"Failed to delete temporary file [{f}]: {str(e)}; ignored")
+                print(f"Failed to delete temporary file '{f}': {str(e)}; ignored")
 
 print(f"Files uploaded to: arkcase-public-REGION/DevOps/{package_version}/")
