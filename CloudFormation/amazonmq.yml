@@ -1,4 +1,7 @@
 # Copyright (c) 2020 Armedia, LLC
+#
+# Please note this CloudFormation template has been written with the
+# expectation that it will "called" from another CloudFormation template.
 ---
 AWSTemplateFormatVersion: 2010-09-09
 
@@ -168,6 +171,8 @@ Resources:
       GroupDescription: Security group that can access the AmazonMQ broker
       VpcId: !Ref VpcId
       Tags:
+        - Key: Name
+          Value: !Sub amazonmq-allowed-security-group-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -196,11 +201,6 @@ Resources:
           FromPort: 8883
           ToPort: 8883
           SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
-        - Description: Allow traffic from ArkCase containers for MQTT
-          IpProtocol: tcp
-          FromPort: 8883
-          ToPort: 8883
-          SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
         - Description: Allow traffic from ArkCase containers for OpenWire
           IpProtocol: tcp
           FromPort: 61617
@@ -208,8 +208,6 @@ Resources:
           SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
         - Description: Allow traffic from ArkCase containers for STOMP
           IpProtocol: tcp
-          # NB: Keep the STOMP port open, the SecretsManager rotation lambda
-          #     needs it.
           FromPort: 61614
           ToPort: 61614
           SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
@@ -219,6 +217,8 @@ Resources:
           ToPort: 61619
           SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
       Tags:
+        - Key: Name
+          Value: !Sub amazonmq-broker-security-group-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -256,6 +256,8 @@ Resources:
         General: true
       AutoMinorVersionUpgrade: true
       Tags:
+        - Key: Name
+          Value: !Sub amazonmq-broker-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -281,6 +283,8 @@ Resources:
         PasswordLength: !Ref PasswordLength
         ExcludePunctuation: true  # AmazonMQ is quite picky
       Tags:
+        - Key: Name
+          Value: !Sub amazonmq-master-secret-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -295,7 +299,7 @@ Resources:
   MasterSecretConfig:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200501-0929/CloudFormation/amqsecretcfg.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200504-1925/CloudFormation/amqsecretcfg.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
@@ -306,6 +310,8 @@ Resources:
         BrokerId: !Ref Broker
         BrokerArn: !GetAtt Broker.Arn
       Tags:
+        - Key: Name
+          Value: !Sub amazonmq-master-secret-config-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -336,6 +342,8 @@ Resources:
         PasswordLength: !Ref PasswordLength
         ExcludePunctuation: true  # AmazonMQ is quite picky
       Tags:
+        - Key: Name
+          Value: !Sub amazonmq-alfresco-user-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -350,7 +358,7 @@ Resources:
   AlfrescoUserSecretConfig:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200501-0929/CloudFormation/amqsecretcfg.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200504-1925/CloudFormation/amqsecretcfg.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
@@ -361,6 +369,8 @@ Resources:
         BrokerId: !Ref Broker
         BrokerArn: !GetAtt Broker.Arn
       Tags:
+        - Key: Name
+          Value: !Sub amazonmq-alfresco-user-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
