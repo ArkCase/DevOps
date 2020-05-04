@@ -38,11 +38,15 @@ package_version = "ACM-" + tag + "-" + datetime.datetime.utcnow().strftime("%Y%m
 
 # Build Lambda packages
 
-print(f"Building MariaDB rotation Lambda function package")
-subprocess.check_call(["./mariadb_rotation_lambda/package.sh"])
+lambda_functions = [
+  "mariadb_rotation_lambda",
+  "amazonmq_rotation_lambda",
+  "maintenance_windows_lambda",
+]
 
-print(f"Building Maintenance Windows Lambda function package")
-subprocess.check_call(["./maintenance_windows_lambda/package.sh"])
+for i in lambda_functions:
+    print(f"Building Lambda package for {i}")
+    subprocess.check_call([f"./{i}/package.sh"])
 
 # Modify the CloudFormation templates so that references to external resources
 # (other CloudFormation templates, Lambda packages, etc.) point to the correct
@@ -63,7 +67,8 @@ def replace_package_version(filepath):
 
 templates = [
     "CloudFormation/arkcase.yml",
-    "CloudFormation/mariadb.yml"
+    "CloudFormation/mariadb.yml",
+    "CloudFormation/amazonmq.yml",
 ]
 
 for i in templates:
@@ -93,7 +98,8 @@ regions = [
 public_files = templates
 public_files += [
     "mariadb_rotation_lambda/mariadb_rotation_lambda.zip",
-    "maintenance_windows_lambda/maintenance_windows_lambda.zip"
+    "amazonmq_rotation_lambda/amazonmq_rotation_lambda.zip",
+    "maintenance_windows_lambda/maintenance_windows_lambda.zip",
 ]
 
 s3 = boto3.client("s3")

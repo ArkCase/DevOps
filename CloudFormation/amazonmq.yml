@@ -1,0 +1,480 @@
+# Copyright (c) 2020 Armedia, LLC
+#
+# Please note this CloudFormation template has been written with the
+# expectation that it will "called" from another CloudFormation template.
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >
+  Deploy an AmazonMQ broker with the help of SecretsManager to manage
+  credentials and secret rotation
+
+Parameters:
+  Env:
+    Type: String
+    Description: Type of environment to provision
+    Default: prod
+    MinLength: 1
+    MaxLength: 30
+    AllowedPattern: ^[-_.a-zA-Z0-9]*$
+    ConstraintDescription: >
+      Up to 30 alpha-numeric characters; can use underscores,
+      dots and dashes
+
+  Project:
+    Type: String
+    Description: Name of the project (or product)
+    Default: arkcase
+    MinLength: 1
+    MaxLength: 30
+    AllowedPattern: ^[-_.a-zA-Z0-9]*$
+    ConstraintDescription: >
+      Up to 30 alpha-numeric characters; can use underscores,
+      dots and dashes
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The VPC where the AmazonMQ broker will live
+
+  SubnetIdA:
+    Type: AWS::EC2::Subnet::Id
+    Description: >
+      ID of the first subnet where the AmazonMQ broker and its hot standby will
+      live
+
+  SubnetIdB:
+    Type: AWS::EC2::Subnet::Id
+    Description: >
+      ID of the second subnet where the AmazonMQ broker and its hot standby
+      will live
+
+  InstanceType:
+    Type: String
+    Description: The instance type to use for the AmazonMQ broker
+    Default: mq.m5.large
+    AllowedValues:
+      - mq.t2.micro
+      - mq.m5.large
+      - mq.m5.xlarge
+      - mq.m5.2xlarge
+      - mq.m5.4xlarge
+
+  PasswordLength:
+    Type: Number
+    Description: How long passwords should be
+    Default: 20
+    MinValue: 15
+    MaxValue: 80
+
+  ActivemqVersion:
+    Type: String
+    Description: ActiveMQ version to use
+    Default: 5.15.10
+    AllowedValues: [ 5.15.10, 5.15.9, 5.15.8, 5.15.6, 5.15.0 ]
+
+  MaintenanceDayOfWeek:
+    Type: String
+    Description: >
+      Day of the week when maintenance will be performed on the AmazonMQ broker
+    Default: Sunday
+    AllowedValues: [ Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday ]
+
+  MaintenanceTimeOfDay:
+    Type: String
+    Description: >
+      Time when to start the weekly maintenance on the AmazonMQ broker, in UTC
+      timezone
+    Default: 08:00
+    AllowedPattern: ^[0-2][0-9]:[0-5][0-9]$
+    ConstraintDescription: Must be in the format "HH:MM"
+
+  EnableAuditLogs:
+    Type: String
+    Description: >
+      Whether to enable AmazonMQ audit logs
+    Default: false
+    AllowedValues: [ true, false ]
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: { default: Definition }
+        Parameters:
+          - Env
+          - Project
+
+      - Label: { default: Network configuration }
+        Parameters:
+          - VpcId
+          - SubnetIdA
+          - SubnetIdB
+
+      - Label: { default: AmazonMQ configuration }
+        Parameters:
+          - InstanceType
+          - PasswordLength
+          - ActivemqVersion
+          - MaintenanceDayOfWeek
+          - MaintenanceTimeOfDay
+          - EnableAuditLogs
+
+    ParameterLabels:
+      Env: { default: Environment }
+      VpcId: { default: VPC ID }
+      SubnetIdA: { default: First subnet ID }
+      SubnetIdB: { default: Second subnet ID }
+      InstanceType: { default: Instance type }
+      PasswordLength: { default: Password length }
+      ActivemqVersion: { default: ActiveMQ version }
+      MaintenanceDayOfWeek: { default: Maintenance day of the week }
+      MaintenanceTimeOfDay: { default: Maintenance start time }
+      EnableAuditLogs: { default: Enable audit logs }
+
+Rules:
+  SubnetsInVpc:
+    Assertions:
+      - AssertDescription: All subnets must be in the VPC
+        Assert:
+          Fn::EachMemberIn:
+            - Fn::ValueOfAll: [ "AWS::EC2::Subnet::Id", VpcId ]
+            - Fn::RefAll: AWS::EC2::VPC::Id
+
+Resources:
+
+  ###########
+  # Secrets #
+  ###########
+
+  MasterUserSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: Master credentials to connect to the AmazonMQ broker
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "admin1"}'
+        GenerateStringKey: password
+        PasswordLength: !Ref PasswordLength
+        ExcludePunctuation: true
+      Tags:
+        - Key: Name
+          Value: !Sub amazonmq-master-secret-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: amq
+        - Key: Component
+          Value: secretsmanager
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  MasterUserSecretPolicy:
+    Type: AWS::SecretsManager::ResourcePolicy
+    Properties:
+      SecretId: !Ref MasterUserSecret
+      ResourcePolicy:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Deny
+            Principal:
+              AWS: !Ref AWS::AccountId
+            Action: secretsmanager:DeleteSecret
+            Resource: "*"
+
+  MasterUserSecretRotationSchedule:
+    Type: AWS::SecretsManager::RotationSchedule
+    # NB: When creating this resource, SecretsManager will initate a secret
+    #     rotation. So it's better to ensure everything is in place beforehand.
+    #     SecretsManager will perform retries otherwise, but it's cleaner this
+    #     way.
+    DependsOn: RotationLambdaInvokePermission
+    Properties:
+      SecretId: !Ref MasterUserSecret
+      RotationLambdaARN: !GetAtt RotationLambda.Arn
+      RotationRules:
+        AutomaticallyAfterDays: 1000
+        # NB: Actually, a CloudWatch event will trigger a weekly rotation
+        #     during the global maintenance window
+
+  AlfrescoUserSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: >
+        Credentials to allow Alfresco to connect to the AmazonMQ broker
+      GenerateSecretString:
+        SecretStringTemplate: !Sub
+          - '{"username": "alfresco1", "AMQP endpoints": ["${AmqpEndpoints}"]}'
+          - AmqpEndpoints: !Join [ '", "', !GetAtt Broker.AmqpEndpoints ]
+        GenerateStringKey: password
+        PasswordLength: !Ref PasswordLength
+        ExcludePunctuation: true
+      Tags:
+        - Key: Name
+          Value: !Sub amazonmq-alfresco-user-secret-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: amq
+        - Key: Component
+          Value: secretsmanager
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  AlfrescoUserSecretPolicy:
+    Type: AWS::SecretsManager::ResourcePolicy
+    Properties:
+      SecretId: !Ref AlfrescoUserSecret
+      ResourcePolicy:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Deny
+            Principal:
+              AWS: !Ref AWS::AccountId
+            Action: secretsmanager:DeleteSecret
+            Resource: "*"
+
+  AlfrescoUserSecretRotationSchedule:
+    Type: AWS::SecretsManager::RotationSchedule
+    # NB: When creating this resource, SecretsManager will initate a secret
+    #     rotation. So it's better to ensure everything is in place beforehand.
+    #     SecretsManager will perform retries otherwise, but it's cleaner this
+    #     way.
+    DependsOn: RotationLambdaInvokePermission
+    Properties:
+      SecretId: !Ref AlfrescoUserSecret
+      RotationLambdaARN: !GetAtt RotationLambda.Arn
+      RotationRules:
+        AutomaticallyAfterDays: 1000
+        # NB: Actually, a CloudWatch event will trigger a weekly rotation
+        #     during the global maintenance window
+
+  RotationLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: SecretsManagerRotationPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:DescribeSecret
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:PutSecretValue
+                  - secretsmanager:UpdateSecretVersionStage
+                Resource:
+                  - !Ref MasterUserSecret
+                  - !Ref AlfrescoUserSecret
+              - Effect: Allow
+                Action: secretsmanager:GetRandomPassword
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - mq:ListUsers
+                  - mq:CreateUser
+                  - mq:UpdateUser
+                Resource: !GetAtt Broker.Arn
+      Tags:
+        - Key: Name
+          Value: !Sub amazonmq-rotation-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: amq
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ###################
+  # Rotation Lambda #
+  ###################
+
+  RotationLambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for the AmazonMQ Lambda rotation function
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Sub rotation-lambda-security-group-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: amq
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  RotationLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Rotate AmazonMQ secrets
+      Runtime: python3.7
+      Role: !GetAtt RotationLambdaExecutionRole.Arn
+      Handler: amazonmq_rotation_lambda.handler
+      Timeout: 30
+      VpcConfig:
+        SecurityGroupIds: [ !GetAtt RotationLambdaSecurityGroup.GroupId ]
+        SubnetIds: [ !Ref SubnetIdA, !Ref SubnetIdB ]
+      Environment:
+        Variables:
+          PASSWORD_LENGTH: !Ref PasswordLength
+          AMAZONMQ_BROKER_ID: !Ref Broker
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20200501-1228/amazonmq_rotation_lambda/amazonmq_rotation_lambda.zip
+      Tags:
+        - Key: Name
+          Value: !Sub amazonmq-rotation-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: amq
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  RotationLambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref RotationLambda
+      Action: lambda:InvokeFunction
+      Principal: secretsmanager.amazonaws.com
+
+  ###################
+  # AmazonMQ broker #
+  ###################
+
+  AllowedSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group that can access the AmazonMQ broker
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Sub amazonmq-allowed-security-group-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: amq
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  BrokerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for the AmazonMQ broker
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        # TODO: close unnecessary ports
+        - Description: Allow traffic from ArkCase containers for AMQP
+          IpProtocol: tcp
+          FromPort: 5671
+          ToPort: 5671
+          SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
+        - Description: Allow traffic from ArkCase containers for MQTT
+          IpProtocol: tcp
+          FromPort: 8883
+          ToPort: 8883
+          SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
+        - Description: Allow traffic from ArkCase containers for OpenWire
+          IpProtocol: tcp
+          FromPort: 61617
+          ToPort: 61617
+          SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
+        - Description: Allow traffic from ArkCase containers for STOMP
+          IpProtocol: tcp
+          FromPort: 61614
+          ToPort: 61614
+          SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
+        - Description: Allow traffic from ArkCase containers for Websocket
+          IpProtocol: tcp
+          FromPort: 61619
+          ToPort: 61619
+          SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
+      Tags:
+        - Key: Name
+          Value: !Sub amazonmq-broker-security-group-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: amq
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  Broker:
+    Type: AWS::AmazonMQ::Broker
+    Properties:
+      BrokerName: !Sub AmazonMQ-${AWS::StackName}
+      DeploymentMode: ACTIVE_STANDBY_MULTI_AZ
+      EncryptionOptions:
+        UseAwsOwnedKey: true
+      EngineType: ActiveMQ
+      EngineVersion: !Ref ActivemqVersion
+      HostInstanceType: !Ref InstanceType
+      SecurityGroups: [ !GetAtt BrokerSecurityGroup.GroupId ]
+      SubnetIds: [ !Ref SubnetIdA, !Ref SubnetIdB ]
+      PubliclyAccessible: false
+      Users:
+        - Username: !Sub "{{resolve:secretsmanager:${MasterUserSecret}:SecretString:username}}"
+          Password: !Sub "{{resolve:secretsmanager:${MasterUserSecret}:SecretString:password}}"
+      MaintenanceWindowStartTime:
+        DayOfWeek: !Ref MaintenanceDayOfWeek
+        TimeOfDay: !Ref MaintenanceTimeOfDay
+        TimeZone: UTC
+      Logs:
+        Audit: false
+        General: true
+      AutoMinorVersionUpgrade: true
+      Tags:
+        - Key: Name
+          Value: !Sub amazonmq-broker-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: amq
+        - Key: Component
+          Value: amazonmq
+        - Key: ManagedBy
+          Value: CloudFormation
+
+Outputs:
+  AllowedSecurityGroupId:
+    Description: >
+      ID of the security group allowed to connect to the AmazonMQ broker
+    Value: !GetAtt AllowedSecurityGroup.GroupId
+
+  AlfrescoUserSecretArn:
+    Description: ARN of the credential secret to be used by Alfresco
+    Value: !Ref AlfrescoUserSecret
