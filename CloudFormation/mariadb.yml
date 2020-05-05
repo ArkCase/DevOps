@@ -351,7 +351,7 @@ Resources:
           PASSWORD_LENGTH: !Ref PasswordLength
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200504-1925/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200505-1159/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-instance-${Project}-${Env}
@@ -436,7 +436,7 @@ Resources:
       Timeout: 10
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200504-1925/LambdaFunctions/rotation_trigger/rotation_trigger.zip
+        S3Key: DevOps/ACM-TMP-20200505-1159/LambdaFunctions/rotation_trigger/rotation_trigger.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-trigger-lambda-${Project}-${Env}
@@ -583,7 +583,7 @@ Resources:
             ALTER ROUTINE, EVENT, TRIGGER
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200504-1925/LambdaFunctions/mariadb_rotation/mariadb_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200505-1159/LambdaFunctions/mariadb_rotation/mariadb_rotation.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-rotation-lambda-${Project}-${Env}
@@ -668,7 +668,7 @@ Resources:
       Timeout: 10
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200504-1925/LambdaFunctions/rotation_trigger/rotation_trigger.zip
+        S3Key: DevOps/ACM-TMP-20200505-1159/LambdaFunctions/rotation_trigger/rotation_trigger.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-user-trigger-lambda-${Project}-${Env}
