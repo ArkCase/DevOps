@@ -1,0 +1,100 @@
+version: "3"
+
+services:
+#  mariadb:
+#    image: mariadb:10.2
+#    restart: always
+#    volumes:
+#      - mariadb-volume:/var/lib/mysql
+#    environment:
+#      MYSQL_ROOT_PASSWORD: zie3Ethi
+#      MYSQL_USER: alfresco
+#      MYSQL_PASSWORD: hei4aeY9
+#      MYSQL_DATABASE: alfresco
+#    ports:
+#      - 3306:3306
+
+  postgres:
+    image: postgres:11.4
+    environment:
+      - POSTGRES_USER=alfresco
+      - POSTGRES_PASSWORD=hei4aeY9
+      - POSTGRES_DB=alfresco
+    volumes:
+      - postgres-volume:/var/lib/postgresql/data
+    command: postgres -c max_connections=300 -c log_min_messages=LOG
+    ports:
+      - 5432:5432
+
+  activemq:
+    image: alfresco/alfresco-activemq:5.15.8
+    ports:
+      - 8161:8161  # Web console
+      - 5672:5672  # AMQP
+      - 61616:61616  # OpenWire
+      - 61613:61613  # STOMP
+
+  alfresco:
+    image: alfresco/alfresco-governance-repository-community:V3.3.1.x-latest
+    volumes:
+      - alfdata-volume:/usr/local/tomcat/alf_data
+    environment:
+      JAVA_OPTS: >
+        -Ddb.driver=org.postgresql.Driver
+        -Ddb.username=alfresco
+        -Ddb.password=hei4aeY9
+        -Ddb.url=jdbc:postgresql://postgres:5432/alfresco
+        -Dindex.subsystem.name=noindex
+        -Dshare.host=${HOSTNAME}
+        -Dshare.port=8080
+        -Dalfresco.host=${HOSTNAME}
+        -Dalfresco.port=8080
+        -Daos.baseUrlOverwrite=http://${HOSTNAME}:8080/alfresco/aos
+        -Dmessaging.broker.url="failover:(nio://activemq:61616)?timeout=3000&jms.useCompression=true"
+        -Ddeployment.method=DOCKER_COMPOSE
+        -Dcsrf.filter.enabled=false
+        -Djodconverter.enabled=false
+        -Djodconverter.officeHome=null
+        -Xms1500m -Xmx1500m
+        -Dlocal.transform.service.enabled=false
+        -Dtransform.service.enabled=false
+        -Dlegacy.transform.service.enabled=false
+        -DsyncService.mode=OFF
+        -Dsync.mode=OFF
+        -Dsync.pullJob.enabled=false
+        -Dsync.pushJob.enabled=false
+        -Dsystem.usages.enabled=false
+        -Dsystem.usages.clearBatchSize=0
+        -Dactivities.feed.notifier.enabled=false
+        -Dactivities.feed.cleaner.enabled=false
+        -Dactivities.post.cleaner.enabled=false
+        -Dactivities.feed.generator.enabled=false
+        -Dactivities.post.lookup.enabled=false
+        -Dreplication.enabled=false
+        -Dtransferservice.receiver.enabled=false
+        -Dsystem.thumbnail.generate=false
+
+  share:
+    image: alfresco/alfresco-governance-share-community:V3.3.1.x-latest
+    environment:
+      REPO_HOST: alfresco
+      REPO_PORT: 8080
+      JAVA_OPTS: >
+        -Xms500m
+        -Xmx500m
+        -Dalfresco.host=${HOSTNAME}
+        -Dalfresco.port=8080
+        -Dalfresco.context=alfresco
+        -Dalfresco.protocol=http
+
+  nginx:
+    image: alfresco/acs-community-ngnix:1.0.0
+    depends_on:
+      - alfresco
+    ports:
+      - 8080:8080
+
+volumes:
+  #mariadb-volume:
+  postgres-volume:
+  alfdata-volume:
