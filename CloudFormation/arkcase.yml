@@ -299,14 +299,14 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  ElasticIpForNatGatewayA:
+  ElasticIpForNatGateway:
     Type: AWS::EC2::EIP
     DependsOn: InternetGatewayAttachment
     Properties:
       Domain: vpc
       Tags:
         - Key: Name
-          Value: !Sub elastic-ip-for-nat-gateway-A-${Project}-${Env}
+          Value: !Sub elastic-ip-for-nat-gateway-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -318,14 +318,14 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  NatGatewayA:
+  NatGateway:
     Type: AWS::EC2::NatGateway
     Properties:
-      AllocationId: !GetAtt ElasticIpForNatGatewayA.AllocationId
+      AllocationId: !GetAtt ElasticIpForNatGateway.AllocationId
       SubnetId: !Ref PublicSubnetA
       Tags:
         - Key: Name
-          Value: !Sub nat-gateway-A-${Project}-${Env}
+          Value: !Sub nat-gateway-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -398,7 +398,7 @@ Resources:
     Properties:
       RouteTableId: !Ref PrivateRouteTableA
       DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGatewayA
+      NatGatewayId: !Ref NatGateway
 
   PrivateSubnetARouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -429,7 +429,7 @@ Resources:
     Properties:
       RouteTableId: !Ref PrivateRouteTableB
       DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGatewayA
+      NatGatewayId: !Ref NatGateway
 
   PrivateSubnetBRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
