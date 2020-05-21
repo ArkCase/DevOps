@@ -106,20 +106,36 @@ Parameters:
     MinValue: 12
     MaxValue: 80
 
-  AlfrescoRdsInstanceClass:
+  MariadbRdsInstanceClass:
     Type: String
     Description: >
-      RDS instance class for the Alfresco database; for more detail, refer to
-      the official AWS documentation here:
+      RDS instance class for the database; for more detail, refer to the
+      official AWS documentation here:
       https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.DBInstanceClass.html
-    MinLength: 1
-    MaxLength: 20
     Default: db.t3.small
+    AllowedValues: [ db.m5.24xlarge, db.m5.16xlarge, db.m5.12xlarge, db.m5.8xlarge, db.m5.4xlarge, db.m5.4xlarge, db.m5.2xlarge, db.m5.xlarge, db.m5.large,
+                     db.m4.16xlarge, db.m4.10xlarge, db.m4.4xlarge, db.m4.2xlarge, db.m4.xlarge, db.m4.large,
+                     db.z1d.12xlarge, db.z1d.6xlarge, db.z1d.3xlarge, db.z1d.2xlarge, db.z1d.xlarge, db.z1d.large,
+                     db.x1e.32xlarge, db.x1e.16xlarge, db.x1e.8xlarge, db.x1e.4xlarge, db.x1e.2xlarge, db.x1e.xlarge,
+                     db.x1.32xlarge, db.x1.16xlarge,
+                     db.r5.24xlarge, db.r5.16xlarge, db.r5.12xlarge, db.r5.8xlarge, db.r5.4xlarge, db.r5.2xlarge, db.r5.xlarge, db.r5.large,
+                     db.r4.16xlarge, db.r4.8xlarge, db.r4.4xlarge, db.r4.2xlarge, db.r4.xlarge, db.r4.large,
+                     db.t3.2xlarge, db.t3.xlarge, db.t3.large, db.t3.medium, db.t3.small, db.t3.micro,
+                     db.t2.2xlarge, db.t2.xlarge, db.t2.large, db.t2.medium, db.t2.small, db.t2.micro ]
 
-  AlfrescoRdsDiskSizeGB:
+  MariadbRdsDiskSizeGB:
     Type: Number
     MinValue: 20
     Default: 50
+
+  MariadbRdsEnableHotStandby:
+    Type: String
+    Description: >
+      If this is set to `true`, RDS will maintain a hot standy in a different
+      Availability Zone. This will make the database highly available, but
+      will cost more. Please note this has no effect on performance.
+    Default: true
+    AllowedValues: [ true, false ]
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -138,10 +154,11 @@ Metadata:
         Parameters:
           - PasswordsLength
 
-      - Label: { default: Alfresco configuration }
+      - Label: { default: Database configuration }
         Parameters:
-          - AlfrescoRdsInstanceClass
-          - AlfrescoRdsDiskSizeGB
+          - MariadbRdsInstanceClass
+          - MariadbRdsDiskSizeGB
+          - MariadbRdsEnableHotStandby
 
       - Label: { default: Directory Services Configuration }
         Parameters:
@@ -166,8 +183,9 @@ Metadata:
       ActivemqVersion: { default: ActiveMQ version }
       AmazonmqEnableAuditLogs: { default: Enable AmazonMQ audit logs }
       PasswordsLength: { default: Passwords length }
-      AlfrescoRdsInstanceClass: { default: Alfresco RDS instance class }
-      AlfrescoRdsDiskSizeGB: { default: "Alfresco RDS disk size, in GB" }
+      MariadbRdsInstanceClass: { default: MariaDB RDS instance class }
+      MariadbRdsDiskSizeGB: { default: "MariaDB RDS disk size, in GB" }
+      MariadbRdsEnableHotStandby: { default: Enable MariaDB RDS hot standby }
 
 Resources:
 
@@ -477,7 +495,7 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200520-0917/LambdaFunctions/maintenance_windows/maintenance_windows.zip
+        S3Key: DevOps/ACM-TMP-20200521-1648/LambdaFunctions/maintenance_windows/maintenance_windows.zip
       Tags:
         - Key: Name
           Value: !Sub maintenance-windows-lambda-${Project}-${Env}
@@ -502,7 +520,7 @@ Resources:
       # the stack is updated. The reason is that CloudFormation doesn't call
       # the Lambda function during an update unless there is a change in the
       # input parameters.
-      RandomToken: ACM-TMP-20200520-0917
+      RandomToken: ACM-TMP-20200521-1648
 
   ######################################
   # Microsoft Active Directory Service #
@@ -528,7 +546,7 @@ Resources:
   Amazonmq:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200520-0917/CloudFormation/amazonmq.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200521-1648/CloudFormation/amazonmq.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -550,74 +568,366 @@ Resources:
         - Key: Project
           Value: !Ref Project
         - Key: Service
-          Value: alfresco
+          Value: amazonmq
         - Key: Component
           Value: cfn
         - Key: ManagedBy
           Value: CloudFormation
 
   ############
-  # Alfresco #
+  # Database #
   ############
 
-  AlfrescoSecurityGroup:
+  # Security groups
+
+  MariadbRotationLambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Security group for Alfresco containers
+      GroupDescription: Security group for the MariaDB rotation Lambda functions
       VpcId: !Ref Vpc
-      # SecurityGroupIngress:
-      #   - Description: Allow traffic from ArkCase containers
-      #     IpProtocol: tcp
-      #     FromPort: 443
-      #     ToPort: 443
-      #     SourceSecurityGroupId: !GetAtt ArkcaseSecurityGroup.GroupId
       Tags:
         - Key: Name
-          Value: !Sub alfresco-security-group-${Project}-${Env}
+          Value: !Sub mariadb-rotation-lambda-security-group-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
           Value: !Ref Project
         - Key: Service
-          Value: alfresco
+          Value: database
         - Key: Component
           Value: vpc
         - Key: ManagedBy
           Value: CloudFormation
 
-  AlfrescoDatabase:
-    Type: AWS::CloudFormation::Stack
+  MariadbAllowedSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200520-0917/CloudFormation/mariadb.yml
-      TimeoutInMinutes: 30
-      Parameters:
-        Env: !Ref Env
-        Project: !Ref Project
-        VpcId: !Ref Vpc
-        # NB: We can't use lists when creating a nested stack, we have to
-        #     expand it into a comma-separated list.
-        SubnetIds: !Join [ ",", [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ] ]
-        DatabaseName: alfresco
-        InstanceClass: !Ref AlfrescoRdsInstanceClass
-        DiskSizeGB: !Ref AlfrescoRdsDiskSizeGB
-        EnableMultiAZ: true
-        BackupWindow: !Sub ${MaintenanceWindows.StartRdsBackup}-${MaintenanceWindows.EndRdsBackup}
-        MaintenanceWindow:
-          !Sub ${MaintenanceWindows.StartAlfrescoRdsMaintenance}-${MaintenanceWindows.EndAlfrescoRdsMaintenance}
-        PasswordLength: !Ref PasswordsLength
+      GroupDescription: Security group that can access the MariaDB RDS instance
+      VpcId: !Ref Vpc
       Tags:
         - Key: Name
-          Value: !Sub mariadb-for-alfresco-${Project}-${Env}
+          Value: !Sub mariadb-allowed-security-group-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
           Value: !Ref Project
         - Key: Service
-          Value: alfresco
+          Value: database
         - Key: Component
-          Value: cfn
+          Value: vpc
         - Key: ManagedBy
           Value: CloudFormation
+
+  MariadbInstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for the MariaDB RDS instance
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - Description: Allow traffic from rotation Lambda functions
+          IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !GetAtt MariadbRotationLambdaSecurityGroup.GroupId
+        - Description: Allow traffic from authorized security group
+          IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !GetAtt MariadbAllowedSecurityGroup.GroupId
+      Tags:
+        - Key: Name
+          Value: !Sub mariadb-instance-security-group-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # MariaDB Master Secret
+
+  MariadbMasterSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: Master secret
+      GenerateSecretString:
+        SecretStringTemplate: !Sub '{"username": "master"}'
+        GenerateStringKey: password
+        PasswordLength: !Ref PasswordsLength
+        ExcludeCharacters: "'/@\"\\%"
+      Tags:
+        - Key: Name
+          Value: !Sub mariadb-master-secret-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: secretsmanager
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  MariadbMasterSecretPolicy:
+    Type: AWS::SecretsManager::ResourcePolicy
+    Properties:
+      SecretId: !Ref MariadbMasterSecret
+      ResourcePolicy:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Deny
+            Principal:
+              AWS: !Ref AWS::AccountId
+            Action: secretsmanager:DeleteSecret
+            Resource: "*"
+
+  # MariaDB Master Secret Rotation Lambda
+
+  MariadbMasterRotationLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: SecretsManagerRotationPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:DescribeSecret
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:PutSecretValue
+                  - secretsmanager:UpdateSecretVersionStage
+                Resource: !Ref MariadbMasterSecret
+
+              - Effect: Allow
+                Action: secretsmanager:GetRandomPassword
+                Resource: "*"
+      Tags:
+        - Key: Name
+          Value: !Sub mariadb-master-secret-rotation-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  MariadbMasterRotationLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Rotate MariaDB master secret
+      Runtime: python3.7
+      Role: !GetAtt MariadbMasterRotationLambdaExecutionRole.Arn
+      Handler: mariadb_master_rotation.handler
+      Timeout: 30
+      VpcConfig:
+        SecurityGroupIds: [ !GetAtt MariadbRotationLambdaSecurityGroup.GroupId ]
+        SubnetIds: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
+      Environment:
+        Variables:
+          PASSWORD_LENGTH: !Ref PasswordsLength
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20200521-1648/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
+      Tags:
+        - Key: Name
+          Value: !Sub mariadb-master-rotation-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  MariadbMasterRotationLambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref MariadbMasterRotationLambda
+      Action: lambda:InvokeFunction
+      Principal: secretsmanager.amazonaws.com
+
+  # MariaDB Master Secret Rotation Schedule
+
+  MariadbMasterSecretRotationSchedule:
+    Type: AWS::SecretsManager::RotationSchedule
+    # NB: When CloudFormation initially creates this resource, SecretsManager
+    #     will initate a secret rotation. So it's better to ensure everything
+    #     is in place beforehand. SecretsManager will perform retries
+    #     otherwise, but it's cleaner this way.
+    DependsOn: [ MariadbMasterSecretAttachment, MariadbMasterRotationLambdaInvokePermission ]
+    Properties:
+      SecretId: !Ref MariadbMasterSecret
+      RotationLambdaARN: !GetAtt MariadbMasterRotationLambda.Arn
+      RotationRules:
+        # NB: Password rotation will be triggered by a CloudWatch event, check
+        #     the `MariadbMasterTriggerRule` resource.
+        AutomaticallyAfterDays: 1000
+
+  MariadbMasterTriggerLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: TriggerPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:RotateSecret
+                Resource: !Ref MariadbMasterSecret
+      Tags:
+        - Key: Name
+          Value: !Sub mariadb-master-trigger-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  MariadbMasterTriggerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Trigger a master secret rotation
+      Runtime: python3.7
+      Role: !GetAtt MariadbMasterTriggerLambdaExecutionRole.Arn
+      Handler: rotation_trigger.handler
+      Timeout: 30
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20200521-1648/LambdaFunctions/rotation_trigger/rotation_trigger.zip
+      Tags:
+        - Key: Name
+          Value: !Sub mariadb-master-trigger-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  MariadbMasterTriggerRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Periodically trigger a master secret rotation
+      ScheduleExpression: !Sub cron(${MaintenanceWindows.StartRotateMasterPasswords})
+      State: ENABLED
+      Targets:
+        - Id: MariadbMasterTrigger
+          Arn: !GetAtt MariadbMasterTriggerLambda.Arn
+          Input: !Sub '{"SecretArn": "${MariadbMasterSecret}"}'
+
+  MariadbMasterTriggerInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref MariadbMasterTriggerLambda
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt MariadbMasterTriggerRule.Arn
+
+  # MariaDB RDS instance
+
+  MariadbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet for the MariaDB RDS instance
+      SubnetIds: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
+      Tags:
+        - Key: Name
+          Value: !Sub mariadb-db-subnet-group-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: rds
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  MariadbInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    Properties:
+      DBInstanceClass: !Ref MariadbRdsInstanceClass
+      Engine: mariadb
+      EngineVersion: 10.4.8
+      AutoMinorVersionUpgrade: true
+      StorageType: gp2
+      StorageEncrypted: true
+      AllocatedStorage: !Ref MariadbRdsDiskSizeGB
+      BackupRetentionPeriod: 35
+      VPCSecurityGroups: [ !GetAtt MariadbInstanceSecurityGroup.GroupId ]
+      DBSubnetGroupName: !Ref MariadbSubnetGroup
+      MultiAZ: !Ref MariadbRdsEnableHotStandby
+      PubliclyAccessible: false
+      PreferredBackupWindow:
+        !Sub ${MaintenanceWindows.StartRdsBackup}-${MaintenanceWindows.EndRdsBackup}
+      PreferredMaintenanceWindow:
+        !Sub ${MaintenanceWindows.StartRdsMaintenance}-${MaintenanceWindows.EndRdsMaintenance}
+      MasterUsername: !Sub "{{resolve:secretsmanager:${MariadbMasterSecret}:SecretString:username}}"
+      MasterUserPassword: !Sub "{{resolve:secretsmanager:${MariadbMasterSecret}:SecretString:password}}"
+      CACertificateIdentifier: rds-ca-2019
+      Tags:
+        - Key: Name
+          Value: !Sub mariadb-rds-instance-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: database
+        - Key: Component
+          Value: rds
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  MariadbMasterSecretAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref MariadbMasterSecret
+      TargetType: AWS::RDS::DBInstance
+      TargetId: !Ref MariadbInstance
 
 Outputs:
   StartBlockTraffic:
@@ -640,13 +950,13 @@ Outputs:
     Description: When to end backing up RDS instances
     Value: !GetAtt MaintenanceWindows.EndRdsBackup
 
-  StartAlfrescoRdsMaintenance:
-    Description: When to start maintenance of the Alfresco RDS instance
-    Value: !GetAtt MaintenanceWindows.StartAlfrescoRdsMaintenance
+  StartRdsMaintenance:
+    Description: When to start maintenance of the RDS instance
+    Value: !GetAtt MaintenanceWindows.StartRdsMaintenance
 
-  EndAlfrescoRdsMaintenance:
-    Description: When to end maintenance of the Alfresco RDS instance
-    Value: !GetAtt MaintenanceWindows.EndAlfrescoRdsMaintenance
+  EndRdsMaintenance:
+    Description: When to end maintenance of the RDS instance
+    Value: !GetAtt MaintenanceWindows.EndRdsMaintenance
 
   StartAmazonmqMaintenanceDayOfWeek:
     Description: When to start maintenance of AmazonMQ (day of week)

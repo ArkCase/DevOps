@@ -20,7 +20,7 @@ def handler(event, context):
         "ResourceType": "Custom::MaintenanceWindows",  # or whatever
         "LogicalResourceId": "MaintenanceWindows",     # or whatever
         "ResourceProperties": {
-          "Start": "Sun:08:00"  # Maintenance window start time in UTC
+          "Start": "Sun:08:00"  # Maintenance window start time in day of the week + UTC
         }
     }
 
@@ -73,11 +73,11 @@ def compute_maintenance_windows(event):
     end = start.next(30)
     data['EndRdsBackup'] = end.get_time()
 
-    # 30' window to perform Alfresco RDS maintenance
+    # 30' window to perform maintenance on all RDS instances
     start = end
-    data['StartAlfrescoRdsMaintenance'] = start.get_day_and_time()
+    data['StartRdsMaintenance'] = start.get_day_and_time()
     end = start.next(30)
-    data['EndAlfrescoRdsMaintenance'] = end.get_day_and_time()
+    data['EndRdsMaintenance'] = end.get_day_and_time()
 
     # 30' window to perform AmazonMQ maintenance
     start = end
