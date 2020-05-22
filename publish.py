@@ -65,6 +65,7 @@ def replace_package_version(filepath):
 
 templates = [
     "CloudFormation/arkcase.yml",
+    "CloudFormation/mariadb-user-secret.yml",
     "CloudFormation/amazonmq.yml",
     "CloudFormation/amqsecretcfg.yml",
 ]

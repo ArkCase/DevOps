@@ -71,7 +71,6 @@ def handle_request(event):
     client = boto3.client("secretsmanager")
     value = client.get_secret_value(SecretId=secret_arn)
     master_secret = json.loads(value['SecretString'])
-    print(f"XXX master_secret: {master_secret}")
     host = master_secret['host']
     username = master_secret['username']
     password = master_secret['password']
@@ -115,3 +114,4 @@ def send_response(event, success: bool, msg="", data={}):
     body = json.dumps(response)
     print(f"Sending response back to CloudFormation: {response['Status']}")
     requests.put(event['ResponseURL'], headers=headers, data=body)
+    print(f"Response successfully sent to CloudFormation")
