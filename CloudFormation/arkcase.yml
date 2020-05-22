@@ -495,7 +495,7 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200521-1648/LambdaFunctions/maintenance_windows/maintenance_windows.zip
+        S3Key: DevOps/ACM-TMP-20200522-1228/LambdaFunctions/maintenance_windows/maintenance_windows.zip
       Tags:
         - Key: Name
           Value: !Sub maintenance-windows-lambda-${Project}-${Env}
@@ -520,7 +520,7 @@ Resources:
       # the stack is updated. The reason is that CloudFormation doesn't call
       # the Lambda function during an update unless there is a change in the
       # input parameters.
-      RandomToken: ACM-TMP-20200521-1648
+      RandomToken: ACM-TMP-20200522-1228
 
   ######################################
   # Microsoft Active Directory Service #
@@ -546,7 +546,7 @@ Resources:
   Amazonmq:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200521-1648/CloudFormation/amazonmq.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200522-1228/CloudFormation/amazonmq.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -580,14 +580,14 @@ Resources:
 
   # Security groups
 
-  MariadbRotationLambdaSecurityGroup:
+  MariadbLambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Security group for the MariaDB rotation Lambda functions
+      GroupDescription: Security group for the Lambda functions that access MariaDB
       VpcId: !Ref Vpc
       Tags:
         - Key: Name
-          Value: !Sub mariadb-rotation-lambda-security-group-${Project}-${Env}
+          Value: !Sub mariadb-lambda-security-group-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -624,11 +624,11 @@ Resources:
       GroupDescription: Security group for the MariaDB RDS instance
       VpcId: !Ref Vpc
       SecurityGroupIngress:
-        - Description: Allow traffic from rotation Lambda functions
+        - Description: Allow traffic from MariaDB-related Lambda functions
           IpProtocol: tcp
           FromPort: 3306
           ToPort: 3306
-          SourceSecurityGroupId: !GetAtt MariadbRotationLambdaSecurityGroup.GroupId
+          SourceSecurityGroupId: !GetAtt MariadbLambdaSecurityGroup.GroupId
         - Description: Allow traffic from authorized security group
           IpProtocol: tcp
           FromPort: 3306
@@ -740,14 +740,14 @@ Resources:
       Handler: mariadb_master_rotation.handler
       Timeout: 30
       VpcConfig:
-        SecurityGroupIds: [ !GetAtt MariadbRotationLambdaSecurityGroup.GroupId ]
+        SecurityGroupIds: [ !GetAtt MariadbLambdaSecurityGroup.GroupId ]
         SubnetIds: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
       Environment:
         Variables:
           PASSWORD_LENGTH: !Ref PasswordsLength
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200521-1648/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200522-1228/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-rotation-lambda-${Project}-${Env}
@@ -830,7 +830,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200521-1648/LambdaFunctions/rotation_trigger/rotation_trigger.zip
+        S3Key: DevOps/ACM-TMP-20200522-1228/LambdaFunctions/rotation_trigger/rotation_trigger.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-trigger-lambda-${Project}-${Env}
@@ -928,6 +928,85 @@ Resources:
       SecretId: !Ref MariadbMasterSecret
       TargetType: AWS::RDS::DBInstance
       TargetId: !Ref MariadbInstance
+
+  # Lambda function for CFN custom resource to create a database
+
+  MariadbCreateDatabaseLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: CreateDatabasePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref MariadbMasterSecret
+      Tags:
+        - Key: Name
+          Value: !Sub mariadb-create-database-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: admin
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  MariadbCreateDatabaseLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Create a database/schema in a MariaDB server
+      Runtime: python3.7
+      Role: !GetAtt MariadbCreateDatabaseLambdaExecutionRole.Arn
+      Handler: mariadb_create_database.handler
+      Timeout: 30
+      VpcConfig:
+        SecurityGroupIds: [ !GetAtt MariadbLambdaSecurityGroup.GroupId ]
+        SubnetIds: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20200522-1228/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
+      Tags:
+        - Key: Name
+          Value: !Sub mariadb-create-database-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: admin
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ############
+  # Alfresco #
+  ############
+
+  AlfrescoDatabase:
+    Type: Custom::MariadbDatabase
+    # NB: The Lambda function needs the secret to have the `host` fields etc.
+    #     So we need to wait until the attachment is done.
+    DependsOn: [ MariadbMasterSecretAttachment ]
+    Properties:
+      ServiceToken: !GetAtt MariadbCreateDatabaseLambda.Arn
+      SecretArn: !Ref MariadbMasterSecret
+      DatabaseName: alfresco
 
 Outputs:
   StartBlockTraffic:
