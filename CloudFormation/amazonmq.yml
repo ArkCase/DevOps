@@ -435,7 +435,7 @@ Resources:
 
   Broker:
     Type: AWS::AmazonMQ::Broker
-    DependsOn: MasterSecret
+    DependsOn: [ MasterSecret, AlfrescoUserSecret ]
     Properties:
       BrokerName: !Sub AmazonMQ-${AWS::StackName}
       DeploymentMode: ACTIVE_STANDBY_MULTI_AZ
@@ -510,7 +510,7 @@ Resources:
   MasterSecretConfig:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200520-0917/CloudFormation/amqsecretcfg.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200527-0532/CloudFormation/amqsecretcfg.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
@@ -566,7 +566,7 @@ Resources:
   AlfrescoUserSecretConfig:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200520-0917/CloudFormation/amqsecretcfg.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200527-0532/CloudFormation/amqsecretcfg.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
