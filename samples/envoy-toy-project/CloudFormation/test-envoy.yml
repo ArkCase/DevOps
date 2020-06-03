@@ -1,0 +1,374 @@
+Parameters:
+
+  VpcCidr:
+    Type: String
+    Description: CIDR block for the VPC
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: ^\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}/\d{1,2}$
+    ConstraintDescription: Must be a valid CIDR range like "10.10.0.0/16"
+    Default: 10.210.0.0/16
+
+  Route53HostedZoneId:
+    Type: AWS::Route53::HostedZone::Id
+    Description: ID of the hosted zone for the domain name served by this app
+
+  DomainName:
+    Type: String
+    Description: Domain name served by this app
+    MinLength: 1
+    Default: test-envoy.arkcaselab.com
+
+  CertificateArn:
+    Type: String
+    Description: ARN of the SSL certificate
+
+Resources:
+
+  #######
+  # VPC #
+  #######
+
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: vpc-test-envoy
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Select [ 0, !Cidr [ !Ref VpcCidr, 4, 10 ] ]
+      AvailabilityZone: !Select [ 0, !GetAZs ]
+      Tags:
+        - Key: Name
+          Value: public-subnet-A-test-envoy
+
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Select [ 1, !Cidr [ !Ref VpcCidr, 4, 10 ] ]
+      AvailabilityZone: !Select [ 1, !GetAZs ]
+      Tags:
+        - Key: Name
+          Value: public-subnet-B-test-envoy
+
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Select [ 2, !Cidr [ !Ref VpcCidr, 4, 10 ] ]
+      AvailabilityZone: !Select [ 0, !GetAZs ]
+      Tags:
+        - Key: Name
+          Value: private-subnet-A-test-envoy
+
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Select [ 3, !Cidr [ !Ref VpcCidr, 4, 10 ] ]
+      AvailabilityZone: !Select [ 1, !GetAZs ]
+      Tags:
+        - Key: Name
+          Value: private-subnet-B-test-envoy
+
+  ElasticIpForNatGateway:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt ElasticIpForNatGateway.AllocationId
+      SubnetId: !Ref PublicSubnetA
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+
+  DefaultPrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  PrivateSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetB
+      RouteTableId: !Ref PrivateRouteTable
+
+  #################
+  # Load balancer #
+  #################
+
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for the load balancer
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - Description: http
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - Description: https
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Scheme: internet-facing
+      SecurityGroups: [ !GetAtt LoadBalancerSecurityGroup.GroupId ]
+      Subnets: [ !Ref PublicSubnetA, !Ref PublicSubnetB ]
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Port: 443
+      Protocol: HTTPS
+      VpcId: !Ref Vpc
+      TargetType: ip
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 10
+      HealthCheckProtocol: HTTPS
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+
+  ListenerHttp:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Host: '#{host}'
+            Path: '/#{path}'
+            Query: '#{query}'
+            Port: 443
+            Protocol: HTTPS
+            StatusCode: HTTP_302
+
+  ListenerHttps:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      Certificates:
+        - CertificateArn: !Ref CertificateArn
+
+  ###########
+  # Route53 #
+  ###########
+
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Ref DomainName
+      Type: A
+      HostedZoneId: !Ref Route53HostedZoneId
+      AliasTarget:
+        DNSName: !GetAtt LoadBalancer.DNSName
+        EvaluateTargetHealth: false
+        HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
+
+  ###############
+  # ECS cluster #
+  ###############
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: test-envoy
+      RetentionInDays: 30
+
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: test-envoy
+      Cpu: 256
+      Memory: 512
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      RequiresCompatibilities: [ FARGATE ]
+      NetworkMode: awsvpc
+      ContainerDefinitions:
+        - Name: nginx
+          Image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/nginx-unprivileged:alpine-2
+          Essential: true
+          HealthCheck:
+            Command: [ "CMD-SHELL", "curl -f http://localhost:8080/" ]
+            Interval: 10
+            Retries: 2
+            StartPeriod: 10
+            Timeout: 2
+          PortMappings:
+            - ContainerPort: 8080
+              Protocol: tcp
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref LogGroup
+              awslogs-stream-prefix: nginx
+        - Name: envoy
+          Image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/test-envoy:ssl-4
+          Essential: false
+          HealthCheck:
+            Command: [ "CMD-SHELL", "curl -f http://localhost:8081/" ]
+            Interval: 10
+            Retries: 2
+            StartPeriod: 10
+            Timeout: 2
+          Environment:
+            - Name: DOMAIN_NAME
+              Value: arkcase.internal
+            - Name: TEST_ENVOY_HTTPS_PORT
+              Value: 8443
+            - Name: TEST_ENVOY_UPSTREAM_HOST
+              Value: 127.0.0.1  # Containers in a task can access each others on localhost
+            - Name: TEST_ENVOY_UPSTREAM_PORT
+              Value: 8080
+            - Name: TEST_ENVOY_ADMIN_PORT
+              Value: 8081
+          PortMappings:
+            - ContainerPort: 8443
+              Protocol: tcp
+            - ContainerPort: 8081  # Admin console, careful with that!
+              Protocol: tcp
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref LogGroup
+              awslogs-stream-prefix: envoy
+
+  TaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for the app ECS task
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - Description: HTTPS from load balancer
+          IpProtocol: tcp
+          FromPort: 8443
+          ToPort: 8443
+          SourceSecurityGroupId: !GetAtt LoadBalancerSecurityGroup.GroupId
+        - Description: HTTPS debug
+          IpProtocol: tcp
+          FromPort: 8443
+          ToPort: 8443
+          CidrIp: 0.0.0.0/0
+        - Description: HTTP debug
+          IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+
+  Service:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 2
+      HealthCheckGracePeriodSeconds: 10
+      LoadBalancers:
+        - ContainerName: envoy
+          ContainerPort: 8443
+          TargetGroupArn: !Ref TargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups: [ !GetAtt TaskSecurityGroup.GroupId ]
+          Subnets: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
