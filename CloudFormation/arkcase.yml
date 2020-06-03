@@ -1028,7 +1028,8 @@ Resources:
     DependsOn: MariadbMasterSecretAttachment
     # NB: Upon deletion, for some reason, the backend Lambda function times out
     #     trying to communicate with the `ResponseURL`. In order to work around
-    #     that bug, tell CloudFormation to not delete that custom resource.
+    #     that CloudFormation bug, tell CloudFormation to not delete this
+    #     `AlfrescoDatabase` custom resource.
     #     Please note that this does not mean that the database will not be
     #     destroyed. It will, along with the RDS instance.
     DeletionPolicy: Retain
