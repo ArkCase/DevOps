@@ -495,7 +495,7 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200527-0532/LambdaFunctions/maintenance_windows/maintenance_windows.zip
+        S3Key: DevOps/ACM-TMP-20200527-1157/LambdaFunctions/maintenance_windows/maintenance_windows.zip
       Tags:
         - Key: Name
           Value: !Sub maintenance-windows-lambda-${Project}-${Env}
@@ -520,7 +520,7 @@ Resources:
       # the stack is updated. The reason is that CloudFormation doesn't call
       # the Lambda function during an update unless there is a change in the
       # input parameters.
-      RandomToken: ACM-TMP-20200527-0532
+      RandomToken: ACM-TMP-20200527-1157
 
   ######################################
   # Microsoft Active Directory Service #
@@ -546,7 +546,7 @@ Resources:
   Amazonmq:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200527-0532/CloudFormation/amazonmq.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200527-1157/CloudFormation/amazonmq.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -747,7 +747,7 @@ Resources:
           PASSWORD_LENGTH: !Ref PasswordsLength
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200527-0532/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200527-1157/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-rotation-lambda-${Project}-${Env}
@@ -830,7 +830,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200527-0532/LambdaFunctions/rotation_trigger/rotation_trigger.zip
+        S3Key: DevOps/ACM-TMP-20200527-1157/LambdaFunctions/rotation_trigger/rotation_trigger.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-trigger-lambda-${Project}-${Env}
@@ -1002,7 +1002,7 @@ Resources:
         SubnetIds: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200527-0532/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
+        S3Key: DevOps/ACM-TMP-20200527-1157/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-create-database-lambda-${Project}-${Env}
@@ -1025,9 +1025,14 @@ Resources:
     Type: Custom::MariadbDatabase
     # NB: The Lambda function needs the secret to have the `host` fields etc.
     #     So we need to wait until the attachment is done.
-    #     Also, make sure that upon deletion of this resource, the Lambda
-    #     function implementing its backend is still alive.
-    DependsOn: [ MariadbMasterSecretAttachment, MariadbCreateDatabaseLambda ]
+    DependsOn: MariadbMasterSecretAttachment
+    # NB: Upon deletion, for some reason, the backend Lambda function times out
+    #     trying to communicate with the `ResponseURL`. In order to work around
+    #     that CloudFormation bug, tell CloudFormation to not delete this
+    #     `AlfrescoDatabase` custom resource.
+    #     Please note that this does not mean that the database will not be
+    #     destroyed. It will, along with the RDS instance.
+    DeletionPolicy: Retain
     Properties:
       ServiceToken: !GetAtt MariadbCreateDatabaseLambda.Arn
       SecretArn: !Ref MariadbMasterSecret
@@ -1051,7 +1056,7 @@ Resources:
     # Make sure the user is created after the database
     DependsOn: AlfrescoDatabase
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200527-0532/CloudFormation/mariadb-user-secret.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200527-1157/CloudFormation/mariadb-user-secret.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
