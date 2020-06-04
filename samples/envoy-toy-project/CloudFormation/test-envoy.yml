@@ -288,7 +288,7 @@ Resources:
       NetworkMode: awsvpc
       ContainerDefinitions:
         - Name: nginx
-          Image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/nginx-unprivileged:alpine-2
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.us-west-1.amazonaws.com/nginx-unprivileged:alpine-2
           Essential: true
           HealthCheck:
             Command: [ "CMD-SHELL", "curl -f http://localhost:8080/" ]
@@ -306,7 +306,7 @@ Resources:
               awslogs-group: !Ref LogGroup
               awslogs-stream-prefix: nginx
         - Name: envoy
-          Image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/test-envoy:ssl-4
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.us-west-1.amazonaws.com/test-envoy:ssl-4
           Essential: false
           HealthCheck:
             Command: [ "CMD-SHELL", "curl -f http://localhost:8081/" ]
