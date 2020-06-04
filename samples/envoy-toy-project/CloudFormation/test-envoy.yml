@@ -21,7 +21,11 @@ Parameters:
 
   CertificateArn:
     Type: String
-    Description: ARN of the SSL certificate
+    Description: >
+      ARN of the SSL certificate stored in ACM for the DomainName. You must
+      create an SSL certificate in ACM prior to creating this stack and
+      provide its ARN in this box.
+    MinLength: 1
 
 Resources:
 
