@@ -1,3 +1,10 @@
+# Copyright (c) 2020 Armedia, LLC
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >
+  Deploy a toy example demonstrating end-to-end encryption using Envoy proxy
+
 Parameters:
 
   VpcCidr:
@@ -26,6 +33,33 @@ Parameters:
       create an SSL certificate in ACM prior to creating this stack and
       provide its ARN in this box.
     MinLength: 1
+
+  AppImage:
+    Type: String
+    Description: Name of the Docker image the runs the app
+    MinLength: 1
+    Default: 300674751221.dkr.ecr.us-west-1.amazonaws.com/nginx-unprivileged:alpine-2
+
+  EnvoyImage:
+    Type: String
+    Description: Name of the Docker image the runs the Envoy proxy
+    MinLength: 1
+    Default: 300674751221.dkr.ecr.us-west-1.amazonaws.com/test-envoy:ssl-4
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: { default: Networking }
+        Parameters:
+          - VpcCidr
+          - Route53HostedZoneId
+          - DomainName
+          - CertificateArn
+
+      - Label: { default: Docker images }
+        Parameters:
+          - AppImage
+          - EnvoyImage
 
 Resources:
 
@@ -288,7 +322,7 @@ Resources:
       NetworkMode: awsvpc
       ContainerDefinitions:
         - Name: nginx
-          Image: !Sub ${AWS::AccountId}.dkr.ecr.us-west-1.amazonaws.com/nginx-unprivileged:alpine-2
+          Image: !Ref AppImage
           Essential: true
           HealthCheck:
             Command: [ "CMD-SHELL", "curl -f http://localhost:8080/" ]
@@ -306,7 +340,7 @@ Resources:
               awslogs-group: !Ref LogGroup
               awslogs-stream-prefix: nginx
         - Name: envoy
-          Image: !Sub ${AWS::AccountId}.dkr.ecr.us-west-1.amazonaws.com/test-envoy:ssl-4
+          Image: !Ref EnvoyImage
           Essential: false
           HealthCheck:
             Command: [ "CMD-SHELL", "curl -f http://localhost:8081/" ]
