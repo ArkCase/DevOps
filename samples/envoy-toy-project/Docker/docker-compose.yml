@@ -1,0 +1,24 @@
+version: "3"
+
+services:
+  nginx:
+    image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/nginx-unprivileged:alpine-2
+    build:
+      context: nginx
+    ports:
+      - 8080:8080
+
+  envoy:
+    depends_on: [ nginx ]
+    image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/test-envoy:ssl-4
+    build:
+      context: envoy
+    environment:
+      DOMAIN_NAME: arkcase.internal
+      TEST_ENVOY_HTTPS_PORT: 8443
+      TEST_ENVOY_UPSTREAM_HOST: nginx
+      TEST_ENVOY_UPSTREAM_PORT: 8080
+      TEST_ENVOY_ADMIN_PORT: 8081
+    ports:
+      - 8443:8443
+      - 8081:8081
