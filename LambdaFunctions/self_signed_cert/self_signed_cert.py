@@ -2,6 +2,7 @@
 
 import boto3
 import botocore
+import traceback
 import cryptography
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
@@ -37,7 +38,7 @@ def handler(event, context):
 
             "KeyUsage": {             # Key usage extension, optional
               "Critical": true,       # Whether these key usages are critical; optional, default to `false`
-              [                       # List of usages; absent means "no"
+              "Usages": [             # List of usages; absent means "no"
                 "DigitalSignature",   # Can verify digital signatures
                 "ContentCommitment",  # Non-repudiation
                 "KeyEncipherment",    # Can encrypt keys
@@ -78,6 +79,7 @@ def handler(event, context):
     try:
         response = handle_request(event)
     except Exception as e:
+        traceback.print_exc()
         response = {
             'Success': False,
             'Reason': str(e)
@@ -86,8 +88,6 @@ def handler(event, context):
 
 
 def handle_request(event):
-    ssm = boto3.client("ssm")
-
     # Generate the private key
     key_type = event['KeyType']
     if key_type == "RSA":
@@ -125,7 +125,7 @@ def handle_request(event):
     ).not_valid_before(
         datetime.datetime.utcnow()
     ).not_valid_after(
-        datetime.datetie.utcnow() + datetime.timedelta(days=int(event['ValidityDays']))
+        datetime.datetime.utcnow() + datetime.timedelta(days=int(event['ValidityDays']))
     )
 
     if 'BasicConstraints' in event:
@@ -141,15 +141,16 @@ def handle_request(event):
     if 'KeyUsage' in event:
         key_usage = event['KeyUsage']
         critical = key_usage.get('Critical', False)
-        digital_signature = key_usage.get('DigitalSignature', False)
-        content_commitment = key_usage.get('ContentCommitment', False)
-        key_encipherment = key_usage.get('KeyEncipherment', False)
-        data_encipherment = key_usage.get('DataEncipherment', False)
-        key_agreement = key_usage.get('KeyAgreement', False)
-        key_cert_sign = key_usage.get('KeyCertSign', False)
-        crl_sign = key_usage.get('CrlSign', False)
-        encipher_only = key_usage.get('EncipherOnly', False)
-        decipher_only = key_usage.get('DecipherOnly', False)
+        usages = key_usage['Usages']
+        digital_signature = 'DigitalSignature' in usages
+        content_commitment = 'ContentCommitment' in usages
+        key_encipherment = 'KeyEncipherment' in usages
+        data_encipherment = 'DataEncipherment' in usages
+        key_agreement = 'KeyAgreement' in usages
+        key_cert_sign = 'KeyCertSign' in usages
+        crl_sign = 'CrlSign' in usages
+        encipher_only = 'EncipherOnly' in usages
+        decipher_only = 'DecipherOnly' in usages
         cert = cert.add_extension(
             x509.KeyUsage(
                 digital_signature=digital_signature,
@@ -174,52 +175,44 @@ def handle_request(event):
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption()
-    )
+    ).decode('utf8')
 
     tags = []
     if 'KeyTags' in event:
-        for k, v in event['KeyTags']:
+        for k, v in event['KeyTags'].items():
             tags.append({
                 'Key': k,
                 'Value': v
             })
 
-    ssm.put_parameter(
-        Name=parameter_name,
-        Description="Private key for " + event['CommonName']
-        Value=key_value,
-        Type="SecureString",
-        Overwrite=True,
-        Tags=tags
+    key_parameter_arn = upsert_param(
+        parameter_name,
+        key_value,
+        "Private key for " + event['CommonName'],
+        "SecureString",
+        tags
     )
-
-    response = ssm.get_parameter(Name=parameter_name)
-    key_parameter_arn = response['Parameter']['ARN']
 
     # Save the certificate
 
     parameter_name = event['CertParameterName']
-    cert_value = cert.public_bytes(serialization.Encoding.PEM)
+    cert_value = cert.public_bytes(serialization.Encoding.PEM).decode('utf8')
 
     tags = []
     if 'CertTags' in event:
-        for k, v in event['CertTags']:
+        for k, v in event['CertTags'].items():
             tags.append({
                 'Key': k,
                 'Value': v
             })
 
-    ssm.put_parameter(
-        Name=parameter_name,
-        Description="X.509 certificate for " + event['CommonName']
-        Value=cert_value,
-        Type="String",
-        Overwrite=True,
-        Tags=tags
+    cert_parameter_arn = upsert_param(
+        parameter_name,
+        cert_value,
+        "X.509 certificate for " + event['CommonName'],
+        "String",
+        tags
     )
-
-    response = ssm.get_parameter(Name=parameter_name)
-    cert_parameter_arn = response['Parameter']['ARN']
 
     # Build response
 
@@ -229,3 +222,44 @@ def handle_request(event):
         'KeyParameterArn': key_parameter_arn,
         'CertParameterArn': cert_parameter_arn
     }
+
+
+def upsert_param(name: str, value: str, desc: str, param_type: str, tags: dict):
+    """
+    Save the parameter
+
+    Returns: The parameter's ARN
+    """
+    # NB: `put_parameter()` doesn't allow `Overwrite` to be set to `True` and
+    #     tags to be set as well.
+    ssm = boto3.client("ssm")
+    ssm.put_parameter(
+        Name=name,
+        Value=value,
+        Description=desc,
+        Type=param_type,
+        Overwrite=True
+    )
+
+    # Erase all existing tags
+    response = ssm.list_tags_for_resource(
+        ResourceType="Parameter",
+        ResourceId=name
+    )
+    ssm.remove_tags_from_resource(
+        ResourceType="Parameter",
+        ResourceId=name,
+        TagKeys=[i['Key'] for i in response['TagList']]
+    )
+
+    # Save new tags
+    if tags:
+        ssm.add_tags_to_resource(
+            ResourceType="Parameter",
+            ResourceId=name,
+            Tags=tags
+        )
+
+    # Return the parameter's ARN
+    response = ssm.get_parameter(Name=name)
+    return response['Parameter']['ARN']
