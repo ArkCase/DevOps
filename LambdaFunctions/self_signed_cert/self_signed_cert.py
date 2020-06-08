@@ -77,7 +77,13 @@ def handler(event, context):
     """
 
     try:
-        response = handle_request(event)
+        key_parameter_arn, cert_parameter_arn = handle_request(event)
+        response = {
+            'Success': True,
+            'Reason': "Successfully created/updated private key and certificate for " + event['CommonName'],
+            'KeyParameterArn': key_parameter_arn,
+            'CertParameterArn': cert_parameter_arn
+        }
     except Exception as e:
         traceback.print_exc()
         response = {
@@ -214,14 +220,8 @@ def handle_request(event):
         tags
     )
 
-    # Build response
-
-    return {
-        'Success': True,
-        'Reason': "Successfully created/updated private key and certificate for " + event['CommonName'],
-        'KeyParameterArn': key_parameter_arn,
-        'CertParameterArn': cert_parameter_arn
-    }
+    # Done
+    return key_parameter_arn, cert_parameter_arn
 
 
 def upsert_param(name: str, value: str, desc: str, param_type: str, tags: dict):
