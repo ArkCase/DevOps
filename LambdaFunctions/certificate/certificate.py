@@ -59,12 +59,12 @@ def handler(event, context):
           "CaKeyParameterName": "XYZ",
           "CaCertParameterName": "XYZ",
 
-          # Name of the SSM Parameter where to save the private key
+          # Name of the SSM parameter where to save the private key
           "KeyParameterName": "/arkcase/pki/private/my-key",
-          # Name of the SSM Parameter where to save the certificate
+          # Name of the SSM parameter where to save the certificate
           "CertParameterName": "/arkcase/pki/certs/my-cert",
 
-          "KeyTags": [  # Tags to add to the private key parameter, optional
+          "KeyTags": [  # Tags for the private key parameter, optional
             {
               "Key": "tag key",
               "Value": "tag value"
@@ -74,7 +74,7 @@ def handler(event, context):
               "Value": "tag value 2"
             }
           ],
-          "CertTags": [  # Tags to add to the certificate parameter, optional
+          "CertTags": [  # Tags for the certificate parameter, optional
             {
               "Key": "tag key",
               "Value": "tag value"
