@@ -68,6 +68,7 @@ templates = [
     "CloudFormation/mariadb-user-secret.yml",
     "CloudFormation/amazonmq.yml",
     "CloudFormation/amqsecretcfg.yml",
+    "CloudFormation/pki.yml"
 ]
 
 for i in templates:

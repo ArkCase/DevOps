@@ -1,0 +1,292 @@
+# Copyright (c) 2020 Armedia, LLC
+#
+# Please note this CloudFormation template has been written with the
+# expectation that it will "called" from another CloudFormation template.
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Deploy a PKI for ArkCase, with automated renewals
+
+Parameters:
+  Env:
+    Type: String
+    Description: Type of environment to provision
+    Default: prod
+    MinLength: 1
+    MaxLength: 30
+    AllowedPattern: ^[-_.a-zA-Z0-9]*$
+    ConstraintDescription: >
+      Up to 30 alpha-numeric characters; can use underscores,
+      dots and dashes
+
+  Project:
+    Type: String
+    Description: Name of the project (or product)
+    Default: arkcase
+    MinLength: 1
+    MaxLength: 30
+    AllowedPattern: ^[-_.a-zA-Z0-9]*$
+    ConstraintDescription: >
+      Up to 30 alpha-numeric characters; can use underscores,
+      dots and dashes
+
+#  MasterSecretRotationCron:
+#    Type: String
+#    Description: >
+#      Cron specification of when to trigger a rotation of the master secret.
+#      This must be specified using the AWS cron format and in UTC only.
+#    Default: 0 8 ? * SUN *
+#    MinLength: 11
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: { default: Definition }
+        Parameters:
+          - Env
+          - Project
+
+#      - Label: { default: AmazonMQ configuration }
+#        Parameters:
+#          - InstanceType
+#          - PasswordLength
+#          - MasterSecretRotationCron
+#          - UserSecretRotationCron
+#          - ActivemqVersion
+#          - MaintenanceDayOfWeek
+#          - MaintenanceTimeOfDay
+#          - EnableAuditLogs
+#
+#    ParameterLabels:
+#      Env: { default: Environment }
+#      VpcId: { default: VPC ID }
+#      SubnetIdA: { default: First subnet ID }
+#      SubnetIdB: { default: Second subnet ID }
+#      InstanceType: { default: Instance type }
+#      PasswordLength: { default: Password length }
+#      MasterSecretRotationCron: { default: Master secret rotation cron }
+#      UserSecretRotationCron: { default: User secret rotation cron }
+#      ActivemqVersion: { default: ActiveMQ version }
+#      MaintenanceDayOfWeek: { default: Maintenance day of the week }
+#      MaintenanceTimeOfDay: { default: Maintenance start time }
+#      EnableAuditLogs: { default: Enable audit logs }
+
+Resources:
+
+  #########################################
+  # Lambda function to create certificate #
+  #########################################
+
+  CertificateLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CertificateLambdaPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:PutParameter
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:ListTagsForResource
+                  - ssm:RemoveTagsForResource
+                  - ssm:AddTagsToResource
+                Resource: arn:aws:ssm:*:*:parameter/arkcase/pki/*
+
+              - Effect: Allow
+                Action: ssm:DescribeParameters
+                Resource: "*"
+      Tags:
+        - Key: Name
+          Value: !Sub pki-certificate-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  CertificateLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Create or renew a certificate
+      Runtime: python3.8
+      Role: !GetAtt CertificateLambdaExecutionRole.Arn
+      Handler: certificate.handler
+      Timeout: 20
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20200610-0857/LambdaFunctions/certificate/certificate.zip
+      Tags:
+        - Key: Name
+          Value: !Sub pki-certificate-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  #################################################################
+  # Lambda function for the `Certificate` custom resource backend #
+  #################################################################
+
+  CertificateResourceLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CertificateResourceLambdaPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: ssm:DeleteParameter
+                Resource: arn:aws:ssm:*:*:parameter/arkcase/pki/*
+
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt CertificateLambda.Arn
+      Tags:
+        - Key: Name
+          Value: !Sub pki-certificate-resource-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  CertificateResourceLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: >
+        Backend for CloudFormation custom resources to create or delete a
+        certificate
+      Runtime: python3.8
+      Role: !GetAtt CertificateResourceLambdaExecutionRole.Arn
+      Handler: certificate_resource.handler
+      Timeout: 30
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20200610-0857/LambdaFunctions/certificate_resource/certificate_resource.zip
+      Tags:
+        - Key: Name
+          Value: !Sub pki-certificate-resource-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: admin
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ###########
+  # Root CA #
+  ###########
+
+  RootCaCertificate:
+    Type: Custom::Certificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
+      KeyType: RSA
+      KeySize: 4096
+      ValidityDays: 7300  # About 20 years
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: Armedia, LLC
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: root-ca.arkcase.internal
+      BasicConstraints:
+        Critical: true
+        CA: true
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
+      KeyParameterName: /arkcase/pki/private/root-ca-key
+      CertParameterName: /arkcase/pki/certs/root-ca-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub root-ca-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub root-ca-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub root-ca-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+Outputs:
+  RootCaKeyParameterArn:
+    Description: ARN of the SSM parameter storing the root CA private key
+    Value: !GetAtt RootCaCertificate.KeyParameterArn
+
+  RootCaCertParameterArn:
+    Description: ARN of the SSM parameter storing the root CA certificate
+    Value: !GetAtt RootCaCertificate.CertParameterArn
