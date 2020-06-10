@@ -18,11 +18,13 @@ def handler(event, context):
     configure the proper IAM permissions for the created/updated parameters
     yourself.
 
-    The input `event` must look like this:
+    The input `event` must look like this (fields are mandatory unless marked
+    as "optional"):
 
         {
-          "KeyType": "RSA",  # Optional, can be "RSA" or "DSA", default to "RSA"
-          "KeySize": 2048,
+          "KeyType": "RSA",     # Optional, can be "RSA" or "DSA", default to "RSA"
+          "KeySize": 2048,      # Key size
+          "ValidityDays": 100,  # For how many days the certificate should be valid
 
           "CountryName": "US",                 # Optional
           "StateOrProvinceName": "VA",         # Optional
@@ -30,7 +32,6 @@ def handler(event, context):
           "OrganizationName": "Armedia, LLC",  # Optional
           "OrganizationalUnitName": "SecOps",  # Optional
           "CommonName": "arkcase.internal",    # Optional in theory, required in practice
-          "ValidityDays": 100,                 # For how many days the certificate should be valid
 
           "BasicConstraints": {  # Basic constraints extension, optional
             "Critical": true,    # Whether these basic constraints are critical; optional, default to `false`
@@ -98,9 +99,13 @@ def handler(event, context):
 
     try:
         key_parameter_arn, cert_parameter_arn = handle_request(event)
+        if 'CommonName' in event:
+            msg = "Successfully created/renewed private key and certificate for " + event['CommonName']
+        else:
+            msg = "Successfully created/renewed private key and certificate"
         response = {
             'Success': True,
-            'Reason': "Successfully created/updated private key and certificate for " + event['CommonName'],
+            'Reason': msg,
             'KeyParameterArn': key_parameter_arn,
             'CertParameterArn': cert_parameter_arn
         }
@@ -221,10 +226,14 @@ def handle_request(event):
         encryption_algorithm=serialization.NoEncryption()
     ).decode('utf8')
 
+    if 'CommonName' in event:
+        desc = "Private key for " + event['CommonName']
+    else:
+        desc = "Private key"
     key_parameter_arn = upsert_param(
         parameter_name,
         key_value,
-        "Private key for " + event['CommonName'],
+        desc,
         "SecureString",
         event.get('KeyTags', [])
     )
@@ -234,10 +243,14 @@ def handle_request(event):
     parameter_name = event['CertParameterName']
     cert_value = cert.public_bytes(serialization.Encoding.PEM).decode('utf8')
 
+    if 'CommonName' in event:
+        desc = "X.509 certificate for " + event['CommonName']
+    else:
+        desc = "X.509 certificate"
     cert_parameter_arn = upsert_param(
         parameter_name,
         cert_value,
-        "X.509 certificate for " + event['CommonName'],
+        desc,
         "String",
         event.get('CertTags', [])
     )
