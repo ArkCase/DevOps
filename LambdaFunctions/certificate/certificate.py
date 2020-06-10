@@ -31,6 +31,7 @@ def handler(event, context):
           "LocalityName": "Vienna",            # Optional
           "OrganizationName": "Armedia, LLC",  # Optional
           "OrganizationalUnitName": "SecOps",  # Optional
+          "EmailAddress": "bob@example.com",   # Optional
           "CommonName": "arkcase.internal",    # Optional in theory, required in practice
 
           "BasicConstraints": {  # Basic constraints extension, optional
@@ -152,6 +153,8 @@ def handle_request(event):
         attr.append(x509.NameAttribute(NameOID.ORGANIZATION_NAME, event['OrganizationName']))
     if 'OrganizationalUnitName' in event:
         attr.append(x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, event['OrganizationalUnitName']))
+    if 'EmailAddress' in event:
+        attr.append(x509.NameAttribute(NameOID.EMAIL_ADDRESS, event['EmailAddress']))
     if 'CommonName' in event:
         attr.append(x509.NameAttribute(NameOID.COMMON_NAME, event['CommonName']))
     subject = x509.Name(attr)
