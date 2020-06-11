@@ -32,7 +32,7 @@ def handler(event, context):
             "LocalityName": "Vienna",            # Optional
             "OrganizationName": "Armedia, LLC",  # Optional
             "OrganizationalUnitName": "SecOps",  # Optional
-            "EmailAddress":                      # Optional
+            "EmailAddress": "bob@builder.com",   # Optional
             "CommonName": "arkcase.internal",    # Optional in theory, required in practice
 
             "BasicConstraints": {     # Basic constraints extension, optional
@@ -49,7 +49,7 @@ def handler(event, context):
                 "KeyEncipherment",    # Can encrypt keys
                 "DataEncipherment",   # Can encrypt data
                 "KeyAgreement",       # Key agreement (eg: DH)
-                "KeyCertSign",        # Can sign certficates; if set, `BasicConstraints.CA` must be set to `true`
+                "KeyCertSign",        # Can sign certificates; if set, `BasicConstraints.CA` must be set to `true`
                 "CrlSign",            # Can sign CRLs
                 "EncipherOnly",       # Can encrypt following a key agreement
                 "DecipherOnly"        # Can decrypt following a key agreement
@@ -99,7 +99,7 @@ def handler(event, context):
     """
     try:
         reason, key_param_arn, cert_param_arn = handle_request(event)
-        print(f"Success: {data}")
+        print(f"Success")
         send_response(event, True, reason, key_param_arn, cert_param_arn)
     except Exception as e:
         traceback.print_exc()
@@ -107,8 +107,8 @@ def handler(event, context):
 
 
 def handle_request(event):
-    print(f"Received event: {event}")
     request_type = event['RequestType']
+    print(f"Received request type: {request_type}")
     if request_type == "Create" or request_type == "Update":
         ret = upsert_certificate(event)
     elif request_type == "Delete":
@@ -120,44 +120,89 @@ def handle_request(event):
 
 def upsert_certificate(event):
     print(f"Creating/renewing certificate")
+
     # Check the key and certificate parameter names do not have commas
     args = event['ResourceProperties']
     if "," in args['KeyParameterName'] or "," in args['CertParameterName']:
         raise ValueError(f"Commas not allowed in key or certificate parameter name")
 
+    # Build payload to `certificate` Lambda function
+    # NB: CloudFormation changes all types to "string", so we have to cast all
+    #     fields that are not strings.
+    payload = args
+    payload['KeySize'] = int(payload['KeySize'])
+    payload['ValidityDays'] = int(payload['ValidityDays'])
+    if 'BasicConstraints' in payload:
+        bc = payload['BasicConstraints']
+        if 'Critical' in bc:
+            bc['Critical'] = bc['Critical'] == "true"
+        if 'CA' in bc:
+            bc['CA'] = bc['CA'] == "true"
+        if 'PathLength' in bc:
+            if bc['PathLength'] == "null":
+                bc['PathLength'] = None
+            else:
+                bc['PathLength'] = int(bc['PathLength'])
+    if 'KeyUsage' in payload:
+        ku = payload['KeyUsage']
+        if 'Critical' in ku:
+            ku['Critical'] = ku['Critical'] == "true"
+
+
     # Call the `certificate` Lambda function
     lambda_arn = args['CertificateLambdaArn']
     lambda_client = boto3.client("lambda")
+    print(f"Invoking `certificate` Lambda function")
     response = lambda_client.invoke(
         FunctionName=lambda_arn,
         LogType="Tail",
         Payload=json.dumps(args).encode('utf8')
     )
+    print(f"`certificate` Lambda function returned: {response}")
 
     # Process the response
     body_json = response['Payload'].read().decode('utf8')
+    print(f"`certificate` Lambda function response payload: {body_json}")
     if 'FunctionError' in response:
         err = response['FunctionError']
         raise ValueError(f"The `certificate` Lambda function failed: {err} - {body_json}")
     body = json.loads(body_json)
-    return body['Reason'], body['KeyParameterArn'], body['CertParameterArn']
+    if body.get('Success', False):
+        reason = body['Reason']
+        key_param_arn = body['KeyParameterArn']
+        cert_param_arn = body['CertParameterArn']
+        print(f"Successfully created/renewed certificate: reason: {reason}, key_param_arn: {key_param_arn}, cert_param_arn: {cert_param_arn}")
+        return reason, key_param_arn, cert_param_arn
+    else:
+        reason = "`certificate` Lambda function failed"
+        if 'Reason' in body:
+            reason += ": " + body['Reason']
+        raise ValueError(reason)
 
 
 def delete_certificate(event):
-    print(f"Deleting certficate")
+    physical_id = event['PhysicalResourceId']
+    print(f"Deleting certificate; physical_id: {physical_id}")
     # Parse the physical id to get the key and certificate parameter names
-    key_param_name, cert_param_name = event['PhysicalResourceId'].split(",")
+    key_param_name, cert_param_name = physical_id.split(",")
     ssm = boto3.client("ssm")
-    ssm.delete_parameter(Name=key_param_name)
-    ssm.delete_parameter(Name=cert_param_name)
+    if key_param_name:
+        ssm.delete_parameter(Name=key_param_name)
+    if cert_param_name:
+        ssm.delete_parameter(Name=cert_param_name)
     return "Success", "", ""
 
 
 def send_response(event, success: bool, reason, key_param_arn="", cert_param_arn=""):
+    if not 'KeyParameterName' in event or not 'CertParameterName' in event:
+        print(f"WARNING: Either KeyParameterName, CertParameterName, or both are absent from the arguments")
+        physial_id = ","
+    else:
+        physial_id = event['KeyParameterName'] + "," + event['CertParameterName']
     response = {
         'Status': "SUCCESS" if success else "FAILED",
         'Reason': reason,
-        'PhysicalResourceId': event['KeyParameterName'] + "," + event['CertParameterName'],
+        'PhysicalResourceId': physial_id,
         'StackId': event['StackId'],
         'RequestId': event['RequestId'],
         'LogicalResourceId': event['LogicalResourceId'],

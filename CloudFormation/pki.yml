@@ -100,7 +100,7 @@ Resources:
                   - ssm:GetParameter
                   - ssm:GetParameters
                   - ssm:ListTagsForResource
-                  - ssm:RemoveTagsForResource
+                  - ssm:RemoveTagsFromResource
                   - ssm:AddTagsToResource
                 Resource: arn:aws:ssm:*:*:parameter/arkcase/pki/*
 
@@ -125,13 +125,13 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       Description: Create or renew a certificate
-      Runtime: python3.8
+      Runtime: python3.7
       Role: !GetAtt CertificateLambdaExecutionRole.Arn
       Handler: certificate.handler
       Timeout: 20
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200610-0857/LambdaFunctions/certificate/certificate.zip
+        S3Key: DevOps/ACM-TMP-20200611-1016/LambdaFunctions/certificate/certificate.zip
       Tags:
         - Key: Name
           Value: !Sub pki-certificate-lambda-${Project}-${Env}
@@ -194,13 +194,13 @@ Resources:
       Description: >
         Backend for CloudFormation custom resources to create or delete a
         certificate
-      Runtime: python3.8
+      Runtime: python3.7
       Role: !GetAtt CertificateResourceLambdaExecutionRole.Arn
       Handler: certificate_resource.handler
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200610-0857/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200611-1016/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub pki-certificate-resource-lambda-${Project}-${Env}
@@ -232,7 +232,7 @@ Resources:
       LocalityName: Vienna
       OrganizationName: Armedia, LLC
       OrganizationalUnitName: Product Development
-      EmailAddress: info@arkcase.com
+      EmailAddress: admin@arkcase.com
       CommonName: root-ca.arkcase.internal
       BasicConstraints:
         Critical: true
