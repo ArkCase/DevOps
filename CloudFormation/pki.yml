@@ -131,7 +131,7 @@ Resources:
       Timeout: 20
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200611-1016/LambdaFunctions/certificate/certificate.zip
+        S3Key: DevOps/ACM-TMP-20200611-1403/LambdaFunctions/certificate/certificate.zip
       Tags:
         - Key: Name
           Value: !Sub pki-certificate-lambda-${Project}-${Env}
@@ -200,7 +200,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200611-1016/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200611-1403/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub pki-certificate-resource-lambda-${Project}-${Env}
@@ -215,9 +215,9 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  ###########
-  # Root CA #
-  ###########
+  #######
+  # PKI #
+  #######
 
   RootCaCertificate:
     Type: Custom::Certificate
@@ -282,6 +282,136 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
+  IntermediateCaCertificate:
+    Type: Custom::Certificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
+      KeyType: RSA
+      KeySize: 4096
+      ValidityDays: 730  # About 2 years
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: intermediate-ca.arkcase.internal
+      BasicConstraints:
+        Critical: true
+        CA: true
+        PathLength: 0
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
+      CaKeyParameterName: /arkcase/pki/private/root-ca-key
+      CaCertParameterName: /arkcase/pki/certs/root-ca-cert
+      KeyParameterName: /arkcase/pki/private/intermediate-ca-key
+      CertParameterName: /arkcase/pki/certs/intermediate-ca-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub intermediate-ca-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub intermediate-ca-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub intermediate-ca-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  AlfrescoCertificate:
+    Type: Custom::Certificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
+      KeyType: RSA
+      KeySize: 2048
+      ValidityDays: 90
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: alfresco.arkcase.internal
+      BasicConstraints:
+        CA: false
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyEncipherment ]
+      CaKeyParameterName: /arkcase/pki/private/intermediate-ca-key
+      CaCertParameterName: /arkcase/pki/certs/intermediate-ca-cert
+      KeyParameterName: /arkcase/pki/private/alfresco-ca-key
+      CertParameterName: /arkcase/pki/certs/alfresco-ca-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub alfresco-ca-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub alfresco-ca-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub intermediate-ca-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
 Outputs:
   RootCaKeyParameterArn:
     Description: ARN of the SSM parameter storing the root CA private key
@@ -290,3 +420,19 @@ Outputs:
   RootCaCertParameterArn:
     Description: ARN of the SSM parameter storing the root CA certificate
     Value: !GetAtt RootCaCertificate.CertParameterArn
+
+  IntermediateCaKeyParameterArn:
+    Description: ARN of the SSM parameter storing the intermediate CA private key
+    Value: !GetAtt IntermediateCaCertificate.KeyParameterArn
+
+  IntermediateCaCertParameterArn:
+    Description: ARN of the SSM parameter storing the intermediate CA certificate
+    Value: !GetAtt IntermediateCaCertificate.CertParameterArn
+
+  AlfrescoKeyParameterArn:
+    Description: ARN of the SSM parameter storing the Alfresco service private key
+    Value: !GetAtt AlfrescoCertificate.KeyParameterArn
+
+  AlfrescoCertParameterArn:
+    Description: ARN of the SSM parameter storing the Alfresco service certificate
+    Value: !GetAtt AlfrescoCertificate.CertParameterArn
