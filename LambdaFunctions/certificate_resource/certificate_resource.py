@@ -148,7 +148,6 @@ def upsert_certificate(event):
         if 'Critical' in ku:
             ku['Critical'] = ku['Critical'] == "true"
 
-
     # Call the `certificate` Lambda function
     lambda_arn = args['CertificateLambdaArn']
     lambda_client = boto3.client("lambda")
@@ -167,17 +166,32 @@ def upsert_certificate(event):
         err = response['FunctionError']
         raise ValueError(f"The `certificate` Lambda function failed: {err} - {body_json}")
     body = json.loads(body_json)
-    if body.get('Success', False):
-        reason = body['Reason']
-        key_param_arn = body['KeyParameterArn']
-        cert_param_arn = body['CertParameterArn']
-        print(f"Successfully created/renewed certificate: reason: {reason}, key_param_arn: {key_param_arn}, cert_param_arn: {cert_param_arn}")
-        return reason, key_param_arn, cert_param_arn
-    else:
+    if not body.get('Success', False):
         reason = "`certificate` Lambda function failed"
         if 'Reason' in body:
             reason += ": " + body['Reason']
         raise ValueError(reason)
+    reason = body['Reason']
+    key_param_arn = body['KeyParameterArn']
+    cert_param_arn = body['CertParameterArn']
+
+    # Check if the key and/or certificate parameter name(s) have changed. If
+    # yes, delete the old parameters.
+    if 'OldResourceProperties' in event:
+        ssm = boto3.client("ssm")
+        old_args = event['OldResourceProperties']
+        old_key_param_name = old_args['KeyParameterName']
+        if args['KeyParameterName'] != old_key_param_name:
+            print(f"Key parameter name has changed; deleting old key parameter {old_key_param_name}")
+            ssm.delete_parameter(Name=old_key_param_name)
+        old_cert_param_name = old_args['CertParameterName']
+        if args['CertParameterName'] != old_cert_param_name:
+            print(f"Certificate parameter name has changed; deleting old certificate parameter {old_cert_param_name}")
+            ssm.delete_parameter(Name=old_cert_param_name)
+
+    # Done
+    print(f"Successfully created/renewed certificate: reason: {reason}, key_param_arn: {key_param_arn}, cert_param_arn: {cert_param_arn}")
+    return reason, key_param_arn, cert_param_arn
 
 
 def delete_certificate(event):

@@ -131,7 +131,7 @@ Resources:
       Timeout: 20
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200611-1403/LambdaFunctions/certificate/certificate.zip
+        S3Key: DevOps/ACM-TMP-20200613-0544/LambdaFunctions/certificate/certificate.zip
       Tags:
         - Key: Name
           Value: !Sub pki-certificate-lambda-${Project}-${Env}
@@ -200,7 +200,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200611-1403/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200613-0544/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub pki-certificate-resource-lambda-${Project}-${Env}
@@ -284,6 +284,7 @@ Resources:
 
   IntermediateCaCertificate:
     Type: Custom::Certificate
+    DependsOn: RootCaCertificate
     Properties:
       ServiceToken: !GetAtt CertificateResourceLambda.Arn
       CertificateLambdaArn: !GetAtt CertificateLambda.Arn
@@ -350,6 +351,7 @@ Resources:
 
   AlfrescoCertificate:
     Type: Custom::Certificate
+    DependsOn: IntermediateCaCertificate
     Properties:
       ServiceToken: !GetAtt CertificateResourceLambda.Arn
       CertificateLambdaArn: !GetAtt CertificateLambda.Arn
@@ -370,11 +372,11 @@ Resources:
         Usages: [ DigitalSignature, KeyEncipherment ]
       CaKeyParameterName: /arkcase/pki/private/intermediate-ca-key
       CaCertParameterName: /arkcase/pki/certs/intermediate-ca-cert
-      KeyParameterName: /arkcase/pki/private/alfresco-ca-key
-      CertParameterName: /arkcase/pki/certs/alfresco-ca-cert
+      KeyParameterName: /arkcase/pki/private/alfresco-key
+      CertParameterName: /arkcase/pki/certs/alfresco-cert
       KeyTags:
         - Key: Name
-          Value: !Sub alfresco-ca-private-key-${Project}-${Env}
+          Value: !Sub alfresco-private-key-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -387,7 +389,7 @@ Resources:
           Value: CloudFormation
       CertTags:
         - Key: Name
-          Value: !Sub alfresco-ca-certificate-${Project}-${Env}
+          Value: !Sub alfresco-certificate-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -400,7 +402,7 @@ Resources:
           Value: CloudFormation
       Tags:
         - Key: Name
-          Value: !Sub intermediate-ca-certificate-resource-${Project}-${Env}
+          Value: !Sub alfresco-certificate-resource-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
