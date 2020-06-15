@@ -32,6 +32,7 @@ def handler(event, context):
           "OrganizationName": "Armedia, LLC",  # Optional
           "OrganizationalUnitName": "SecOps",  # Optional
           "EmailAddress": "bob@example.com",   # Optional
+          "DnQualifier": "anything",           # Optional
           "CommonName": "arkcase.internal",    # Optional in theory, required in practice
 
           "BasicConstraints": {  # Basic constraints extension, optional
@@ -98,6 +99,7 @@ def handler(event, context):
         }
     """
 
+    print(f"Received event: {event}")
     try:
         key_parameter_arn, cert_parameter_arn = handle_request(event)
         if 'CommonName' in event:
@@ -111,6 +113,7 @@ def handler(event, context):
             'CertParameterArn': cert_parameter_arn
         }
     except Exception as e:
+        print(f"EXCEPTION: {str(e)}")
         traceback.print_exc()
         response = {
             'Success': False,
@@ -120,7 +123,7 @@ def handler(event, context):
 
 
 def handle_request(event):
-    # Generate the private key
+    print(f"Generating the private key")
     key_type = event.get('KeyType', "RSA")
     key_size = int(event['KeySize'])
     if key_type == "RSA":
@@ -136,12 +139,14 @@ def handle_request(event):
         )
     else:
         raise ValueError(f"Unsupported key type: {key_type}")
+    print(f"Successfully generated a private key")
 
     # Get the CA private key and certificate
     ca_key, ca_cert = get_ca_parameters(event)
 
     # Generate the signed certificate
 
+    print(f"Building distinguished name")
     attr = []
     if 'CountryName' in event:
         attr.append(x509.NameAttribute(NameOID.COUNTRY_NAME, event['CountryName']))
@@ -155,12 +160,15 @@ def handle_request(event):
         attr.append(x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, event['OrganizationalUnitName']))
     if 'EmailAddress' in event:
         attr.append(x509.NameAttribute(NameOID.EMAIL_ADDRESS, event['EmailAddress']))
+    if 'DnQualifier' in event:
+        attr.append(x509.NameAttribute(NameOID.DN_QUALIFIER, event['DnQualifier']))
     if 'CommonName' in event:
         attr.append(x509.NameAttribute(NameOID.COMMON_NAME, event['CommonName']))
     subject = x509.Name(attr)
 
     issuer = ca_cert.subject if ca_cert else subject
 
+    print(f"Generating X.509 certificate")
     cert = x509.CertificateBuilder().subject_name(
         subject
     ).issuer_name(
@@ -176,6 +184,7 @@ def handle_request(event):
     )
 
     if 'BasicConstraints' in event:
+        print(f"Adding basic constraints extension")
         basic_constraints = event['BasicConstraints']
         critical = basic_constraints.get('Critical', False)
         ca = basic_constraints.get('CA', False)
@@ -186,6 +195,7 @@ def handle_request(event):
         )
 
     if 'KeyUsage' in event:
+        print(f"Adding key usage extension")
         key_usage = event['KeyUsage']
         critical = key_usage.get('Critical', False)
         usages = key_usage['Usages']
@@ -214,14 +224,15 @@ def handle_request(event):
         )
 
     if ca_key:
-        # Sign the certficate with the CA key
+        print(f"Signing the certficate with the CA key")
         cert = cert.sign(ca_key, hashes.SHA256(), default_backend())
     else:
-        # Self-sign the certificate
+        print(f"Self-signing the certificate")
         cert = cert.sign(key, hashes.SHA256(), default_backend())
 
     # Save the private key
 
+    print(f"Saving the private key in Parameter Store")
     parameter_name = event['KeyParameterName']
     key_value = key.private_bytes(
         encoding=serialization.Encoding.PEM,
@@ -243,6 +254,7 @@ def handle_request(event):
 
     # Save the certificate
 
+    print(f"Saving the certificate in Parameter Store")
     parameter_name = event['CertParameterName']
     cert_value = cert.public_bytes(serialization.Encoding.PEM).decode('utf8')
 
@@ -259,16 +271,19 @@ def handle_request(event):
     )
 
     # Done
+    print(f"Successfully generated private key and certificate; key ARN: {key_parameter_arn}, certificate ARN: {cert_parameter_arn}")
     return key_parameter_arn, cert_parameter_arn
 
 
 def get_ca_parameters(event):
     """Retrieve the CA private key and certificate"""
     if 'CaKeyParameterName' not in event or 'CaCertParameterName' not in event:
+        print(f"No CA provided; certificate will be self-signed")
         return None, None
 
     ssm = boto3.client("ssm")
 
+    print(f"Retrieving CA private key")
     response = ssm.get_parameter(
         Name=event['CaKeyParameterName'],
         WithDecryption=True
@@ -280,6 +295,7 @@ def get_ca_parameters(event):
         backend=default_backend()
     )
 
+    print(f"Retrieving CA certificate")
     response = ssm.get_parameter(Name=event['CaCertParameterName'])
     ca_cert_value = response['Parameter']['Value']
     ca_cert = x509.load_pem_x509_certificate(
@@ -299,6 +315,7 @@ def upsert_param(name: str, value: str, desc: str, param_type: str, tags: dict):
     # NB: `put_parameter()` doesn't allow `Overwrite` to be set to `True` and
     #     tags to be set as well.
     ssm = boto3.client("ssm")
+    print(f"upsert_param: Calling ssm.put_parameter(Name={name})")
     ssm.put_parameter(
         Name=name,
         Value=value,
@@ -308,10 +325,12 @@ def upsert_param(name: str, value: str, desc: str, param_type: str, tags: dict):
     )
 
     # Erase all existing tags
+    print(f"upsert_param: Calling ssm.list_tags_for_resource(ResourceId={name})")
     response = ssm.list_tags_for_resource(
         ResourceType="Parameter",
         ResourceId=name
     )
+    print(f"upsert_param: Calling ssm.remove_tags_from_resource(ResourceId={name})")
     ssm.remove_tags_from_resource(
         ResourceType="Parameter",
         ResourceId=name,
@@ -320,6 +339,7 @@ def upsert_param(name: str, value: str, desc: str, param_type: str, tags: dict):
 
     # Save new tags
     if tags:
+        print(f"upsert_param: Calling ssm.add_tags_to_resource(ResourceId={name})")
         ssm.add_tags_to_resource(
             ResourceType="Parameter",
             ResourceId=name,
@@ -328,4 +348,5 @@ def upsert_param(name: str, value: str, desc: str, param_type: str, tags: dict):
 
     # Return the parameter's ARN
     response = ssm.get_parameter(Name=name)
+    print(f"upsert_param: Success; ARN: {response['Parameter']['ARN']}")
     return response['Parameter']['ARN']

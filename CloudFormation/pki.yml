@@ -128,10 +128,10 @@ Resources:
       Runtime: python3.7
       Role: !GetAtt CertificateLambdaExecutionRole.Arn
       Handler: certificate.handler
-      Timeout: 20
+      Timeout: 60
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200613-0544/LambdaFunctions/certificate/certificate.zip
+        S3Key: DevOps/ACM-TMP-20200615-1002/LambdaFunctions/certificate/certificate.zip
       Tags:
         - Key: Name
           Value: !Sub pki-certificate-lambda-${Project}-${Env}
@@ -197,10 +197,10 @@ Resources:
       Runtime: python3.7
       Role: !GetAtt CertificateResourceLambdaExecutionRole.Arn
       Handler: certificate_resource.handler
-      Timeout: 30
+      Timeout: 120
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200613-0544/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200615-1002/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub pki-certificate-resource-lambda-${Project}-${Env}
@@ -230,9 +230,10 @@ Resources:
       CountryName: US
       StateOrProvinceName: VA
       LocalityName: Vienna
-      OrganizationName: Armedia, LLC
+      OrganizationName: Arkcase
       OrganizationalUnitName: Product Development
-      EmailAddress: admin@arkcase.com
+      EmailAddress: info@arkcase.com
+      DnQualifier: /arkcase/pki/certs/root-ca-cert,/arkcase/pki/private/root-ca-key
       CommonName: root-ca.arkcase.internal
       BasicConstraints:
         Critical: true
@@ -297,6 +298,7 @@ Resources:
       OrganizationName: ArkCase
       OrganizationalUnitName: Product Development
       EmailAddress: info@arkcase.com
+      DnQualifier: /arkcase/pki/certs/intermediate-ca-cert,/arkcase/pki/private/intermediate-ca-key
       CommonName: intermediate-ca.arkcase.internal
       BasicConstraints:
         Critical: true
@@ -364,6 +366,7 @@ Resources:
       OrganizationName: ArkCase
       OrganizationalUnitName: Product Development
       EmailAddress: info@arkcase.com
+      DnQualifier: /arkcase/pki/certs/alfresco-cert,/arkcase/pki/private/alfresco-key
       CommonName: alfresco.arkcase.internal
       BasicConstraints:
         CA: false

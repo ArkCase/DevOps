@@ -33,6 +33,7 @@ def handler(event, context):
             "OrganizationName": "Armedia, LLC",  # Optional
             "OrganizationalUnitName": "SecOps",  # Optional
             "EmailAddress": "bob@builder.com",   # Optional
+            "DnQualifier": "anything",           # Optional
             "CommonName": "arkcase.internal",    # Optional in theory, required in practice
 
             "BasicConstraints": {     # Basic constraints extension, optional
@@ -201,22 +202,31 @@ def delete_certificate(event):
     key_param_name, cert_param_name = physical_id.split(",")
     ssm = boto3.client("ssm")
     if key_param_name:
-        ssm.delete_parameter(Name=key_param_name)
+        try:
+            ssm.delete_parameter(Name=key_param_name)
+        except ssm.exceptions.ParameterNotFound as e:
+            # Already deleted by the previous update
+            pass
     if cert_param_name:
-        ssm.delete_parameter(Name=cert_param_name)
+        try:
+            ssm.delete_parameter(Name=cert_param_name)
+        except ssm.exceptions.ParameterNotFound as e:
+            # Already deleted by the previous update
+            pass
     return "Success", "", ""
 
 
 def send_response(event, success: bool, reason, key_param_arn="", cert_param_arn=""):
-    if not 'KeyParameterName' in event or not 'CertParameterName' in event:
+    args = event['ResourceProperties']
+    if not 'KeyParameterName' in args or not 'CertParameterName' in args:
         print(f"WARNING: Either KeyParameterName, CertParameterName, or both are absent from the arguments")
-        physial_id = ","
+        physical_id = ","
     else:
-        physial_id = event['KeyParameterName'] + "," + event['CertParameterName']
+        physical_id = args['KeyParameterName'] + "," + args['CertParameterName']
     response = {
         'Status': "SUCCESS" if success else "FAILED",
         'Reason': reason,
-        'PhysicalResourceId': physial_id,
+        'PhysicalResourceId': physical_id,
         'StackId': event['StackId'],
         'RequestId': event['RequestId'],
         'LogicalResourceId': event['LogicalResourceId'],
