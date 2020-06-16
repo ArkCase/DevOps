@@ -32,7 +32,6 @@ def handler(event, context):
           "OrganizationName": "Armedia, LLC",  # Optional
           "OrganizationalUnitName": "SecOps",  # Optional
           "EmailAddress": "bob@example.com",   # Optional
-          "DnQualifier": "anything",           # Optional
           "CommonName": "arkcase.internal",    # Optional in theory, required in practice
 
           "BasicConstraints": {  # Basic constraints extension, optional
@@ -55,6 +54,13 @@ def handler(event, context):
               "DecipherOnly"        # Can decrypt following a key agreement
             ]
           },
+
+          # Whether this certificate should be self-signed or signed by a CA.
+          # If set to `false`, you must also set the `CaKeyParameterName` and
+          # `CaCertParameterName` to valid values.
+          #
+          # Optional; default to `false`
+          "SelfSigned": false,
 
           # Name of the parameters storing the private key and certificate of
           # the CA that will be used to sign this new certificate. If either
@@ -123,7 +129,14 @@ def handler(event, context):
 
 
 def create_or_renew_cert(args):
+    # Check key and certificate parameter names
+    key_parameter_name = args['KeyParameterName']
     cert_parameter_name = args['CertParameterName']
+    if "," in key_parameter_name:
+        raise ValueError(f"Key parameter name can't have commas: {key_parameter_name}")
+    if "," in cert_parameter_name:
+        raise ValueError(f"Certificate parameter name can't have commas: {cert_parameter_name}")
+
     print(f"Generating the private key for {cert_parameter_name}")
     key_type = args.get('KeyType', "RSA")
     key_size = int(args['KeySize'])
@@ -143,7 +156,12 @@ def create_or_renew_cert(args):
     print(f"Successfully generated a private key for {cert_parameter_name}")
 
     # Get the CA private key and certificate
-    ca_key, ca_cert = get_ca_parameters(args)
+    self_signed = args.get('SelfSigned', False)
+    if self_signed:
+        ca_key = None
+        ca_cert = None
+    else:
+        ca_key, ca_cert = get_ca_parameters(args)
 
     # Generate the signed certificate
 
@@ -161,8 +179,9 @@ def create_or_renew_cert(args):
         attr.append(x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, args['OrganizationalUnitName']))
     if 'EmailAddress' in args:
         attr.append(x509.NameAttribute(NameOID.EMAIL_ADDRESS, args['EmailAddress']))
-    if 'DnQualifier' in args:
-        attr.append(x509.NameAttribute(NameOID.DN_QUALIFIER, args['DnQualifier']))
+    if not self_signed:
+        tmp = args['CaKeyParameterName'] + "," + args['CaCertParameterName']
+        attr.append(x509.NameAttribute(NameOID.DN_QUALIFIER, tmp))
     if 'CommonName' in args:
         attr.append(x509.NameAttribute(NameOID.COMMON_NAME, args['CommonName']))
     subject = x509.Name(attr)
@@ -224,16 +243,15 @@ def create_or_renew_cert(args):
             critical=critical
         )
 
-    if ca_key:
-        print(f"Signing the certficate with the CA key for {cert_parameter_name}")
-        cert = cert.sign(ca_key, hashes.SHA256(), default_backend())
-    else:
+    if self_signed:
         print(f"Self-signing the certificate for {cert_parameter_name}")
         cert = cert.sign(key, hashes.SHA256(), default_backend())
+    else:
+        print(f"Signing the certficate with the CA key for {cert_parameter_name}")
+        cert = cert.sign(ca_key, hashes.SHA256(), default_backend())
 
     # Save the private key
 
-    key_parameter_name = args['KeyParameterName']
     print(f"Saving the private key in Parameter Store: {key_parameter_name}")
     key_value = key.private_bytes(
         encoding=serialization.Encoding.PEM,
@@ -277,10 +295,6 @@ def create_or_renew_cert(args):
 
 def get_ca_parameters(args):
     """Retrieve the CA private key and certificate"""
-    if 'CaKeyParameterName' not in args or 'CaCertParameterName' not in args:
-        print(f"No CA provided; certificate will be self-signed")
-        return None, None
-
     ssm = boto3.client("ssm")
 
     print(f"Retrieving CA private key")

@@ -131,7 +131,7 @@ Resources:
       Timeout: 60
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200615-1752/LambdaFunctions/certificate/certificate.zip
+        S3Key: DevOps/ACM-TMP-20200616-1813/LambdaFunctions/certificate/certificate.zip
       Tags:
         - Key: Name
           Value: !Sub pki-certificate-lambda-${Project}-${Env}
@@ -200,7 +200,7 @@ Resources:
       Timeout: 120
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200615-1752/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200616-1813/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub pki-certificate-resource-lambda-${Project}-${Env}
@@ -240,6 +240,7 @@ Resources:
       KeyUsage:
         Critical: true
         Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
+      SelfSigned: true
       KeyParameterName: /arkcase/pki/private/root-ca-key
       CertParameterName: /arkcase/pki/certs/root-ca-cert
       KeyTags:
@@ -297,7 +298,6 @@ Resources:
       OrganizationName: ArkCase
       OrganizationalUnitName: Product Development
       EmailAddress: info@arkcase.com
-      DnQualifier: /arkcase/pki/certs/root-ca-cert,/arkcase/pki/private/root-ca-key
       CommonName: intermediate-ca.arkcase.internal
       BasicConstraints:
         Critical: true
@@ -365,7 +365,6 @@ Resources:
       OrganizationName: ArkCase
       OrganizationalUnitName: Product Development
       EmailAddress: info@arkcase.com
-      DnQualifier: /arkcase/pki/certs/intermediate-ca-cert,/arkcase/pki/private/intermediate-ca-key
       CommonName: alfresco.arkcase.internal
       BasicConstraints:
         CA: false

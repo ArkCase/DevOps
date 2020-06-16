@@ -33,7 +33,6 @@ def handler(event, context):
             "OrganizationName": "Armedia, LLC",  # Optional
             "OrganizationalUnitName": "SecOps",  # Optional
             "EmailAddress": "bob@builder.com",   # Optional
-            "DnQualifier": "anything",           # Optional
             "CommonName": "arkcase.internal",    # Optional in theory, required in practice
 
             "BasicConstraints": {     # Basic constraints extension, optional
@@ -56,6 +55,13 @@ def handler(event, context):
                 "DecipherOnly"        # Can decrypt following a key agreement
               ]
             },
+
+            # Whether this certificate should be self-signed or signed by a CA.
+            # If set to `false`, you must also set the `CaKeyParameterName` and
+            # `CaCertParameterName` to valid values.
+            #
+            # Optional; default to `false`
+            "SelfSigned": false,
 
             # Name of the parameters storing the private key and certificate of
             # the CA that will be used to sign this new certificate. If either
@@ -136,9 +142,9 @@ def upsert_certificate(event):
     if 'BasicConstraints' in payload:
         bc = payload['BasicConstraints']
         if 'Critical' in bc:
-            bc['Critical'] = bc['Critical'] == "true"
+            bc['Critical'] = bc['Critical'].lower() == "true"
         if 'CA' in bc:
-            bc['CA'] = bc['CA'] == "true"
+            bc['CA'] = bc['CA'].lower() == "true"
         if 'PathLength' in bc:
             if bc['PathLength'] == "null":
                 bc['PathLength'] = None
@@ -147,7 +153,9 @@ def upsert_certificate(event):
     if 'KeyUsage' in payload:
         ku = payload['KeyUsage']
         if 'Critical' in ku:
-            ku['Critical'] = ku['Critical'] == "true"
+            ku['Critical'] = ku['Critical'].lower() == "true"
+    if 'SelfSigned' in payload:
+        payload['SelfSigned'] = payload['SelfSigned'].lower() == "true"
 
     # Call the `certificate` Lambda function
     lambda_arn = args['CertificateLambdaArn']
