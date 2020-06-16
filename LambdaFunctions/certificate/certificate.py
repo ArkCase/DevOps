@@ -101,7 +101,7 @@ def handler(event, context):
 
     print(f"Received event: {event}")
     try:
-        key_parameter_arn, cert_parameter_arn = handle_request(event)
+        key_parameter_arn, cert_parameter_arn = create_or_renew_cert(event)
         if 'CommonName' in event:
             msg = "Successfully created/renewed private key and certificate for " + event['CommonName']
         else:
@@ -122,10 +122,11 @@ def handler(event, context):
     return response
 
 
-def handle_request(event):
-    print(f"Generating the private key")
-    key_type = event.get('KeyType', "RSA")
-    key_size = int(event['KeySize'])
+def create_or_renew_cert(args):
+    cert_parameter_name = args['CertParameterName']
+    print(f"Generating the private key for {cert_parameter_name}")
+    key_type = args.get('KeyType', "RSA")
+    key_size = int(args['KeySize'])
     if key_type == "RSA":
         key = cryptography.hazmat.primitives.asymmetric.rsa.generate_private_key(
             public_exponent=65537,
@@ -139,36 +140,36 @@ def handle_request(event):
         )
     else:
         raise ValueError(f"Unsupported key type: {key_type}")
-    print(f"Successfully generated a private key")
+    print(f"Successfully generated a private key for {cert_parameter_name}")
 
     # Get the CA private key and certificate
-    ca_key, ca_cert = get_ca_parameters(event)
+    ca_key, ca_cert = get_ca_parameters(args)
 
     # Generate the signed certificate
 
-    print(f"Building distinguished name")
+    print(f"Building distinguished name for {cert_parameter_name}")
     attr = []
-    if 'CountryName' in event:
-        attr.append(x509.NameAttribute(NameOID.COUNTRY_NAME, event['CountryName']))
-    if 'StateOrProvinceName' in event:
-        attr.append(x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, event['StateOrProvinceName']))
-    if 'LocalityName' in event:
-        attr.append(x509.NameAttribute(NameOID.LOCALITY_NAME, event['LocalityName']))
-    if 'OrganizationName' in event:
-        attr.append(x509.NameAttribute(NameOID.ORGANIZATION_NAME, event['OrganizationName']))
-    if 'OrganizationalUnitName' in event:
-        attr.append(x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, event['OrganizationalUnitName']))
-    if 'EmailAddress' in event:
-        attr.append(x509.NameAttribute(NameOID.EMAIL_ADDRESS, event['EmailAddress']))
-    if 'DnQualifier' in event:
-        attr.append(x509.NameAttribute(NameOID.DN_QUALIFIER, event['DnQualifier']))
-    if 'CommonName' in event:
-        attr.append(x509.NameAttribute(NameOID.COMMON_NAME, event['CommonName']))
+    if 'CountryName' in args:
+        attr.append(x509.NameAttribute(NameOID.COUNTRY_NAME, args['CountryName']))
+    if 'StateOrProvinceName' in args:
+        attr.append(x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, args['StateOrProvinceName']))
+    if 'LocalityName' in args:
+        attr.append(x509.NameAttribute(NameOID.LOCALITY_NAME, args['LocalityName']))
+    if 'OrganizationName' in args:
+        attr.append(x509.NameAttribute(NameOID.ORGANIZATION_NAME, args['OrganizationName']))
+    if 'OrganizationalUnitName' in args:
+        attr.append(x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, args['OrganizationalUnitName']))
+    if 'EmailAddress' in args:
+        attr.append(x509.NameAttribute(NameOID.EMAIL_ADDRESS, args['EmailAddress']))
+    if 'DnQualifier' in args:
+        attr.append(x509.NameAttribute(NameOID.DN_QUALIFIER, args['DnQualifier']))
+    if 'CommonName' in args:
+        attr.append(x509.NameAttribute(NameOID.COMMON_NAME, args['CommonName']))
     subject = x509.Name(attr)
 
     issuer = ca_cert.subject if ca_cert else subject
 
-    print(f"Generating X.509 certificate")
+    print(f"Generating X.509 certificate for {cert_parameter_name}")
     cert = x509.CertificateBuilder().subject_name(
         subject
     ).issuer_name(
@@ -180,12 +181,12 @@ def handle_request(event):
     ).not_valid_before(
         datetime.datetime.utcnow()
     ).not_valid_after(
-        datetime.datetime.utcnow() + datetime.timedelta(days=int(event['ValidityDays']))
+        datetime.datetime.utcnow() + datetime.timedelta(days=int(args['ValidityDays']))
     )
 
-    if 'BasicConstraints' in event:
+    if 'BasicConstraints' in args:
         print(f"Adding basic constraints extension")
-        basic_constraints = event['BasicConstraints']
+        basic_constraints = args['BasicConstraints']
         critical = basic_constraints.get('Critical', False)
         ca = basic_constraints.get('CA', False)
         path_length = basic_constraints.get('PathLength', None)
@@ -194,9 +195,9 @@ def handle_request(event):
             critical=critical
         )
 
-    if 'KeyUsage' in event:
+    if 'KeyUsage' in args:
         print(f"Adding key usage extension")
-        key_usage = event['KeyUsage']
+        key_usage = args['KeyUsage']
         critical = key_usage.get('Critical', False)
         usages = key_usage['Usages']
         digital_signature = 'DigitalSignature' in usages
@@ -224,50 +225,49 @@ def handle_request(event):
         )
 
     if ca_key:
-        print(f"Signing the certficate with the CA key")
+        print(f"Signing the certficate with the CA key for {cert_parameter_name}")
         cert = cert.sign(ca_key, hashes.SHA256(), default_backend())
     else:
-        print(f"Self-signing the certificate")
+        print(f"Self-signing the certificate for {cert_parameter_name}")
         cert = cert.sign(key, hashes.SHA256(), default_backend())
 
     # Save the private key
 
-    print(f"Saving the private key in Parameter Store")
-    parameter_name = event['KeyParameterName']
+    key_parameter_name = args['KeyParameterName']
+    print(f"Saving the private key in Parameter Store: {key_parameter_name}")
     key_value = key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption()
     ).decode('utf8')
 
-    if 'CommonName' in event:
-        desc = "Private key for " + event['CommonName']
+    if 'CommonName' in args:
+        desc = "Private key for " + args['CommonName']
     else:
         desc = "Private key"
     key_parameter_arn = upsert_param(
-        parameter_name,
+        key_parameter_name,
         key_value,
         desc,
         "SecureString",
-        event.get('KeyTags', [])
+        args.get('KeyTags', [])
     )
 
     # Save the certificate
 
-    print(f"Saving the certificate in Parameter Store")
-    parameter_name = event['CertParameterName']
+    print(f"Saving the certificate in Parameter Store: {cert_parameter_name}")
     cert_value = cert.public_bytes(serialization.Encoding.PEM).decode('utf8')
 
-    if 'CommonName' in event:
-        desc = "X.509 certificate for " + event['CommonName']
+    if 'CommonName' in args:
+        desc = "X.509 certificate for " + args['CommonName']
     else:
         desc = "X.509 certificate"
     cert_parameter_arn = upsert_param(
-        parameter_name,
+        cert_parameter_name,
         cert_value,
         desc,
         "String",
-        event.get('CertTags', [])
+        args.get('CertTags', [])
     )
 
     # Done
@@ -275,9 +275,9 @@ def handle_request(event):
     return key_parameter_arn, cert_parameter_arn
 
 
-def get_ca_parameters(event):
+def get_ca_parameters(args):
     """Retrieve the CA private key and certificate"""
-    if 'CaKeyParameterName' not in event or 'CaCertParameterName' not in event:
+    if 'CaKeyParameterName' not in args or 'CaCertParameterName' not in args:
         print(f"No CA provided; certificate will be self-signed")
         return None, None
 
@@ -285,7 +285,7 @@ def get_ca_parameters(event):
 
     print(f"Retrieving CA private key")
     response = ssm.get_parameter(
-        Name=event['CaKeyParameterName'],
+        Name=args['CaKeyParameterName'],
         WithDecryption=True
     )
     ca_key_value = response['Parameter']['Value']
@@ -296,7 +296,7 @@ def get_ca_parameters(event):
     )
 
     print(f"Retrieving CA certificate")
-    response = ssm.get_parameter(Name=event['CaCertParameterName'])
+    response = ssm.get_parameter(Name=args['CaCertParameterName'])
     ca_cert_value = response['Parameter']['Value']
     ca_cert = x509.load_pem_x509_certificate(
         ca_cert_value.encode('utf8'),
