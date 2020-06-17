@@ -68,6 +68,15 @@ def handler(event, context):
           "CaKeyParameterName": "XYZ",
           "CaCertParameterName": "XYZ",
 
+          # Comma-separated list of paths of where certificates are stored in
+          # the Parameter Store. If this certificate is a CA, this field is
+          # mandatory. If it isn't a CA, this parameter is ignored. This field
+          # is used to cascade renewals to certificates under this path that
+          # have been signed with this certificate.
+          "CertParametersPaths": [
+            "/arkcase/pki/certs"
+          ],
+
           # Name of the SSM parameter where to save the private key
           "KeyParameterName": "/arkcase/pki/private/my-key",
           # Name of the SSM parameter where to save the certificate
@@ -156,12 +165,13 @@ def create_or_renew_cert(args):
     print(f"Successfully generated a private key for {cert_parameter_name}")
 
     # Get the CA private key and certificate
+    ssm = boto3.client("ssm")
     self_signed = args.get('SelfSigned', False)
     if self_signed:
         ca_key = None
         ca_cert = None
     else:
-        ca_key, ca_cert = get_ca_parameters(args)
+        ca_key, ca_cert = get_ca_parameters(ssm, args)
 
     # Generate the signed certificate
 
@@ -208,12 +218,16 @@ def create_or_renew_cert(args):
         print(f"Adding basic constraints extension")
         basic_constraints = args['BasicConstraints']
         critical = basic_constraints.get('Critical', False)
-        ca = basic_constraints.get('CA', False)
+        is_ca = basic_constraints.get('CA', False)
+        if is_ca and 'CertParametersPaths' not in args:
+            raise KeyError(f"This certificate is a CA and CertParametersPaths is not set")
         path_length = basic_constraints.get('PathLength', None)
         cert = cert.add_extension(
-            x509.BasicConstraints(ca=ca, path_length=path_length),
+            x509.BasicConstraints(ca=is_ca, path_length=path_length),
             critical=critical
         )
+    else:
+        is_ca = False
 
     if 'KeyUsage' in args:
         print(f"Adding key usage extension")
@@ -265,6 +279,7 @@ def create_or_renew_cert(args):
     else:
         desc = "Private key"
     key_parameter_arn = upsert_param(
+        ssm,
         key_parameter_name,
         key_value,
         desc,
@@ -282,6 +297,7 @@ def create_or_renew_cert(args):
     else:
         desc = "X.509 certificate"
     cert_parameter_arn = upsert_param(
+        ssm,
         cert_parameter_name,
         cert_value,
         desc,
@@ -291,13 +307,13 @@ def create_or_renew_cert(args):
 
     # Done
     print(f"Successfully generated private key and certificate; key ARN: {key_parameter_arn}, certificate ARN: {cert_parameter_arn}")
+    if is_ca:
+        cascade(ssm, args)
     return key_parameter_arn, cert_parameter_arn
 
 
-def get_ca_parameters(args):
+def get_ca_parameters(ssm, args):
     """Retrieve the CA private key and certificate"""
-    ssm = boto3.client("ssm")
-
     print(f"Retrieving CA private key")
     response = ssm.get_parameter(
         Name=args['CaKeyParameterName'],
@@ -321,7 +337,7 @@ def get_ca_parameters(args):
     return ca_key, ca_cert
 
 
-def upsert_param(name: str, value: str, desc: str, param_type: str, tags: dict):
+def upsert_param(ssm, name: str, value: str, desc: str, param_type: str, tags: dict):
     """
     Save the parameter
 
@@ -329,7 +345,6 @@ def upsert_param(name: str, value: str, desc: str, param_type: str, tags: dict):
     """
     # NB: `put_parameter()` doesn't allow `Overwrite` to be set to `True` and
     #     tags to be set as well.
-    ssm = boto3.client("ssm")
     print(f"upsert_param: Calling ssm.put_parameter(Name={name})")
     ssm.put_parameter(
         Name=name,
@@ -365,3 +380,75 @@ def upsert_param(name: str, value: str, desc: str, param_type: str, tags: dict):
     response = ssm.get_parameter(Name=name)
     print(f"upsert_param: Success; ARN: {response['Parameter']['ARN']}")
     return response['Parameter']['ARN']
+
+
+def cascade(ssm, args):
+    # Build a list of certificates to inspect
+    parameters = []
+    paths = args['CertParametersPaths']
+    parent_key_parameter_name = args['KeyParameterName']
+    for path in paths:
+        parameters += collect_cert_parameters(ssm, path)
+
+    for parameter in parameters:
+        # Load this certificate
+        cert_value = parameter['Value']
+        cert = x509.load_pem_x509_certificate(
+            cert_value.encode('utf8'),
+            backend=default_backend()
+        )
+
+        # Inspect `dnQualifier` for this certificate and check whether it has
+        # been signed by the parent key, in which case it will need to be
+        # renewed.
+        attributes = cert.subject.get_attributes_for_oid(NameOID.DN_QUALIFIER)
+        parameter_name = parameter['Name']
+        if not attributes:
+            print(f"WARNING: Certificate {parameter_name} doesn't have a dnQualifier element; skipped")
+            continue
+        if len(attributes) != 1:
+            print(f"WARNING: Certificate {parameter_name} has more than one dnQualifier element; using only the first one")
+        values = attributes[0].value.split(',')
+        if not values:
+            print(f"WARNING: Certificate {parameter_name} has an empty dnQualifier element; skipped")
+            continue
+        if len(values) == 1:
+            print(f"Certificate {parameter_name} is self-signed, no renewal needed")
+            continue
+        if len(values) != 3:
+            print(f"WARNING: Certificate {parameter_name} has a dnQualifier element with {len(values)} comma-separated values; expected 1 or 3; skipped")
+            continue
+        key_parameter_name, ca_key_parameter_name, ca_cert_parameter_name = values
+        if ca_key_parameter_name != parent_key_parameter_name:
+            print(f"Certificate {parameter_name} has been signed by {ca_key_parameter_name}; no renewal needed")
+            continue
+
+        # This certificate needs renewal
+        print(f"Certificate {parameter_name} has been signed by {ca_key_parameter_name}; renewal needed")
+        # TODO
+
+
+def collect_cert_parameters(ssm, path):
+    result = []
+    has_more = True
+    next_token = ""
+    while has_more:
+        # NB: AWS API doesn't allow to get more than 10 parameters at a time
+        if next_token:
+            response = ssm.get_parameters_by_path(
+                Path=path,
+                Recursive=True,
+                MaxResults=10,
+                NextToken=next_token
+            )
+        else:
+            response = ssm.get_parameters_by_path(
+                Path=path,
+                MaxResults=10,
+                Recursive=True
+            )
+        result += response['Parameters']
+        next_token = response.get('NextToken', "")
+        if not next_token:
+            has_more = False
+    return result

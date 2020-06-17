@@ -69,6 +69,12 @@ def handler(event, context):
             "CaKeyParameterName": "XYZ",
             "CaCertParameterName": "XYZ",
 
+            # Path of where certificates are stored. If this certificate is a CA,
+            # this field is mandatory. If it isn't a CA, this parameter is
+            # ignored. This field is used to cascade renewals to certificates
+            # under this path that have been signed with this certificate.
+            "CertParametersPaths": "/arkcase/pki/certs",
+
             # Name of the SSM parameter where to save the private key
             "KeyParameterName": "/arkcase/pki/private/my-key",
             "CertParameterName": "/arkcase/pki/certs/my-cert",
