@@ -6,8 +6,9 @@ import traceback
 import cryptography
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import rsa, dsa
 from cryptography import x509
-from cryptography.x509.oid import NameOID
+from cryptography.x509.oid import NameOID, ExtensionOID
 import datetime
 
 
@@ -116,7 +117,7 @@ def handler(event, context):
 
     print(f"Received event: {event}")
     try:
-        key_parameter_arn, cert_parameter_arn = create_or_renew_cert(event)
+        key_parameter_arn, cert_parameter_arn = handle_request(event)
         if 'CommonName' in event:
             msg = "Successfully created/renewed private key and certificate for " + event['CommonName']
         else:
@@ -137,26 +138,142 @@ def handler(event, context):
     return response
 
 
-def create_or_renew_cert(args):
+def handle_request(event):
+    key_type = event.get('KeyType', "RSA")
+    key_size = int(event['KeySize'])
+    validity_days = int(event['ValidityDays'])
+    self_signed = event.get('SelfSigned', False)
+    if self_signed:
+        ca_key_parameter_name = None
+        ca_cert_parameter_name = None
+    else:
+        if 'CaKeyParameterName' not in event:
+            raise KeyError(f"`SelfSigned` is set to `false`, but `CaKeyParameterName` is not set")
+        if 'CaCertParameterName' not in event:
+            raise KeyError(f"`SelfSigned` is set to `false`, but `CaCertParameterName` is not set")
+        ca_key_parameter_name = event['CaKeyParameterName']
+        ca_cert_parameter_name = event['CaCertParameterName']
+
+    attr = []
+    if 'CountryName' in event:
+        attr.append(x509.NameAttribute(NameOID.COUNTRY_NAME, event['CountryName']))
+    if 'StateOrProvinceName' in event:
+        attr.append(x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, event['StateOrProvinceName']))
+    if 'LocalityName' in event:
+        attr.append(x509.NameAttribute(NameOID.LOCALITY_NAME, event['LocalityName']))
+    if 'OrganizationName' in event:
+        attr.append(x509.NameAttribute(NameOID.ORGANIZATION_NAME, event['OrganizationName']))
+    if 'OrganizationalUnitName' in event:
+        attr.append(x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, event['OrganizationalUnitName']))
+    if 'EmailAddress' in event:
+        attr.append(x509.NameAttribute(NameOID.EMAIL_ADDRESS, event['EmailAddress']))
+    value = event['KeyParameterName']
+    if ca_key_parameter_name:
+        value += "," + ca_key_parameter_name + "," + ca_cert_parameter_name
+    attr.append(x509.NameAttribute(NameOID.DN_QUALIFIER, value))
+    if 'CommonName' in event:
+        attr.append(x509.NameAttribute(NameOID.COMMON_NAME, event['CommonName']))
+    subject = x509.Name(attr)
+
+    extensions = []
+
+    if 'BasicConstraints' in event:
+        print(f"Adding basic constraints extension")
+        basic_constraints = event['BasicConstraints']
+        critical = basic_constraints.get('Critical', False)
+        is_ca = basic_constraints.get('CA', False)
+        if is_ca and 'CertParametersPaths' not in event:
+            raise KeyError(f"This certificate is a CA and CertParametersPaths is not set")
+        path_length = basic_constraints.get('PathLength', None)
+        extension = x509.Extension(
+            oid=ExtensionOID.BASIC_CONSTRAINTS,
+            critical=critical,
+            value=x509.BasicConstraints(ca=is_ca, path_length=path_length)
+        )
+        extensions.append(extension)
+    else:
+        is_ca = False
+
+    if 'KeyUsage' in event:
+        print(f"Adding key usage extension")
+        key_usage = event['KeyUsage']
+        critical = key_usage.get('Critical', False)
+        usages = key_usage['Usages']
+        digital_signature = 'DigitalSignature' in usages
+        content_commitment = 'ContentCommitment' in usages
+        key_encipherment = 'KeyEncipherment' in usages
+        data_encipherment = 'DataEncipherment' in usages
+        key_agreement = 'KeyAgreement' in usages
+        key_cert_sign = 'KeyCertSign' in usages
+        crl_sign = 'CrlSign' in usages
+        encipher_only = 'EncipherOnly' in usages
+        decipher_only = 'DecipherOnly' in usages
+        extension = x509.Extension(
+            oid=ExtensionOID.KEY_USAGE,
+            critical=critical,
+            value=x509.KeyUsage(
+                digital_signature=digital_signature,
+                content_commitment=content_commitment,
+                key_encipherment=key_encipherment,
+                data_encipherment=data_encipherment,
+                key_agreement=key_agreement,
+                key_cert_sign=key_cert_sign,
+                crl_sign=crl_sign,
+                encipher_only=encipher_only,
+                decipher_only=decipher_only
+            )
+        )
+        extensions.append(extension)
+
+    if is_ca:
+        if 'CertParametersPaths' not in event:
+            raise KeyError(f"The certificate is a CA but `CertParametersPaths` is not set")
+        cert_parameters_paths = event['CertParametersPaths']
+    else:
+        cert_parameters_paths = []
+
+    key_parameter_name = event['KeyParameterName']
+    cert_parameter_name = event['CertParameterName']
+    key_tags = event.get('KeyTags', [])
+    cert_tags = event.get('CertTags', [])
+
+    return create_or_renew_cert(
+        key_type=key_type,
+        key_size=key_size,
+        validity_days=validity_days,
+        subject=subject,
+        extensions=extensions,
+        is_ca=is_ca,
+        ca_key_parameter_name=ca_key_parameter_name,
+        ca_cert_parameter_name=ca_cert_parameter_name,
+        cert_parameters_paths=cert_parameters_paths,
+        key_parameter_name=key_parameter_name,
+        cert_parameter_name=cert_parameter_name,
+        key_tags=key_tags,
+        cert_tags=cert_tags
+    )
+
+
+def create_or_renew_cert(
+        key_type, key_size, validity_days,
+        subject, extensions, is_ca,
+        ca_key_parameter_name, ca_cert_parameter_name, cert_parameters_paths,
+        key_parameter_name, cert_parameter_name, key_tags, cert_tags):
     # Check key and certificate parameter names
-    key_parameter_name = args['KeyParameterName']
-    cert_parameter_name = args['CertParameterName']
     if "," in key_parameter_name:
         raise ValueError(f"Key parameter name can't have commas: {key_parameter_name}")
     if "," in cert_parameter_name:
         raise ValueError(f"Certificate parameter name can't have commas: {cert_parameter_name}")
 
     print(f"Generating the private key for {cert_parameter_name}")
-    key_type = args.get('KeyType', "RSA")
-    key_size = int(args['KeySize'])
     if key_type == "RSA":
-        key = cryptography.hazmat.primitives.asymmetric.rsa.generate_private_key(
+        key = rsa.generate_private_key(
             public_exponent=65537,
             key_size=key_size,
             backend=default_backend()
         )
     elif key_type == "DSA":
-        key = cryptography.hazmat.primitives.asymmetric.dsa.generate_private_key(
+        key = dsa.generate_private_key(
             key_size=key_size,
             backend=default_backend()
         )
@@ -166,38 +283,15 @@ def create_or_renew_cert(args):
 
     # Get the CA private key and certificate
     ssm = boto3.client("ssm")
-    self_signed = args.get('SelfSigned', False)
-    if self_signed:
+    if ca_key_parameter_name:
+        # Sign with CA key
+        ca_key, ca_cert = get_ca_parameters(ssm, ca_key_parameter_name, ca_cert_parameter_name)
+        issuer = ca_cert.subject
+    else:
+        # Self-signed
         ca_key = None
         ca_cert = None
-    else:
-        ca_key, ca_cert = get_ca_parameters(ssm, args)
-
-    # Generate the signed certificate
-
-    print(f"Building distinguished name for {cert_parameter_name}")
-    attr = []
-    if 'CountryName' in args:
-        attr.append(x509.NameAttribute(NameOID.COUNTRY_NAME, args['CountryName']))
-    if 'StateOrProvinceName' in args:
-        attr.append(x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, args['StateOrProvinceName']))
-    if 'LocalityName' in args:
-        attr.append(x509.NameAttribute(NameOID.LOCALITY_NAME, args['LocalityName']))
-    if 'OrganizationName' in args:
-        attr.append(x509.NameAttribute(NameOID.ORGANIZATION_NAME, args['OrganizationName']))
-    if 'OrganizationalUnitName' in args:
-        attr.append(x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, args['OrganizationalUnitName']))
-    if 'EmailAddress' in args:
-        attr.append(x509.NameAttribute(NameOID.EMAIL_ADDRESS, args['EmailAddress']))
-    value = args['KeyParameterName']
-    if not self_signed:
-        value += "," + args['CaKeyParameterName'] + "," + args['CaCertParameterName']
-    attr.append(x509.NameAttribute(NameOID.DN_QUALIFIER, value))
-    if 'CommonName' in args:
-        attr.append(x509.NameAttribute(NameOID.COMMON_NAME, args['CommonName']))
-    subject = x509.Name(attr)
-
-    issuer = ca_cert.subject if ca_cert else subject
+        issuer = subject
 
     print(f"Generating X.509 certificate for {cert_parameter_name}")
     cert = x509.CertificateBuilder().subject_name(
@@ -211,59 +305,18 @@ def create_or_renew_cert(args):
     ).not_valid_before(
         datetime.datetime.utcnow()
     ).not_valid_after(
-        datetime.datetime.utcnow() + datetime.timedelta(days=int(args['ValidityDays']))
+        datetime.datetime.utcnow() + datetime.timedelta(days=validity_days)
     )
 
-    if 'BasicConstraints' in args:
-        print(f"Adding basic constraints extension")
-        basic_constraints = args['BasicConstraints']
-        critical = basic_constraints.get('Critical', False)
-        is_ca = basic_constraints.get('CA', False)
-        if is_ca and 'CertParametersPaths' not in args:
-            raise KeyError(f"This certificate is a CA and CertParametersPaths is not set")
-        path_length = basic_constraints.get('PathLength', None)
-        cert = cert.add_extension(
-            x509.BasicConstraints(ca=is_ca, path_length=path_length),
-            critical=critical
-        )
-    else:
-        is_ca = False
+    for extension in extensions:
+        cert = cert.add_extension(extension.value, extension.critical)
 
-    if 'KeyUsage' in args:
-        print(f"Adding key usage extension")
-        key_usage = args['KeyUsage']
-        critical = key_usage.get('Critical', False)
-        usages = key_usage['Usages']
-        digital_signature = 'DigitalSignature' in usages
-        content_commitment = 'ContentCommitment' in usages
-        key_encipherment = 'KeyEncipherment' in usages
-        data_encipherment = 'DataEncipherment' in usages
-        key_agreement = 'KeyAgreement' in usages
-        key_cert_sign = 'KeyCertSign' in usages
-        crl_sign = 'CrlSign' in usages
-        encipher_only = 'EncipherOnly' in usages
-        decipher_only = 'DecipherOnly' in usages
-        cert = cert.add_extension(
-            x509.KeyUsage(
-                digital_signature=digital_signature,
-                content_commitment=content_commitment,
-                key_encipherment=key_encipherment,
-                data_encipherment=data_encipherment,
-                key_agreement=key_agreement,
-                key_cert_sign=key_cert_sign,
-                crl_sign=crl_sign,
-                encipher_only=encipher_only,
-                decipher_only=decipher_only
-            ),
-            critical=critical
-        )
-
-    if self_signed:
-        print(f"Self-signing the certificate for {cert_parameter_name}")
-        cert = cert.sign(key, hashes.SHA256(), default_backend())
-    else:
+    if ca_key:
         print(f"Signing the certficate with the CA key for {cert_parameter_name}")
         cert = cert.sign(ca_key, hashes.SHA256(), default_backend())
+    else:
+        print(f"Self-signing the certificate for {cert_parameter_name}")
+        cert = cert.sign(key, hashes.SHA256(), default_backend())
 
     # Save the private key
 
@@ -274,17 +327,13 @@ def create_or_renew_cert(args):
         encryption_algorithm=serialization.NoEncryption()
     ).decode('utf8')
 
-    if 'CommonName' in args:
-        desc = "Private key for " + args['CommonName']
-    else:
-        desc = "Private key"
     key_parameter_arn = upsert_param(
         ssm,
         key_parameter_name,
         key_value,
-        desc,
+        "Private key for " + cert_parameter_name,
         "SecureString",
-        args.get('KeyTags', [])
+        key_tags
     )
 
     # Save the certificate
@@ -292,31 +341,27 @@ def create_or_renew_cert(args):
     print(f"Saving the certificate in Parameter Store: {cert_parameter_name}")
     cert_value = cert.public_bytes(serialization.Encoding.PEM).decode('utf8')
 
-    if 'CommonName' in args:
-        desc = "X.509 certificate for " + args['CommonName']
-    else:
-        desc = "X.509 certificate"
     cert_parameter_arn = upsert_param(
         ssm,
         cert_parameter_name,
         cert_value,
-        desc,
+        "X.509 certificate for " + cert_parameter_name,
         "String",
-        args.get('CertTags', [])
+        cert_tags
     )
 
     # Done
     print(f"Successfully generated private key and certificate; key ARN: {key_parameter_arn}, certificate ARN: {cert_parameter_arn}")
     if is_ca:
-        cascade(ssm, args)
+        cascade(ssm, cert_parameters_paths, key_parameter_name)
     return key_parameter_arn, cert_parameter_arn
 
 
-def get_ca_parameters(ssm, args):
+def get_ca_parameters(ssm, ca_key_parameter_name, ca_cert_parameter_name):
     """Retrieve the CA private key and certificate"""
     print(f"Retrieving CA private key")
     response = ssm.get_parameter(
-        Name=args['CaKeyParameterName'],
+        Name=ca_key_parameter_name,
         WithDecryption=True
     )
     ca_key_value = response['Parameter']['Value']
@@ -327,7 +372,7 @@ def get_ca_parameters(ssm, args):
     )
 
     print(f"Retrieving CA certificate")
-    response = ssm.get_parameter(Name=args['CaCertParameterName'])
+    response = ssm.get_parameter(Name=ca_cert_parameter_name)
     ca_cert_value = response['Parameter']['Value']
     ca_cert = x509.load_pem_x509_certificate(
         ca_cert_value.encode('utf8'),
@@ -382,11 +427,9 @@ def upsert_param(ssm, name: str, value: str, desc: str, param_type: str, tags: d
     return response['Parameter']['ARN']
 
 
-def cascade(ssm, args):
+def cascade(ssm, paths, parent_key_parameter_name):
     # Build a list of certificates to inspect
     parameters = []
-    paths = args['CertParametersPaths']
-    parent_key_parameter_name = args['KeyParameterName']
     for path in paths:
         parameters += collect_cert_parameters(ssm, path)
 
@@ -402,30 +445,60 @@ def cascade(ssm, args):
         # been signed by the parent key, in which case it will need to be
         # renewed.
         attributes = cert.subject.get_attributes_for_oid(NameOID.DN_QUALIFIER)
-        parameter_name = parameter['Name']
+        cert_parameter_name = parameter['Name']
         if not attributes:
-            print(f"WARNING: Certificate {parameter_name} doesn't have a dnQualifier element; skipped")
+            print(f"WARNING: Certificate {cert_parameter_name} doesn't have a dnQualifier element; skipped")
             continue
         if len(attributes) != 1:
-            print(f"WARNING: Certificate {parameter_name} has more than one dnQualifier element; using only the first one")
+            print(f"WARNING: Certificate {cert_parameter_name} has more than one dnQualifier element; using only the first one")
         values = attributes[0].value.split(',')
         if not values:
-            print(f"WARNING: Certificate {parameter_name} has an empty dnQualifier element; skipped")
+            print(f"WARNING: Certificate {cert_parameter_name} has an empty dnQualifier element; skipped")
             continue
         if len(values) == 1:
-            print(f"Certificate {parameter_name} is self-signed, no renewal needed")
+            print(f"Certificate {cert_parameter_name} is self-signed, no renewal needed")
             continue
         if len(values) != 3:
-            print(f"WARNING: Certificate {parameter_name} has a dnQualifier element with {len(values)} comma-separated values; expected 1 or 3; skipped")
+            print(f"WARNING: Certificate {cert_parameter_name} has a dnQualifier element with {len(values)} comma-separated values; expected 1 or 3; skipped")
             continue
         key_parameter_name, ca_key_parameter_name, ca_cert_parameter_name = values
         if ca_key_parameter_name != parent_key_parameter_name:
-            print(f"Certificate {parameter_name} has been signed by {ca_key_parameter_name}; no renewal needed")
+            print(f"Certificate {cert_parameter_name} has been signed by {ca_key_parameter_name}; no renewal needed")
             continue
 
         # This certificate needs renewal
-        print(f"Certificate {parameter_name} has been signed by {ca_key_parameter_name}; renewal needed")
-        # TODO
+        print(f"Certificate {cert_parameter_name} has been signed by {ca_key_parameter_name}; renewal needed")
+
+        print(f"Fetching private key")
+        response = ssm.get_parameter(
+            Name=key_parameter_name,
+            WithDecryption=True
+        )
+        key_value = response['Parameter']['Value']
+        key = serialization.load_pem_private_key(
+            key_value.encode('utf8'),
+            password=None,
+            backend=default_backend()
+        )
+        if isinstance(key, rsa.RSAPrivateKey):
+            key_type = "RSA"
+            key_size = key.key_size
+        elif isinstance(key, dsa.DSAPrivateKey):
+            key_type = "DSA"
+            key_size = key.key_size
+        else:
+            raise ValueError(f"Unhandled private key type")
+
+        validity_delta = cert.not_valid_after - cert.not_valid_before
+
+#        create_or_renew_cert(
+#            key_parameter_name=key_parameter_name,
+#            cert_parameter_name=cert_parameter_name,
+#            key_type=key_type,
+#            key_size=key_size,
+#            validity_days=validity_delta.days,
+#            ca_key_parameter_name=ca_key_parameter_name
+#        )
 
 
 def collect_cert_parameters(ssm, path):
