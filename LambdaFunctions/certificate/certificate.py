@@ -179,9 +179,10 @@ def create_or_renew_cert(args):
         attr.append(x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, args['OrganizationalUnitName']))
     if 'EmailAddress' in args:
         attr.append(x509.NameAttribute(NameOID.EMAIL_ADDRESS, args['EmailAddress']))
+    value = args['KeyParameterName']
     if not self_signed:
-        tmp = args['CaKeyParameterName'] + "," + args['CaCertParameterName']
-        attr.append(x509.NameAttribute(NameOID.DN_QUALIFIER, tmp))
+        value += "," + args['CaKeyParameterName'] + "," + args['CaCertParameterName']
+    attr.append(x509.NameAttribute(NameOID.DN_QUALIFIER, value))
     if 'CommonName' in args:
         attr.append(x509.NameAttribute(NameOID.COMMON_NAME, args['CommonName']))
     subject = x509.Name(attr)
