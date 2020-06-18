@@ -129,10 +129,10 @@ Resources:
       Runtime: python3.7
       Role: !GetAtt CertificateLambdaExecutionRole.Arn
       Handler: certificate.handler
-      Timeout: 60
+      Timeout: 900  # 15 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200617-0946/LambdaFunctions/certificate/certificate.zip
+        S3Key: DevOps/ACM-TMP-20200618-1108/LambdaFunctions/certificate/certificate.zip
       Tags:
         - Key: Name
           Value: !Sub pki-certificate-lambda-${Project}-${Env}
@@ -198,10 +198,10 @@ Resources:
       Runtime: python3.7
       Role: !GetAtt CertificateResourceLambdaExecutionRole.Arn
       Handler: certificate_resource.handler
-      Timeout: 120
+      Timeout: 900  # 15 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200617-0946/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200618-1108/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub pki-certificate-resource-lambda-${Project}-${Env}
