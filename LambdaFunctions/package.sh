@@ -22,7 +22,7 @@ if [ -e requirements.txt ]; then
     zip -r9 "../${lambda}.zip" .
     cd ..
     rm -rf "$tmpdir"
-    zip -g "${lambda}.zip" "${lambda}.py"
+    zip -g "${lambda}.zip" *.py
 else
-    zip -r9 "${lambda}.zip" "${lambda}.py"
+    zip -r9 "${lambda}.zip" *.py
 fi
