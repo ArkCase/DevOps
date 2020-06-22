@@ -132,7 +132,7 @@ Resources:
       Timeout: 900  # 15 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200619-0521/LambdaFunctions/certificate/certificate.zip
+        S3Key: DevOps/ACM-TMP-20200620-0841/LambdaFunctions/certificate/certificate.zip
       Tags:
         - Key: Name
           Value: !Sub pki-certificate-lambda-${Project}-${Env}
@@ -146,6 +146,104 @@ Resources:
           Value: lambda
         - Key: ManagedBy
           Value: CloudFormation
+
+  ######################################################
+  # Lambda function to periodically check for renewals #
+  ######################################################
+
+  RenewCertificatesLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: RenewCertificates
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:PutParameter
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                  - ssm:ListTagsForResource
+                  - ssm:RemoveTagsFromResource
+                  - ssm:AddTagsToResource
+                Resource: arn:aws:ssm:*:*:parameter/arkcase/pki/*
+
+              - Effect: Allow
+                Action: ssm:DescribeParameters
+                Resource: "*"
+      Tags:
+        - Key: Name
+          Value: !Sub pki-renew-certificates-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  RenewCertificatesLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: >
+        Scan all certificates to check whether they are close to expiry and
+        renew them if needed
+      Runtime: python3.7
+      Role: !GetAtt RenewCertificatesLambdaExecutionRole.Arn
+      Handler: renew_certificates.handler
+      Timeout: 900  # 15 minutes
+      Environment:
+        Variables:
+          CERT_PARAMETERS_PATHS: /arkcase/pki/certs
+          RENEW_BEFORE_DAYS: !Ref RenewBeforeDays
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20200620-0841/LambdaFunctions/renew_certificates/renew_certificates.zip
+      Tags:
+        - Key: Name
+          Value: !Sub pki-renew-certificates-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  RenewCertificatesRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Periodically check for certificate renewals
+      ScheduleExpression: !Sub cron(${RenewCertificatesCron})
+      State: ENABLED
+      Targets:
+        - Id: RenewCertificates
+          Arn: !GetAtt RenewCertificatesLambda.Arn
+
+  RenewCertificatesInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref RenewCertificatesLambda
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt RenewCertificatesRule.Arn
 
   #################################################################
   # Lambda function for the `Certificate` custom resource backend #
@@ -201,7 +299,7 @@ Resources:
       Timeout: 900  # 15 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200619-0521/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200620-0841/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub pki-certificate-resource-lambda-${Project}-${Env}
@@ -417,96 +515,6 @@ Resources:
           Value: admin
         - Key: ManagedBy
           Value: CloudFormation
-
-  ###################################
-  # Periodically check for renewals #
-  ###################################
-
-  RenewCertificatesLambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      Policies:
-        - PolicyName: RenewCertificates
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action: ssm:GetParametersByPath
-                Resource: arn:aws:ssm:*:*:parameter/arkcase/pki/*
-
-              - Effect: Allow
-                Action: ssm:DescribeParameters
-                Resource: "*"
-      Tags:
-        - Key: Name
-          Value: !Sub pki-renew-certificates-lambda-execution-role-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: iam
-        - Key: ManagedBy
-          Value: CloudFormation
-
-  RenewCertificatesLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      Description: >
-        Scan all certificates to check whether they are close to expiry and
-        renew them if needed
-      Runtime: python3.7
-      Role: !GetAtt RenewCertificatesLambdaExecutionRole.Arn
-      Handler: renew_certificates.handler
-      Timeout: 900  # 15 minutes
-      Environment:
-        Variables:
-          CERT_PARAMETERS_PATHS: /arkcase/pki/certs
-      Code:
-        S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200619-0521/LambdaFunctions/renew_certificates/renew_certificates.zip
-      Tags:
-        - Key: Name
-          Value: !Sub pki-renew-certificates-lambda-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: lambda
-        - Key: ManagedBy
-          Value: CloudFormation
-
-  RenewCertificatesRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Description: Periodically check for certificate renewals
-      ScheduleExpression: !Sub cron(${RenewCertificatesCron})
-      State: ENABLED
-      Targets:
-        - Id: RenewCertificates
-          Arn: !GetAtt RenewCertificatesLambda.Arn
-
-  RenewCertificatesInvokePermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref RenewCertificatesLambda
-      Action: lambda:InvokeFunction
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt RenewCertificatesRule.Arn
 
 Outputs:
   RootCaKeyParameterArn:
