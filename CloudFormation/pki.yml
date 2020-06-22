@@ -38,7 +38,7 @@ Parameters:
     Default: 0 8 ? * SUN *
     MinLength: 11
 
-  RenewBeforeDays:
+  DaysBeforeExpiryCertificateRenewal:
     Type: Number
     Description: >
       How many days before expiry should a certificate be renewed
@@ -55,21 +55,12 @@ Metadata:
       - Label: { default: Renewals configuration }
         Parameters:
           - RenewCertificatesCron
-          - RenewBeforeDays
+          - DaysBeforeExpiryCertificateRenewal
 
-#    ParameterLabels:
-#      Env: { default: Environment }
-#      VpcId: { default: VPC ID }
-#      SubnetIdA: { default: First subnet ID }
-#      SubnetIdB: { default: Second subnet ID }
-#      InstanceType: { default: Instance type }
-#      PasswordLength: { default: Password length }
-#      MasterSecretRotationCron: { default: Master secret rotation cron }
-#      UserSecretRotationCron: { default: User secret rotation cron }
-#      ActivemqVersion: { default: ActiveMQ version }
-#      MaintenanceDayOfWeek: { default: Maintenance day of the week }
-#      MaintenanceTimeOfDay: { default: Maintenance start time }
-#      EnableAuditLogs: { default: Enable audit logs }
+    ParameterLabels:
+      Env: { default: Environment }
+      RenewCertificatesCron: { default: Renew certificates cron }
+      DaysBeforeExpiryCertificateRenewal: { default: Days before expiry to renew a certificate }
 
 Resources:
 
@@ -110,7 +101,7 @@ Resources:
                 Resource: "*"
       Tags:
         - Key: Name
-          Value: !Sub pki-certificate-lambda-execution-role-${Project}-${Env}
+          Value: !Sub certificate-lambda-execution-role-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -132,10 +123,10 @@ Resources:
       Timeout: 900  # 15 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200620-0841/LambdaFunctions/certificate/certificate.zip
+        S3Key: DevOps/ACM-TMP-20200622-1841/LambdaFunctions/certificate/certificate.zip
       Tags:
         - Key: Name
-          Value: !Sub pki-certificate-lambda-${Project}-${Env}
+          Value: !Sub certificate-lambda-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -184,7 +175,7 @@ Resources:
                 Resource: "*"
       Tags:
         - Key: Name
-          Value: !Sub pki-renew-certificates-lambda-execution-role-${Project}-${Env}
+          Value: !Sub renew-certificates-lambda-execution-role-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -209,13 +200,13 @@ Resources:
       Environment:
         Variables:
           CERT_PARAMETERS_PATHS: /arkcase/pki/certs
-          RENEW_BEFORE_DAYS: !Ref RenewBeforeDays
+          RENEW_BEFORE_DAYS: !Ref DaysBeforeExpiryCertificateRenewal
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200620-0841/LambdaFunctions/renew_certificates/renew_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200622-1841/LambdaFunctions/renew_certificates/renew_certificates.zip
       Tags:
         - Key: Name
-          Value: !Sub pki-renew-certificates-lambda-${Project}-${Env}
+          Value: !Sub renew-certificates-lambda-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -275,7 +266,7 @@ Resources:
                 Resource: !GetAtt CertificateLambda.Arn
       Tags:
         - Key: Name
-          Value: !Sub pki-certificate-resource-lambda-execution-role-${Project}-${Env}
+          Value: !Sub certificate-resource-lambda-execution-role-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -299,10 +290,10 @@ Resources:
       Timeout: 900  # 15 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200620-0841/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200622-1841/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
-          Value: !Sub pki-certificate-resource-lambda-${Project}-${Env}
+          Value: !Sub certificate-resource-lambda-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
