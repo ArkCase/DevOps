@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from anytree import NodeMixin, RenderTree
+from anytree import NodeMixin, RenderTree, LevelOrderIter
 import boto3
 import botocore
 import cryptography
@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa, dsa
 from cryptography import x509
 from cryptography.x509.oid import NameOID, ExtensionOID
 import datetime
+import json
 
 
 def handler(event, context):
@@ -75,6 +76,7 @@ class Certificate(NodeMixin):
             key_parameter_name,
             ca_key_parameter_name,
             ca_cert_parameter_name,
+            cert,
             parent=None,
             children=None
     ):
@@ -83,6 +85,7 @@ class Certificate(NodeMixin):
         self.key_parameter_name = key_parameter_name
         self.ca_key_parameter_name = ca_key_parameter_name
         self.ca_cert_parameter_name = ca_cert_parameter_name
+        self.cert = cert
         self.parent = parent
         if children:
             self.children
@@ -124,11 +127,12 @@ def make_certificate_from_parameter(parameter):
         raise KeyError(f"dnQualifier doesn't contain the key parameter name for certificate {cert_parameter_name}")
 
     return Certificate(
-        cert_parameter_arn,
-        cert_parameter_name,
-        key_parameter_name,
-        ca_key_parameter_name,
-        ca_cert_parameter_name
+        cert_parameter_arn=cert_parameter_arn,
+        cert_parameter_name=cert_parameter_name,
+        key_parameter_name=key_parameter_name,
+        ca_key_parameter_name=ca_key_parameter_name,
+        ca_cert_parameter_name=ca_cert_parameter_name,
+        cert=cert
     )
 
 
@@ -160,19 +164,29 @@ def handle_request(event):
         certificate = make_certificate_from_parameter(parameter)
         certificates.append(certificate)
 
-    # Perform the requested operation
+    # Get the list of certificates to renew according to the requested mode of
+    # operation
     if 'ParentCertParameterArn' in event:
-        s3key = cascade(
+        result = cascade(
             ssm,
             certificates,
             event['ParentCertParameterArn']
         )
     else:
-        s3key = check_renewals(
+        result = check_renewals(
             ssm,
             certificates,
             int(event['DaysToExpiryToTriggerRenewal'])
         )
+
+    # Save the certificate list in S3
+    output = serialize(ssm, result)
+    timestamp = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    s3key = "list of certificates to renew " + timestamp
+    content = json.dumps(output, indent=2)
+    print(content)  # XXX
+    # TODO
+
     return s3key
 
 
@@ -208,12 +222,16 @@ def cascade(ssm, certificates, parent_cert_parameter_arn):
 
     # Build a tree rooted on the parent certificate
     build_tree(certificates, parent_certificate)
-    # XXX
-    print(RenderTree(parent_certificate))
+    # print(RenderTree(parent_certificate))
+
+    result = [certificate for certificate in LevelOrderIter(parent_certificate)]
+    print(f"cascade result: {result}")
+    return result
 
 
 def check_renewals(ssm, certificates, days_to_expiry_to_trigger_renewal):
-    pass  # TODO
+    # TODO
+    return []
 
 
 def build_tree(certificates, root_certificate):
@@ -223,6 +241,133 @@ def build_tree(certificates, root_certificate):
             certificate.parent = root_certificate
             # Recurse down this certificate to build the tree
             build_tree(certificates, certificate)
+
+
+def serialize(ssm, certificates):
+    """Serialize a list of `Certificate` objects in a list of dictionaires
+    that can be turned into JSON.
+    """
+    output = []
+    for certificate in certificates:
+        # Inspect private key to determine key type and size
+        key_parameter_name = certificate.key_parameter_name
+        cert_parameter_name = certificate.cert_parameter_name
+        print(f"Fetching private key {key_parameter_name}")
+        response = ssm.get_parameter(
+            Name=key_parameter_name,
+            WithDecryption=True
+        )
+        key_value = response['Parameter']['Value']
+        key = serialization.load_pem_private_key(
+            key_value.encode('utf8'),
+            password=None,
+            backend=default_backend()
+        )
+        if isinstance(key, rsa.RSAPrivateKey):
+            key_type = "RSA"
+            key_size = key.key_size
+        elif isinstance(key, dsa.DSAPrivateKey):
+            key_type = "DSA"
+            key_size = key.key_size
+        else:
+            raise ValueError(f"Unhandled private key type for {cert_parameter_name}")
+
+        # Calculate validity duration
+        cert = certificate.cert
+        validity_delta = cert.not_valid_after - cert.not_valid_before
+        validity_days = validity_delta.days
+
+        # Get tags for key and certificate parameters
+        response = ssm.list_tags_for_resource(
+            ResourceType="Parameter",
+            ResourceId=key_parameter_name
+        )
+        key_tags = response['TagList']
+        response = ssm.list_tags_for_resource(
+            ResourceType="Parameter",
+            ResourceId=cert_parameter_name
+        )
+        cert_tags = response['TagList']
+
+        # Build serialized item
+
+        item = {
+            'KeyType': key_type,
+            'KeySize': key_size,
+            'ValidityDays': validity_days,
+        }
+
+        add_subject_attribute_if_present(item, 'CountryName', cert.subject, NameOID.COUNTRY_NAME)
+        add_subject_attribute_if_present(item, 'StateOrProvinceName', cert.subject, NameOID.STATE_OR_PROVINCE_NAME)
+        add_subject_attribute_if_present(item, 'LocalityName', cert.subject, NameOID.LOCALITY_NAME)
+        add_subject_attribute_if_present(item, 'OrganizationName', cert.subject, NameOID.ORGANIZATION_NAME)
+        add_subject_attribute_if_present(item, 'OrganizationalUnitName', cert.subject, NameOID.ORGANIZATIONAL_UNIT_NAME)
+        add_subject_attribute_if_present(item, 'EmailAddress', cert.subject, NameOID.EMAIL_ADDRESS)
+
+        try:
+            basic_constraints = cert.extensions.get_extension_for_oid(ExtensionOID.BASIC_CONSTRAINTS)
+            tmp = {
+                'Critical': basic_constraints.critical,
+                'CA': basic_constraints.value.ca
+            }
+            if basic_constraints.value.path_length is not None:
+                tmp['PathLength'] = basic_constraints.value.path_length
+            item['BasicConstraints'] = tmp
+        except x509.ExtensionNotFound:
+            pass
+
+        try:
+            key_usage = cert.extensions.get_extension_for_oid(ExtensionOID.KEY_USAGE)
+            tmp = {
+                'Critical': key_usage.critical
+            }
+            usages = []
+            if key_usage.value.digital_signature:
+                usages.append("DigitalSignature")
+            if key_usage.value.content_commitment:
+                usages.append("ContentCommitment")
+            if key_usage.value.key_encipherment:
+                usages.append("KeyEncipherment")
+            if key_usage.value.data_encipherment:
+                usages.append("DataEncipherment")
+            if key_usage.value.key_cert_sign:
+                usages.append("KeyCertSign")
+            if key_usage.value.crl_sign:
+                usages.append("CrlSign")
+            if key_usage.value.key_agreement:
+                usages.append("KeyAgreement")
+                # NB: `encipher_only` and `decipher_only` are present only if
+                #     `key_agreement` is set to `True`
+                if key_usage.value.encipher_only:
+                    usages.append("EncipherOnly")
+                if key_usage.value.decipher_only:
+                    usages.append("DecipherOnly")
+            tmp['Usages'] = usages
+            item['KeyUsage'] = tmp
+        except x509.ExtensionNotFound:
+            pass
+
+        if certificate.ca_key_parameter_name:
+            item['SelfSigned'] = False
+            item['CaKeyParameterName'] = certificate.ca_key_parameter_name
+            item['CaCertParameterName'] = certificate.ca_cert_parameter_name
+        else:
+            item['SelfSigned'] = True
+
+        item['KeyParameterName'] = key_parameter_name
+        item['CertParameterName'] = cert_parameter_name
+        item['KeyTags'] = key_tags
+        item['CertTags'] = cert_tags
+
+        # Add this item to the list
+        output.append(item)
+    return output
+
+
+def add_subject_attribute_if_present(item, key, subject, name_oid):
+    attributes = subject.get_attributes_for_oid(name_oid)
+    if attributes:
+        item[key] = attributes[0].value
 
 
 #    for parameter in parameters:
@@ -242,60 +387,7 @@ def build_tree(certificates, root_certificate):
 #            continue
 #
 #        print(f"Certificate {cert_parameter_name} is close to expiry (only {remaining_days} left, min {renew_before_days}); renewing now")
-#        # Inspect `dnQualifier` attributes for this certificate
-#        key_parameter_name = None
-#        ca_key_parameter_name = None
-#        ca_cert_parameter_name = None
-#        cert_parameters_paths = []
-#        attributes = cert.subject.get_attributes_for_oid(NameOID.DN_QUALIFIER)
-#        for attribute in attributes:
-#            name, value = attribute.value.split(":", 1)
-#            if name == "key":
-#                key_parameter_name = value
-#            elif name == "cakey":
-#                ca_key_parameter_name = value
-#            elif name == "cacert":
-#                ca_cert_parameter_name = value
-#            elif name == "path":
-#                cert_parameters_paths.append(value)
-#        if not key_parameter_name:
-#            raise KeyError(f"Missing key parameter name in dnQualifier in certificate {cert_parameter_name}")
 #
-#        # Inspect private key to determine key type and size
-#        print(f"Fetching private key {key_parameter_name}")
-#        response = ssm.get_parameter(
-#            Name=key_parameter_name,
-#            WithDecryption=True
-#        )
-#        key_value = response['Parameter']['Value']
-#        key = serialization.load_pem_private_key(
-#            key_value.encode('utf8'),
-#            password=None,
-#            backend=default_backend()
-#        )
-#        if isinstance(key, rsa.RSAPrivateKey):
-#            key_type = "RSA"
-#            key_size = key.key_size
-#        elif isinstance(key, dsa.DSAPrivateKey):
-#            key_type = "DSA"
-#            key_size = key.key_size
-#        else:
-#            raise ValueError(f"Unhandled private key type for {cert_parameter_name}")
-#
-#        validity_delta = cert.not_valid_after - cert.not_valid_before
-#        validity_days = validity_delta.days
-#
-#        # Get tags for key and certificate parameters
-#        response = ssm.list_tags_for_resource(
-#            ResourceType="Parameter",
-#            ResourceId=key_parameter_name
-#        )
-#        key_tags = response['TagList']
-#        response = ssm.list_tags_for_resource(
-#            ResourceType="Parameter",
-#            ResourceId=cert_parameter_name
-#        )
-#        cert_tags = response['TagList']
 #
 #        print(f"Renewing certificate {cert_parameter_name}")
 #        create_or_renew_cert(

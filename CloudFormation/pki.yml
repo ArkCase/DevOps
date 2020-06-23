@@ -124,7 +124,7 @@ Resources:
       Timeout: 900  # 15 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200623-1410/LambdaFunctions/certificate/certificate.zip
+        S3Key: DevOps/ACM-TMP-20200623-1747/LambdaFunctions/certificate/certificate.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-lambda-${Project}-${Env}
@@ -161,8 +161,16 @@ Resources:
             Version: 2012-10-17
             Statement:
               - Effect: Allow
-                Action: ssm:GetParametersByPath
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                  - ssm:ListTagsForResource
                 Resource: arn:aws:ssm:*:*:parameter/arkcase/pki/*
+
+              - Effect: Allow
+                Action: ssm:DescribeParameters
+                Resource: "*"
       Tags:
         - Key: Name
           Value: !Sub check-certificates-lambda-execution-role-${Project}-${Env}
@@ -188,7 +196,7 @@ Resources:
       Timeout: 300  # 5 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200623-1410/LambdaFunctions/check_certificates/check_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200623-1747/LambdaFunctions/check_certificates/check_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub check-certificates-lambda-${Project}-${Env}
@@ -268,7 +276,7 @@ Resources:
           RENEW_BEFORE_DAYS: !Ref DaysBeforeExpiryCertificateRenewal
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200623-1410/LambdaFunctions/renew_certificates/renew_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200623-1747/LambdaFunctions/renew_certificates/renew_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub renew-certificates-lambda-${Project}-${Env}
@@ -355,7 +363,7 @@ Resources:
       Timeout: 900  # 15 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200623-1410/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200623-1747/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-resource-lambda-${Project}-${Env}
