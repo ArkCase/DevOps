@@ -43,6 +43,7 @@ Parameters:
     Description: >
       How many days before expiry should a certificate be renewed
     MinValue: 0
+    Default: 15
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -123,10 +124,74 @@ Resources:
       Timeout: 900  # 15 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200622-1841/LambdaFunctions/certificate/certificate.zip
+        S3Key: DevOps/ACM-TMP-20200623-1410/LambdaFunctions/certificate/certificate.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ##############################################################
+  # Lambda function to compute a list of certificates to renew #
+  ##############################################################
+
+  CheckCertificatesLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CheckCertificatesLambdaPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: ssm:GetParametersByPath
+                Resource: arn:aws:ssm:*:*:parameter/arkcase/pki/*
+      Tags:
+        - Key: Name
+          Value: !Sub check-certificates-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  CheckCertificatesLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Check certificates for renewal
+      Runtime: python3.7
+      Role: !GetAtt CheckCertificatesLambdaExecutionRole.Arn
+      Handler: check_certificates.handler
+      MemorySize: 1024  # 1GiB
+      Timeout: 300  # 5 minutes
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20200623-1410/LambdaFunctions/check_certificates/check_certificates.zip
+      Tags:
+        - Key: Name
+          Value: !Sub check-certificates-lambda-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -203,7 +268,7 @@ Resources:
           RENEW_BEFORE_DAYS: !Ref DaysBeforeExpiryCertificateRenewal
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200622-1841/LambdaFunctions/renew_certificates/renew_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200623-1410/LambdaFunctions/renew_certificates/renew_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub renew-certificates-lambda-${Project}-${Env}
@@ -290,7 +355,7 @@ Resources:
       Timeout: 900  # 15 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200622-1841/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200623-1410/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-resource-lambda-${Project}-${Env}
@@ -507,6 +572,473 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
+  PentahoCertificate:
+    Type: Custom::Certificate
+    DependsOn: IntermediateCaCertificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
+      KeyType: RSA
+      KeySize: 2048
+      ValidityDays: 90
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: pentaho.arkcase.internal
+      BasicConstraints:
+        CA: false
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyEncipherment ]
+      CaKeyParameterName: /arkcase/pki/private/intermediate-ca-key
+      CaCertParameterName: /arkcase/pki/certs/intermediate-ca-cert
+      KeyParameterName: /arkcase/pki/private/pentaho-key
+      CertParameterName: /arkcase/pki/certs/pentaho-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub pentaho-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub pentaho-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub pentaho-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  #################################
+  # Parallel PKI for testing only #
+  #################################
+
+  # TODO: remove parallel PKI when testing finished
+
+  OtherRootCaCertificate:
+    Type: Custom::Certificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
+      KeyType: RSA
+      KeySize: 4096
+      ValidityDays: 7300  # About 20 years
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: Arkcase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: other-root-ca.arkcase.internal
+      BasicConstraints:
+        Critical: true
+        CA: true
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
+      SelfSigned: true
+      CertParametersPaths: [ /arkcase/pki/certs ]
+      KeyParameterName: /arkcase/pki/private/other-root-ca-key
+      CertParameterName: /arkcase/pki/certs/other-root-ca-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub other-root-ca-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub other-root-ca-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub other-root-ca-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  FirstIntermediateCaCertificate:
+    Type: Custom::Certificate
+    DependsOn: OtherRootCaCertificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
+      KeyType: RSA
+      KeySize: 4096
+      ValidityDays: 730  # About 2 years
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: first-intermediate-ca.arkcase.internal
+      BasicConstraints:
+        Critical: true
+        CA: true
+        PathLength: 0
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
+      CaKeyParameterName: /arkcase/pki/private/other-root-ca-key
+      CaCertParameterName: /arkcase/pki/certs/other-root-ca-cert
+      CertParametersPaths: [ /arkcase/pki/certs ]
+      KeyParameterName: /arkcase/pki/private/first-intermediate-ca-key
+      CertParameterName: /arkcase/pki/certs/first-intermediate-ca-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub first-intermediate-ca-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub first-intermediate-ca-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub first-intermediate-ca-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  SecondIntermediateCaCertificate:
+    Type: Custom::Certificate
+    DependsOn: OtherRootCaCertificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
+      KeyType: RSA
+      KeySize: 4096
+      ValidityDays: 730  # About 2 years
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: second-intermediate-ca.arkcase.internal
+      BasicConstraints:
+        Critical: true
+        CA: true
+        PathLength: 0
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
+      CaKeyParameterName: /arkcase/pki/private/other-root-ca-key
+      CaCertParameterName: /arkcase/pki/certs/other-root-ca-cert
+      CertParametersPaths: [ /arkcase/pki/certs ]
+      KeyParameterName: /arkcase/pki/private/second-intermediate-ca-key
+      CertParameterName: /arkcase/pki/certs/second-intermediate-ca-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub second-intermediate-ca-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub second-intermediate-ca-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub second-intermediate-ca-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  FirstServiceCertificate:
+    Type: Custom::Certificate
+    DependsOn: FirstIntermediateCaCertificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
+      KeyType: RSA
+      KeySize: 2048
+      ValidityDays: 90
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: first-service.arkcase.internal
+      BasicConstraints:
+        CA: false
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyEncipherment ]
+      CaKeyParameterName: /arkcase/pki/private/first-intermediate-ca-key
+      CaCertParameterName: /arkcase/pki/certs/first-intermediate-ca-cert
+      KeyParameterName: /arkcase/pki/private/first-service-key
+      CertParameterName: /arkcase/pki/certs/first-service-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub first-service-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub first-service-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub first-service-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  SecondServiceCertificate:
+    Type: Custom::Certificate
+    DependsOn: SecondIntermediateCaCertificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
+      KeyType: RSA
+      KeySize: 2048
+      ValidityDays: 90
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: second-service.arkcase.internal
+      BasicConstraints:
+        CA: false
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyEncipherment ]
+      CaKeyParameterName: /arkcase/pki/private/second-intermediate-ca-key
+      CaCertParameterName: /arkcase/pki/certs/second-intermediate-ca-cert
+      KeyParameterName: /arkcase/pki/private/second-service-key
+      CertParameterName: /arkcase/pki/certs/second-service-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub second-service-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub second-service-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub second-service-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ThirdServiceCertificate:
+    Type: Custom::Certificate
+    DependsOn: SecondIntermediateCaCertificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
+      KeyType: RSA
+      KeySize: 2048
+      ValidityDays: 90
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: third-service.arkcase.internal
+      BasicConstraints:
+        CA: false
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyEncipherment ]
+      CaKeyParameterName: /arkcase/pki/private/second-intermediate-ca-key
+      CaCertParameterName: /arkcase/pki/certs/second-intermediate-ca-cert
+      KeyParameterName: /arkcase/pki/private/third-service-key
+      CertParameterName: /arkcase/pki/certs/third-service-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub third-service-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub third-service-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub third-service-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
 Outputs:
   RootCaKeyParameterArn:
     Description: ARN of the SSM parameter storing the root CA private key
@@ -531,3 +1063,11 @@ Outputs:
   AlfrescoCertParameterArn:
     Description: ARN of the SSM parameter storing the Alfresco service certificate
     Value: !GetAtt AlfrescoCertificate.CertParameterArn
+
+  PentahoKeyParameterArn:
+    Description: ARN of the SSM parameter storing the Pentaho service private key
+    Value: !GetAtt PentahoCertificate.KeyParameterArn
+
+  PentahoCertParameterArn:
+    Description: ARN of the SSM parameter storing the Pentaho service certificate
+    Value: !GetAtt PentahoCertificate.CertParameterArn
