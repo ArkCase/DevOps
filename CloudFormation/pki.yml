@@ -124,7 +124,7 @@ Resources:
       Timeout: 900  # 15 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200624-0730/LambdaFunctions/certificate/certificate.zip
+        S3Key: DevOps/ACM-TMP-20200624-1011/LambdaFunctions/certificate/certificate.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-lambda-${Project}-${Env}
@@ -142,6 +142,20 @@ Resources:
   ##############################################################
   # Lambda function to compute a list of certificates to renew #
   ##############################################################
+
+  CheckCertificatesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      LifecycleConfiguration:
+        Rules:
+          - ExpirationInDays: 1  # Delete temporary files after one day
+            Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
 
   CheckCertificatesLambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -171,6 +185,10 @@ Resources:
               - Effect: Allow
                 Action: ssm:DescribeParameters
                 Resource: "*"
+
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub ${CheckCertificatesBucket.Arn}/*
       Tags:
         - Key: Name
           Value: !Sub check-certificates-lambda-execution-role-${Project}-${Env}
@@ -198,9 +216,10 @@ Resources:
         Variables:
           CERT_PARAMETERS_PATHS: /arkcase/pki/certs
           HOW_MANY_DAYS_LEFT_BEFORE_RENEWING: !Ref HowManyDaysLeftBeforeRenewing
+          S3_BUCKET: !Ref CheckCertificatesBucket
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200624-0730/LambdaFunctions/check_certificates/check_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200624-1011/LambdaFunctions/check_certificates/check_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub check-certificates-lambda-${Project}-${Env}
@@ -280,7 +299,7 @@ Resources:
           RENEW_BEFORE_DAYS: !Ref HowManyDaysLeftBeforeRenewing
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200624-0730/LambdaFunctions/renew_certificates/renew_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200624-1011/LambdaFunctions/renew_certificates/renew_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub renew-certificates-lambda-${Project}-${Env}
@@ -367,7 +386,7 @@ Resources:
       Timeout: 900  # 15 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200624-0730/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200624-1011/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-resource-lambda-${Project}-${Env}

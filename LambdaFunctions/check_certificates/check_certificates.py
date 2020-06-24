@@ -37,13 +37,12 @@ def handler(event, context):
         the Parameter Store
       - HOW_MANY_DAYS_LEFT_BEFORE_RENEWING: Number of days to expiry before
         which a certificate will be renewed
+      - S3_BUCKET: Name of the S3 bucket where to save temporary data and
+        also the output of this function
 
     The input event must look like this:
 
         {
-            # S3 bucket where to save the output; mandatory
-            "S3Bucket": "XYZ",
-
             # ARN of the certificate that has just be renewed; this field is
             # optional and will operate the Lambda function in "cascade" mode;
             # if this field is absent, the Lambda function will work in
@@ -54,15 +53,15 @@ def handler(event, context):
     This Lambda function returns something like this:
 
         {
-          "S3Key": "XYZ"  # S3 key to the file containing the list; the content will be in JSON format
+          "S3Bucket": "XYZ"  # S3 bucket where the output file is located
+          "S3Key": "XYZ"     # S3 key to the output file; the content will be in JSON
         }
     """
 
     print(f"Received event: {event}")
     s3key = handle_request(event)
     response = {
-        'Success': True,
-        'Reason': "Success",
+        'S3Bucket': os.environ['S3_BUCKET'],
         'S3Key': s3key
     }
     return response
@@ -182,11 +181,15 @@ def handle_request(event):
     # Save the certificate list in S3
     output = serialize(ssm, result)
     timestamp = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-    s3key = "list of certificates to renew " + timestamp
+    s3key = "list of certificates to renew " + timestamp + ".json"
     content = json.dumps(output, indent=2)
-    print(content)  # XXX
-    # TODO
-
+    s3 = boto3.client("s3")
+    s3.put_object(
+        Bucket=os.environ['S3_BUCKET'],
+        Key=s3key,
+        ContentType="application/json",
+        Body=content
+    )
     return s3key
 
 
