@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 from anytree import NodeMixin, RenderTree, LevelOrderIter
 import boto3
 import botocore
@@ -31,12 +32,15 @@ def handler(event, context):
 
     In either case, the list is saved in an S3 bucket.
 
+    The following environment variables must be defined:
+      - CERT_PARAMETERS_PATHS: A colon-separated list of paths to scan in
+        the Parameter Store
+      - HOW_MANY_DAYS_LEFT_BEFORE_RENEWING: Number of days to expiry before
+        which a certificate will be renewed
+
     The input event must look like this:
 
         {
-            # List of paths to scan in the Parameter Store; mandatory
-            "CertParametersPaths": [ "/arkcase/pki/certs" ],
-
             # S3 bucket where to save the output; mandatory
             "S3Bucket": "XYZ",
 
@@ -44,11 +48,7 @@ def handler(event, context):
             # optional and will operate the Lambda function in "cascade" mode;
             # if this field is absent, the Lambda function will work in
             # "renewal" mode.
-            "ParentCertParameterArn": "arn:aws:...",
-
-            # Number of days to expiry to trigger a renewal; this field is
-            # mandatory for "renewal" mode, and ignored in "cascade" mode.
-            "DaysToExpiryToTriggerRenewal": 14
+            "ParentCertParameterArn": "arn:aws:..."
         }
 
     This Lambda function returns something like this:
@@ -152,7 +152,7 @@ def find_certificate_by_name(certificates, name):
 
 def handle_request(event):
     # Fetch all the parameters containing the certificates
-    cert_parameters_paths = event['CertParametersPaths']
+    cert_parameters_paths = os.environ['CERT_PARAMETERS_PATHS'].split(":")
     ssm = boto3.client("ssm")
     parameters = []
     for path in cert_parameters_paths:
@@ -176,7 +176,7 @@ def handle_request(event):
         result = check_renewals(
             ssm,
             certificates,
-            int(event['DaysToExpiryToTriggerRenewal'])
+            int(os.environ['HOW_MANY_DAYS_LEFT_BEFORE_RENEWING'])
         )
 
     # Save the certificate list in S3
@@ -229,7 +229,7 @@ def cascade(ssm, certificates, parent_cert_parameter_arn):
     return result
 
 
-def check_renewals(ssm, certificates, days_to_expiry_to_trigger_renewal):
+def check_renewals(ssm, certificates, how_many_days_left_before_renewing):
     # TODO
     return []
 
