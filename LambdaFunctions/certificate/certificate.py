@@ -62,15 +62,6 @@ def handler(event, context):
           "CaKeyParameterName": "XYZ",
           "CaCertParameterName": "XYZ",
 
-          # Comma-separated list of paths of where certificates are stored in
-          # the Parameter Store. If this certificate is a CA, this field is
-          # mandatory. If it isn't a CA, this parameter is ignored. This field
-          # is used to cascade renewals to certificates under this path that
-          # have been signed with this certificate.
-          "CertParametersPaths": [
-            "/arkcase/pki/certs"
-          ],
-
           # Name of the SSM parameter where to save the private key
           "KeyParameterName": "/arkcase/pki/private/my-key",
           # Name of the SSM parameter where to save the certificate
@@ -186,10 +177,6 @@ def handle_request(event):
         attributes.append(x509.NameAttribute(NameOID.DN_QUALIFIER, value))
         value = "cacert:" + ca_cert_parameter_name
         attributes.append(x509.NameAttribute(NameOID.DN_QUALIFIER, value))
-    if 'CertParametersPaths' in event:
-        for path in event['CertParametersPaths']:
-            value = "path:" + path
-            attributes.append(x509.NameAttribute(NameOID.DN_QUALIFIER, value))
 
     subject = x509.Name(attributes)
 
@@ -200,8 +187,6 @@ def handle_request(event):
         basic_constraints = event['BasicConstraints']
         critical = basic_constraints.get('Critical', False)
         is_ca = basic_constraints.get('CA', False)
-        if is_ca and 'CertParametersPaths' not in event:
-            raise KeyError(f"This certificate is a CA and CertParametersPaths is not set")
         path_length = basic_constraints.get('PathLength', None)
         extension = x509.Extension(
             oid=ExtensionOID.BASIC_CONSTRAINTS,
@@ -243,13 +228,6 @@ def handle_request(event):
         )
         extensions.append(extension)
 
-    if is_ca:
-        if 'CertParametersPaths' not in event:
-            raise KeyError(f"The certificate is a CA but `CertParametersPaths` is not set")
-        cert_parameters_paths = event['CertParametersPaths']
-    else:
-        cert_parameters_paths = []
-
     key_parameter_name = event['KeyParameterName']
     cert_parameter_name = event['CertParameterName']
     key_tags = event.get('KeyTags', [])
@@ -263,7 +241,6 @@ def handle_request(event):
         extensions=extensions,
         ca_key_parameter_name=ca_key_parameter_name,
         ca_cert_parameter_name=ca_cert_parameter_name,
-        cert_parameters_paths=cert_parameters_paths,
         key_parameter_name=key_parameter_name,
         cert_parameter_name=cert_parameter_name,
         key_tags=key_tags,

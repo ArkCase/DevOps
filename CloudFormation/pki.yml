@@ -124,7 +124,7 @@ Resources:
       Timeout: 900  # 15 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200623-1747/LambdaFunctions/certificate/certificate.zip
+        S3Key: DevOps/ACM-TMP-20200624-0603/LambdaFunctions/certificate/certificate.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-lambda-${Project}-${Env}
@@ -196,7 +196,7 @@ Resources:
       Timeout: 300  # 5 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200623-1747/LambdaFunctions/check_certificates/check_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200624-0603/LambdaFunctions/check_certificates/check_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub check-certificates-lambda-${Project}-${Env}
@@ -276,7 +276,7 @@ Resources:
           RENEW_BEFORE_DAYS: !Ref DaysBeforeExpiryCertificateRenewal
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200623-1747/LambdaFunctions/renew_certificates/renew_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200624-0603/LambdaFunctions/renew_certificates/renew_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub renew-certificates-lambda-${Project}-${Env}
@@ -363,7 +363,7 @@ Resources:
       Timeout: 900  # 15 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200623-1747/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200624-0603/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-resource-lambda-${Project}-${Env}
@@ -404,7 +404,6 @@ Resources:
         Critical: true
         Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
       SelfSigned: true
-      CertParametersPaths: [ /arkcase/pki/certs ]
       KeyParameterName: /arkcase/pki/private/root-ca-key
       CertParameterName: /arkcase/pki/certs/root-ca-cert
       KeyTags:
@@ -472,7 +471,6 @@ Resources:
         Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
       CaKeyParameterName: /arkcase/pki/private/root-ca-key
       CaCertParameterName: /arkcase/pki/certs/root-ca-cert
-      CertParametersPaths: [ /arkcase/pki/certs ]
       KeyParameterName: /arkcase/pki/private/intermediate-ca-key
       CertParameterName: /arkcase/pki/certs/intermediate-ca-cert
       KeyTags:
@@ -673,7 +671,6 @@ Resources:
         Critical: true
         Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
       SelfSigned: true
-      CertParametersPaths: [ /arkcase/pki/certs ]
       KeyParameterName: /arkcase/pki/private/other-root-ca-key
       CertParameterName: /arkcase/pki/certs/other-root-ca-cert
       KeyTags:
@@ -741,7 +738,6 @@ Resources:
         Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
       CaKeyParameterName: /arkcase/pki/private/other-root-ca-key
       CaCertParameterName: /arkcase/pki/certs/other-root-ca-cert
-      CertParametersPaths: [ /arkcase/pki/certs ]
       KeyParameterName: /arkcase/pki/private/first-intermediate-ca-key
       CertParameterName: /arkcase/pki/certs/first-intermediate-ca-cert
       KeyTags:
@@ -797,7 +793,7 @@ Resources:
       StateOrProvinceName: VA
       LocalityName: Vienna
       OrganizationName: ArkCase
-      OrganizationalUnitName: Product Development
+      OrganizationalUnitName: Product Development XXX
       EmailAddress: info@arkcase.com
       CommonName: second-intermediate-ca.arkcase.internal
       BasicConstraints:
@@ -809,7 +805,6 @@ Resources:
         Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
       CaKeyParameterName: /arkcase/pki/private/other-root-ca-key
       CaCertParameterName: /arkcase/pki/certs/other-root-ca-cert
-      CertParametersPaths: [ /arkcase/pki/certs ]
       KeyParameterName: /arkcase/pki/private/second-intermediate-ca-key
       CertParameterName: /arkcase/pki/certs/second-intermediate-ca-cert
       KeyTags:

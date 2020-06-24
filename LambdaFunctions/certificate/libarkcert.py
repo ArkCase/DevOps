@@ -12,7 +12,7 @@ import datetime
 def create_or_renew_cert(
         key_type, key_size, validity_days,
         subject, extensions,
-        ca_key_parameter_name, ca_cert_parameter_name, cert_parameters_paths,
+        ca_key_parameter_name, ca_cert_parameter_name,
         key_parameter_name, cert_parameter_name, key_tags, cert_tags):
     # Check key and certificate parameter names
     if "," in key_parameter_name:
@@ -113,10 +113,8 @@ def create_or_renew_cert(
     except x509.ExtensionNotFound:
         is_ca = False
     if is_ca:
-        if not cert_parameters_paths:
-            raise KeyError(f"This certificate {cert_parameter_name} is a CA but no `CertParametersPaths` provided")
         print(f"This certificate {cert_parameter_name} is a CA; propagating renewals to dependent certificates")
-        cascade(ssm, cert_parameters_paths, key_parameter_name)
+        # TODO: cascade
     else:
         print(f"This certificate {cert_parameter_name} is not a CA; no need to search for dependent certificates to renew")
     return key_parameter_arn, cert_parameter_arn
@@ -190,125 +188,3 @@ def upsert_param(ssm, name: str, value: str, desc: str, param_type: str, tags: d
     response = ssm.get_parameter(Name=name)
     print(f"upsert_param: Success; ARN: {response['Parameter']['ARN']}")
     return response['Parameter']['ARN']
-
-
-def cascade(ssm, paths, parent_key_parameter_name):
-    # Build a list of certificates to inspect
-    parameters = []
-    for path in paths:
-        parameters += collect_cert_parameters(ssm, path)
-
-    for parameter in parameters:
-        # Load this certificate
-        cert_parameter_name = parameter['Name']
-        cert_value = parameter['Value']
-        cert = x509.load_pem_x509_certificate(
-            cert_value.encode('utf8'),
-            backend=default_backend()
-        )
-
-        # Inspect `dnQualifier` attributes for this certificate and check
-        # whether it has been signed by the parent key, in which case it will
-        # need to be renewed.
-        key_parameter_name = None
-        ca_key_parameter_name = None
-        ca_cert_parameter_name = None
-        cert_parameters_paths = []
-        attributes = cert.subject.get_attributes_for_oid(NameOID.DN_QUALIFIER)
-        for attribute in attributes:
-            name, value = attribute.value.split(":", 1)
-            if name == "key":
-                key_parameter_name = value
-            elif name == "cakey":
-                ca_key_parameter_name = value
-            elif name == "cacert":
-                ca_cert_parameter_name = value
-            elif name == "path":
-                cert_parameters_paths.append(value)
-        if not key_parameter_name:
-            raise KeyError(f"Missing key parameter name in dnQualifier in certificate {cert_parameter_name}")
-        if not ca_key_parameter_name:
-            print(f"Certificate {cert_parameter_name} is self-signed; no renewal needed")
-            continue
-        if ca_key_parameter_name != parent_key_parameter_name:
-            print(f"Certificate {cert_parameter_name} has been signed by another CA: {ca_key_parameter_name}; no renewal needed")
-            continue
-
-        # This certificate needs renewal
-        print(f"Certificate {cert_parameter_name} has been signed by {ca_key_parameter_name}; renewal needed")
-
-        print(f"Fetching private key {key_parameter_name}")
-        response = ssm.get_parameter(
-            Name=key_parameter_name,
-            WithDecryption=True
-        )
-        key_value = response['Parameter']['Value']
-        key = serialization.load_pem_private_key(
-            key_value.encode('utf8'),
-            password=None,
-            backend=default_backend()
-        )
-        if isinstance(key, rsa.RSAPrivateKey):
-            key_type = "RSA"
-            key_size = key.key_size
-        elif isinstance(key, dsa.DSAPrivateKey):
-            key_type = "DSA"
-            key_size = key.key_size
-        else:
-            raise ValueError(f"Unhandled private key type for {cert_parameter_name}")
-
-        validity_delta = cert.not_valid_after - cert.not_valid_before
-
-        response = ssm.list_tags_for_resource(
-            ResourceType="Parameter",
-            ResourceId=key_parameter_name
-        )
-        key_tags = response['TagList']
-
-        response = ssm.list_tags_for_resource(
-            ResourceType="Parameter",
-            ResourceId=cert_parameter_name
-        )
-        cert_tags = response['TagList']
-
-        print(f"Renewing certificate {cert_parameter_name}")
-        create_or_renew_cert(
-            key_type=key_type,
-            key_size=key_size,
-            validity_days=validity_delta.days,
-            subject=cert.subject,
-            extensions=cert.extensions,
-            ca_key_parameter_name=ca_key_parameter_name,
-            ca_cert_parameter_name=ca_cert_parameter_name,
-            cert_parameters_paths=cert_parameters_paths,
-            key_parameter_name=key_parameter_name,
-            cert_parameter_name=cert_parameter_name,
-            key_tags=key_tags,
-            cert_tags=cert_tags
-        )
-
-
-def collect_cert_parameters(ssm, path):
-    result = []
-    has_more = True
-    next_token = ""
-    while has_more:
-        # NB: AWS API doesn't allow to get more than 10 parameters at a time
-        if next_token:
-            response = ssm.get_parameters_by_path(
-                Path=path,
-                Recursive=True,
-                MaxResults=10,
-                NextToken=next_token
-            )
-        else:
-            response = ssm.get_parameters_by_path(
-                Path=path,
-                MaxResults=10,
-                Recursive=True
-            )
-        result += response['Parameters']
-        next_token = response.get('NextToken', "")
-        if not next_token:
-            has_more = False
-    return result

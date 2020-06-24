@@ -141,7 +141,6 @@ def handle_request(event):
             extensions=cert.extensions,
             ca_key_parameter_name=ca_key_parameter_name,
             ca_cert_parameter_name=ca_cert_parameter_name,
-            cert_parameters_paths=cert_parameters_paths,
             key_parameter_name=key_parameter_name,
             cert_parameter_name=cert_parameter_name,
             key_tags=key_tags,
