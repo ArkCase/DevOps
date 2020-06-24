@@ -85,6 +85,20 @@ class Certificate(NodeMixin):
         self.ca_key_parameter_name = ca_key_parameter_name
         self.ca_cert_parameter_name = ca_cert_parameter_name
         self.cert = cert
+
+        # Determine whether this certificate is a CA or not
+        try:
+            basic_constraints = cert.extensions.get_extension_for_oid(ExtensionOID.BASIC_CONSTRAINTS)
+            self.is_ca = basic_constraints.value.ca
+        except x509.ExtensionNotFound:
+            self.is_ca = False
+
+        # Check if this certificate is close to expiry
+        remaining_delta = cert.not_valid_after - datetime.datetime.utcnow()
+        remaining_days = remaining_delta.days
+        self.renewal_needed = remaining_days <= int(os.environ['HOW_MANY_DAYS_LEFT_BEFORE_RENEWING'])
+
+        # NodeMixin stuff
         self.parent = parent
         if children:
             self.children
@@ -227,14 +241,44 @@ def cascade(ssm, certificates, parent_cert_parameter_arn):
     build_tree(certificates, parent_certificate)
     # print(RenderTree(parent_certificate))
 
+    # Build the list of certificates to renew
     result = [certificate for certificate in LevelOrderIter(parent_certificate)]
-    print(f"cascade result: {result}")
+    # print(f"cascade result: {result}")
     return result
 
 
 def check_renewals(ssm, certificates, how_many_days_left_before_renewing):
-    # TODO
-    return []
+    # Make a list of root (i.e. self-signed) certificates
+    root_certificates = []
+    for certificate in certificates:
+        if certificate.cert.subject == certificate.cert.issuer:
+            # This is a self-signed certificate
+            if certificate.is_ca:
+                print(f"Found root certificate: {certificate.cert_parameter_name}")
+                root_certificates.append(certificate)
+            else:
+                print(f"WARNING: Certificate {certificate.cert_parameter_name} is self-signed but is marked as not being a CA; ignored")
+
+    # Build trees for each root certificate
+    for root_certificate in root_certificates:
+        build_tree(certificates, root_certificate)
+        # print(RenderTree(root_certificate))
+
+    # Certificates have already been checked whether they are close to expiry
+    # in their constructors. We now just need to propagate CA that are to be
+    # renewed to all dependent certificates.
+    for root_certificate in root_certificates:
+        for certificate in LevelOrderIter(root_certificate):
+            if certificate.is_ca and certificate.renewal_needed:
+                print(f"Certificate {certificate.cert_parameter_name} is due for renewal and is a CA; propagating to dependent certificates")
+                for dependent_certificate in LevelOrderIter(certificate):
+                    dependent_certificate.renewal_needed = True
+
+    # Build the list of certificates to renew
+    result = []
+    for root_certificate in root_certificates:
+        result += [certificate for certificate in LevelOrderIter(root_certificate) if certificate.renewal_needed]
+    return result
 
 
 def build_tree(certificates, root_certificate):
@@ -371,39 +415,3 @@ def add_subject_attribute_if_present(item, key, subject, name_oid):
     attributes = subject.get_attributes_for_oid(name_oid)
     if attributes:
         item[key] = attributes[0].value
-
-
-#    for parameter in parameters:
-#        # Load this certificate
-#        cert_parameter_name = parameter['Name']
-#        cert_value = parameter['Value']
-#        cert = x509.load_pem_x509_certificate(
-#            cert_value.encode('utf8'),
-#            backend=default_backend()
-#        )
-#
-#        # Check if it is close to expiry
-#        remaining_delta = cert.not_valid_after - datetime.datetime.utcnow()
-#        remaining_days = remaining_delta.days
-#        if remaining_days > renew_before_days:
-#            print(f"Certificate {cert_parameter_name} has {remaining_days} left before expiry, no need for renewal")
-#            continue
-#
-#        print(f"Certificate {cert_parameter_name} is close to expiry (only {remaining_days} left, min {renew_before_days}); renewing now")
-#
-#
-#        print(f"Renewing certificate {cert_parameter_name}")
-#        create_or_renew_cert(
-#            key_type=key_type,
-#            key_size=key_size,
-#            validity_days=validity_days,
-#            subject=cert.subject,
-#            extensions=cert.extensions,
-#            ca_key_parameter_name=ca_key_parameter_name,
-#            ca_cert_parameter_name=ca_cert_parameter_name,
-#            cert_parameters_paths=cert_parameters_paths,
-#            key_parameter_name=key_parameter_name,
-#            cert_parameter_name=cert_parameter_name,
-#            key_tags=key_tags,
-#            cert_tags=cert_tags
-#        )

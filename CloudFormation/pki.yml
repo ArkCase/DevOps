@@ -124,7 +124,7 @@ Resources:
       Timeout: 900  # 15 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200624-1011/LambdaFunctions/certificate/certificate.zip
+        S3Key: DevOps/ACM-TMP-20200624-1702/LambdaFunctions/certificate/certificate.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-lambda-${Project}-${Env}
@@ -219,7 +219,7 @@ Resources:
           S3_BUCKET: !Ref CheckCertificatesBucket
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200624-1011/LambdaFunctions/check_certificates/check_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200624-1702/LambdaFunctions/check_certificates/check_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub check-certificates-lambda-${Project}-${Env}
@@ -299,7 +299,7 @@ Resources:
           RENEW_BEFORE_DAYS: !Ref HowManyDaysLeftBeforeRenewing
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200624-1011/LambdaFunctions/renew_certificates/renew_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200624-1702/LambdaFunctions/renew_certificates/renew_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub renew-certificates-lambda-${Project}-${Env}
@@ -386,7 +386,7 @@ Resources:
       Timeout: 900  # 15 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200624-1011/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200624-1702/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-resource-lambda-${Project}-${Env}
@@ -811,7 +811,7 @@ Resources:
       CertificateLambdaArn: !GetAtt CertificateLambda.Arn
       KeyType: RSA
       KeySize: 4096
-      ValidityDays: 730  # About 2 years
+      ValidityDays: 3  # XXX
       CountryName: US
       StateOrProvinceName: VA
       LocalityName: Vienna
