@@ -87,6 +87,8 @@ def handler(event, context):
               "Value": "tag value 2"
             }
           ]
+
+          "Cascade": true  # Renew dependent certificates; optional, default to `false`
         }
 
     This Lambda function returns something like this:
@@ -102,10 +104,7 @@ def handler(event, context):
     print(f"Received event: {event}")
     try:
         key_parameter_arn, cert_parameter_arn = handle_request(event)
-        if 'CommonName' in event:
-            msg = "Successfully created/renewed private key and certificate for " + event['CommonName']
-        else:
-            msg = "Successfully created/renewed private key and certificate"
+        msg = "Successfully created/renewed private key and certificate for " + event['CertParameterName']
         response = {
             'Success': True,
             'Reason': msg,
@@ -140,34 +139,13 @@ def handle_request(event):
 
     # Build distinguished name
     attributes = []
-    if 'CountryName' in event:
-        attributes.append(
-            x509.NameAttribute(NameOID.COUNTRY_NAME, event['CountryName'])
-        )
-    if 'StateOrProvinceName' in event:
-        attributes.append(
-            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, event['StateOrProvinceName'])
-        )
-    if 'LocalityName' in event:
-        attributes.append(
-            x509.NameAttribute(NameOID.LOCALITY_NAME, event['LocalityName'])
-        )
-    if 'OrganizationName' in event:
-        attributes.append(
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, event['OrganizationName'])
-        )
-    if 'OrganizationalUnitName' in event:
-        attributes.append(
-            x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, event['OrganizationalUnitName'])
-        )
-    if 'EmailAddress' in event:
-        attributes.append(
-            x509.NameAttribute(NameOID.EMAIL_ADDRESS, event['EmailAddress'])
-        )
-    if 'CommonName' in event:
-        attributes.append(
-            x509.NameAttribute(NameOID.COMMON_NAME, event['CommonName'])
-        )
+    add_attribute_if_present(event, 'CountryName', attributes, NameOID.COUNTRY_NAME)
+    add_attribute_if_present(event, 'StateOrProvinceName', attributes, NameOID.STATE_OR_PROVINCE_NAME)
+    add_attribute_if_present(event, 'LocalityName', attributes, NameOID.LOCALITY_NAME)
+    add_attribute_if_present(event, 'OrganizationName', attributes, NameOID.ORGANIZATION_NAME)
+    add_attribute_if_present(event, 'OrganizationalUnitName', attributes, NameOID.ORGANIZATIONAL_UNIT_NAME)
+    add_attribute_if_present(event, 'EmailAddress', attributes, NameOID.EMAIL_ADDRESS)
+    add_attribute_if_present(event, 'CommonName', attributes, NameOID.COMMON_NAME)
 
     # Use `dnQualifier` to store custom information
     value = "key:" + event['KeyParameterName']
@@ -233,7 +211,7 @@ def handle_request(event):
     key_tags = event.get('KeyTags', [])
     cert_tags = event.get('CertTags', [])
 
-    return create_or_renew_cert(
+    key_parameter_arn, cert_parameter_arn = create_or_renew_cert(
         key_type=key_type,
         key_size=key_size,
         validity_days=validity_days,
@@ -246,3 +224,16 @@ def handle_request(event):
         key_tags=key_tags,
         cert_tags=cert_tags
     )
+
+    if is_ca and event.get('Cascade', False):
+        # TODO: kick off state machine
+        pass
+
+    return key_parameter_arn, cert_parameter_arn
+
+
+def add_attribute_if_present(event, key, attributes, name_oid):
+    if key in event:
+        attributes.append(
+            x509.NameAttribute(name_oid, event[key])
+        )

@@ -107,16 +107,6 @@ def create_or_renew_cert(
 
     # Propagate renewals if applicable
     print(f"Successfully generated private key and certificate; key ARN: {key_parameter_arn}, certificate ARN: {cert_parameter_arn}")
-    try:
-        extension = cert.extensions.get_extension_for_oid(ExtensionOID.BASIC_CONSTRAINTS)
-        is_ca = extension.value.ca
-    except x509.ExtensionNotFound:
-        is_ca = False
-    if is_ca:
-        print(f"This certificate {cert_parameter_name} is a CA; propagating renewals to dependent certificates")
-        # TODO: cascade
-    else:
-        print(f"This certificate {cert_parameter_name} is not a CA; no need to search for dependent certificates to renew")
     return key_parameter_arn, cert_parameter_arn
 
 
