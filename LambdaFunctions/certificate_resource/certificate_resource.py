@@ -108,6 +108,7 @@ def handler(event, context):
         !GetAtt Certificate.CertParameterArn
 
     """
+    print(f"Received event: {event}")
     try:
         reason, key_param_arn, cert_param_arn = handle_request(event)
         print(f"Success")
@@ -121,7 +122,7 @@ def handle_request(event):
     request_type = event['RequestType']
     print(f"Received request type: {request_type}")
     if request_type == "Create" or request_type == "Update":
-        ret = upsert_certificate(event)
+        ret = upsert_certificate(event, request_type)
     elif request_type == "Delete":
         ret = delete_certificate(event)
     else:
@@ -129,11 +130,21 @@ def handle_request(event):
     return ret
 
 
-def upsert_certificate(event):
+def upsert_certificate(event, request_type):
     print(f"Creating/renewing certificate")
 
     # Check the key and certificate parameter names do not have commas
     args = event['ResourceProperties']
+
+    if request_type == "Update":
+        # NB: When a certificate is renewed through the CloudFormation template
+        #     (eg: a parameter changes, such as `OrganizationalUnitName`) and
+        #     it is a CA, we need to renew certificates that depend on it as
+        #     well.
+        is_ca = args.get('BasicConstraints', {}).get('CA', False)
+        if is_ca:
+            print(f"This certificate is a CA, requesting renewals for dependent certificates")
+            args['Cascade'] = True
 
     # Build payload to `create_certificate` Lambda function
     # NB: CloudFormation changes all types to "string", so we have to cast all

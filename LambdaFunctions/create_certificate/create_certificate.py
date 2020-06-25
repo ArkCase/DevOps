@@ -226,6 +226,7 @@ def handle_request(event):
     )
 
     if is_ca and event.get('Cascade', False):
+        print(f"This certificate is a CA and cascading is requested; executing state machine to renew dependent certificates")
         # TODO: kick off state machine
         pass
 
