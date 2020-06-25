@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import traceback
 import boto3
 import botocore
@@ -9,7 +10,11 @@ import requests
 
 def handler(event, context):
     """
-    Create a certificate that is either self-signed ro signed by a CA.
+    Create a certificate that is either self-signed or signed by a CA.
+
+    The following environment variables must be set:
+      - CREATE_CERTIFICATE_LAMBDA_ARN: ARN of the `create_certificate` Lambda
+        function
 
     The event received has the following pattern (the fields are mandatory
     unless marked as "optional"):
@@ -22,7 +27,6 @@ def handler(event, context):
           "ResourceType": "Custom::Certificate",   # or whatever
           "LogicalResourceId": "Certificate",      # or whatever
           "ResourceProperties": {
-            "CertificateLambdaArn": "arn:...",   # Name of the `certificate` Lambda function
             "KeyType": "RSA",                    # Or "DSA"; optional, defaults to "RSA"
             "KeySize": 2048,                     # Key size
             "ValidityDays": 100,                 # For how many days the certificate should be valid
@@ -130,10 +134,8 @@ def upsert_certificate(event):
 
     # Check the key and certificate parameter names do not have commas
     args = event['ResourceProperties']
-    if "," in args['KeyParameterName'] or "," in args['CertParameterName']:
-        raise ValueError(f"Commas not allowed in key or certificate parameter name")
 
-    # Build payload to `certificate` Lambda function
+    # Build payload to `create_certificate` Lambda function
     # NB: CloudFormation changes all types to "string", so we have to cast all
     #     fields that are not strings.
     payload = args
@@ -157,26 +159,26 @@ def upsert_certificate(event):
     if 'SelfSigned' in payload:
         payload['SelfSigned'] = payload['SelfSigned'].lower() == "true"
 
-    # Call the `certificate` Lambda function
-    lambda_arn = args['CertificateLambdaArn']
+    # Call the `create_certificate` Lambda function
+    lambda_arn = os.environ['CREATE_CERTIFICATE_LAMBDA_ARN']
     lambda_client = boto3.client("lambda")
-    print(f"Invoking `certificate` Lambda function")
+    print(f"Invoking `create_certificate` Lambda function")
     response = lambda_client.invoke(
         FunctionName=lambda_arn,
         LogType="Tail",
         Payload=json.dumps(args).encode('utf8')
     )
-    print(f"`certificate` Lambda function returned: {response}")
+    print(f"`create_certificate` Lambda function returned: {response}")
 
     # Process the response
     body_json = response['Payload'].read().decode('utf8')
-    print(f"`certificate` Lambda function response payload: {body_json}")
+    print(f"`create_certificate` Lambda function response payload: {body_json}")
     if 'FunctionError' in response:
         err = response['FunctionError']
-        raise ValueError(f"The `certificate` Lambda function failed: {err} - {body_json}")
+        raise ValueError(f"The `create_certificate` Lambda function failed: {err} - {body_json}")
     body = json.loads(body_json)
     if not body.get('Success', False):
-        reason = "`certificate` Lambda function failed"
+        reason = "`create_certificate` Lambda function failed"
         if 'Reason' in body:
             reason += ": " + body['Reason']
         raise ValueError(reason)

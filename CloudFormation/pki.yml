@@ -69,7 +69,7 @@ Resources:
   # Lambda function to create certificate #
   #########################################
 
-  CertificateLambdaExecutionRole:
+  CreateCertificateLambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -102,7 +102,7 @@ Resources:
                 Resource: "*"
       Tags:
         - Key: Name
-          Value: !Sub certificate-lambda-execution-role-${Project}-${Env}
+          Value: !Sub create-certificate-lambda-execution-role-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -114,20 +114,20 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  CertificateLambda:
+  CreateCertificateLambda:
     Type: AWS::Lambda::Function
     Properties:
       Description: Create or renew a certificate
       Runtime: python3.7
-      Role: !GetAtt CertificateLambdaExecutionRole.Arn
-      Handler: certificate.handler
+      Role: !GetAtt CreateCertificateLambdaExecutionRole.Arn
+      Handler: create_certificate.handler
       Timeout: 900  # 15 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200624-1702/LambdaFunctions/certificate/certificate.zip
+        S3Key: DevOps/ACM-TMP-20200625-0745/LambdaFunctions/create_certificate/create_certificate.zip
       Tags:
         - Key: Name
-          Value: !Sub certificate-lambda-${Project}-${Env}
+          Value: !Sub create-certificate-lambda-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -219,7 +219,7 @@ Resources:
           S3_BUCKET: !Ref CheckCertificatesBucket
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200624-1702/LambdaFunctions/check_certificates/check_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200625-0745/LambdaFunctions/check_certificates/check_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub check-certificates-lambda-${Project}-${Env}
@@ -299,7 +299,7 @@ Resources:
           RENEW_BEFORE_DAYS: !Ref HowManyDaysLeftBeforeRenewing
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200624-1702/LambdaFunctions/renew_certificates/renew_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200625-0745/LambdaFunctions/renew_certificates/renew_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub renew-certificates-lambda-${Project}-${Env}
@@ -359,7 +359,7 @@ Resources:
 
               - Effect: Allow
                 Action: lambda:InvokeFunction
-                Resource: !GetAtt CertificateLambda.Arn
+                Resource: !GetAtt CreateCertificateLambda.Arn
       Tags:
         - Key: Name
           Value: !Sub certificate-resource-lambda-execution-role-${Project}-${Env}
@@ -384,9 +384,12 @@ Resources:
       Role: !GetAtt CertificateResourceLambdaExecutionRole.Arn
       Handler: certificate_resource.handler
       Timeout: 900  # 15 minutes
+      Environment:
+        Variables:
+          CREATE_CERTIFICATE_LAMBDA_ARN: !GetAtt CreateCertificateLambda.Arn
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200624-1702/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200625-0745/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-resource-lambda-${Project}-${Env}
@@ -409,7 +412,6 @@ Resources:
     Type: Custom::Certificate
     Properties:
       ServiceToken: !GetAtt CertificateResourceLambda.Arn
-      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
       KeyType: RSA
       KeySize: 4096
       ValidityDays: 7300  # About 20 years
@@ -474,7 +476,6 @@ Resources:
     DependsOn: RootCaCertificate
     Properties:
       ServiceToken: !GetAtt CertificateResourceLambda.Arn
-      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
       KeyType: RSA
       KeySize: 4096
       ValidityDays: 730  # About 2 years
@@ -541,7 +542,6 @@ Resources:
     DependsOn: IntermediateCaCertificate
     Properties:
       ServiceToken: !GetAtt CertificateResourceLambda.Arn
-      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
       KeyType: RSA
       KeySize: 2048
       ValidityDays: 90
@@ -606,7 +606,6 @@ Resources:
     DependsOn: IntermediateCaCertificate
     Properties:
       ServiceToken: !GetAtt CertificateResourceLambda.Arn
-      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
       KeyType: RSA
       KeySize: 2048
       ValidityDays: 90
@@ -676,7 +675,6 @@ Resources:
     Type: Custom::Certificate
     Properties:
       ServiceToken: !GetAtt CertificateResourceLambda.Arn
-      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
       KeyType: RSA
       KeySize: 4096
       ValidityDays: 7300  # About 20 years
@@ -741,7 +739,6 @@ Resources:
     DependsOn: OtherRootCaCertificate
     Properties:
       ServiceToken: !GetAtt CertificateResourceLambda.Arn
-      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
       KeyType: RSA
       KeySize: 4096
       ValidityDays: 730  # About 2 years
@@ -808,7 +805,6 @@ Resources:
     DependsOn: OtherRootCaCertificate
     Properties:
       ServiceToken: !GetAtt CertificateResourceLambda.Arn
-      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
       KeyType: RSA
       KeySize: 4096
       ValidityDays: 3  # XXX
@@ -875,7 +871,6 @@ Resources:
     DependsOn: FirstIntermediateCaCertificate
     Properties:
       ServiceToken: !GetAtt CertificateResourceLambda.Arn
-      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
       KeyType: RSA
       KeySize: 2048
       ValidityDays: 90
@@ -940,7 +935,6 @@ Resources:
     DependsOn: SecondIntermediateCaCertificate
     Properties:
       ServiceToken: !GetAtt CertificateResourceLambda.Arn
-      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
       KeyType: RSA
       KeySize: 2048
       ValidityDays: 90
@@ -1005,7 +999,6 @@ Resources:
     DependsOn: SecondIntermediateCaCertificate
     Properties:
       ServiceToken: !GetAtt CertificateResourceLambda.Arn
-      CertificateLambdaArn: !GetAtt CertificateLambda.Arn
       KeyType: RSA
       KeySize: 2048
       ValidityDays: 90

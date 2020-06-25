@@ -22,4 +22,4 @@ zip -r9 "../${lambda}.zip" .
 cd ..
 rm -rf "$tmpdir"
 zip -g "${lambda}.zip" *.py
-zip -gj "${lambda}.zip" ../certificate/libarkcert.py
+zip -gj "${lambda}.zip" ../create_certificate/libarkcert.py
