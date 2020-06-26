@@ -68,8 +68,8 @@ def handler(event, context):
             "SelfSigned": false,
 
             # Name of the parameters storing the private key and certificate of
-            # the CA that will be used to sign this new certificate. If either
-            # is missing, a self-signed certificate will be issued.
+            # the CA that will be used to sign this new certificate. If
+            # `SelfSigned` is set to `false`, those fields are mandatory.
             "CaKeyParameterName": "XYZ",
             "CaCertParameterName": "XYZ",
 
@@ -173,7 +173,7 @@ def upsert_certificate(event, request_type):
     # Call the `create_certificate` Lambda function
     lambda_arn = os.environ['CREATE_CERTIFICATE_LAMBDA_ARN']
     lambda_client = boto3.client("lambda")
-    print(f"Invoking `create_certificate` Lambda function")
+    print(f"Invoking the `create_certificate` Lambda function")
     response = lambda_client.invoke(
         FunctionName=lambda_arn,
         LogType="Tail",
@@ -193,7 +193,7 @@ def upsert_certificate(event, request_type):
         if 'Reason' in body:
             reason += ": " + body['Reason']
         raise ValueError(reason)
-    reason = body['Reason']
+    reason = body.get('Reason', "Success")
     key_param_arn = body['KeyParameterArn']
     cert_param_arn = body['CertParameterArn']
 

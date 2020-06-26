@@ -53,16 +53,23 @@ def handler(event, context):
     This Lambda function returns something like this:
 
         {
-          "S3Bucket": "XYZ"  # S3 bucket where the output file is located
-          "S3Key": "XYZ"     # S3 key to the output file; the content will be in JSON
+          "S3Bucket": "XYZ",  # S3 bucket where the output file is located
+          "S3Key": "XYZ"      # S3 key to the output file; the content will be in JSON
         }
+
+    In actuality, a few more fields will be returned but are relevant only
+    when the `check_certificates` Lambda function is called from the
+    `renew_certificates` state machine.
     """
 
     print(f"Received event: {event}")
-    s3key = handle_request(event)
+    s3key, count = handle_request(event)
     response = {
         'S3Bucket': os.environ['S3_BUCKET'],
-        'S3Key': s3key
+        'S3Key': s3key,
+        'Count': count,
+        'Index': 0,
+        'IsFinished': False
     }
     return response
 
@@ -204,7 +211,7 @@ def handle_request(event):
         ContentType="application/json",
         Body=content
     )
-    return s3key
+    return s3key, len(output)
 
 
 def collect_cert_parameters(ssm, path):

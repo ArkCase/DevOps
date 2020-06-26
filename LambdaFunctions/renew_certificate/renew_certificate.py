@@ -3,173 +3,113 @@
 import os
 import boto3
 import botocore
-import traceback
-import cryptography
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa, dsa
-from cryptography import x509
-from cryptography.x509.oid import NameOID, ExtensionOID
-import datetime
-from libarkcert import create_or_renew_cert
+import json
+
 
 def handler(event, context):
-    """Scan all certificates under the given paths and renew them if they are
-    about to expire.
+    """Renew the given certificate.
+
+    NB: This Lambda function is meant to be part of the `renew_certificates`
+        state machine.
 
     Required environment variables:
-      - CERT_PARAMETERS_PATHS: Comma-separated list of paths to scan in the
-        Parameter Store
-      - RENEW_BEFORE_DAYS: How many days in advance of the certificate expiry
-        to trigger the certificate renewal
+      - CREATE_CERTIFICATE_LAMBDA_ARN: ARN of the `create_certificate` Lambda
+        function
+
+    The input `event` should look like this:
+
+        {
+            "S3Bucket": "XYZ",   # Bucket that contains the list of certificates to renew
+            "S3Key": "XYZ",      # Key to the JSON file that contains the list of certificates to renew
+            "Count": 17,         # Length of the above list
+            "Index": 3,          # Index in the above list of the certificate to renew
+            "IsFinished": false  # Whether all the certificates have been renewed or not
+        }
 
     This Lambda function returns something like this:
 
         {
-          "Success": true,  # Or `false`
-          "Reason": "bla bla bla"
+          "S3Bucket": "XYZ",  # Copy of the input
+          "S3Key": "XYZ",     # Copy of the input
+          "Count": 17,        # Copy of the input
+          "Index": 17,        # Index of next certificate to renew
+          "IsFinished": true  # Whether all the certificates have been renewed or not
         }
     """
 
     print(f"Received event: {event}")
-    try:
-        handle_request(event)
-        response = {
-            'Success': True,
-            'Reason': "All went well"
-        }
-    except Exception as e:
-        print(f"EXCEPTION: {str(e)}")
-        traceback.print_exc()
-        response = {
-            'Success': False,
-            'Reason': str(e)
-        }
-    return response
+
+    # Retrieve list of certificates to renew
+    s3 = boto3.client("s3")
+    response = s3.get_object(
+        Bucket = event['S3Bucket'],
+        Key=event['Key']
+    )
+    data = response['Body'].read().decode('utf8')
+    cert_list = json.loads(data)
+
+    # Build arguments to `create_certificate` Lambda function
+    index = event['Index']
+    certificate = cert_list[index]
+    args = {
+        'KeyType': certificate['KeyType'],
+        'KeySize': certificate['KeySize'],
+        'ValidityDays': certificate['ValidityDays']
+    }
+
+    add_arg_if_present(args, 'CountryName', event)
+    add_arg_if_present(args, 'StateOrProvinceName', event)
+    add_arg_if_present(args, 'LocalityName', event)
+    add_arg_if_present(args, 'OrganizationName', event)
+    add_arg_if_present(args, 'OrganizationalUnitName', event)
+    add_arg_if_present(args, 'EmailAddress', event)
+    add_arg_if_present(args, 'CommonName', event)
+    add_arg_if_present(args, 'BasicConstraints', event)
+    add_arg_if_present(args, 'KeyUsage', event)
+    add_arg_if_present(args, 'SelfSigned', event)
+    add_arg_if_present(args, 'CaKeyParameterName', event)
+    add_arg_if_present(args, 'CaCertParameterName', event)
+
+    args['KeyParameterName'] = event['KeyParameterName']
+    args['CertParameterName'] = event['CertParameterName']
+
+    add_arg_if_present(args, 'KeyTags', event)
+    add_arg_if_present(args, 'CertTags', event)
+
+    args['Cascade'] = False
+
+    # Invoke the `create_certificate` Lambda function
+    lambda_client = boto3.client("lambda")
+    print(f"Invoking the `create_certificate` Lambda function")
+    response = lambda_client.invoke(
+        FunctionName=os.environ['CREATE_CERTIFICATE_LAMBDA_ARN'],
+        LogType="Tail",
+        Payload=json.dumps(args).encode('utf8')
+    )
+    print(f"`create_certificate` Lambda function returned: {response}")
+
+    # Process the response
+    body_json = response['Payload'].read().decode('utf8')
+    print(f"`create_certificate` Lambda function response payload: {body_json}")
+    if 'FunctionError' in response:
+        err = response['FunctionError']
+        raise ValueError(f"The `create_certificate` Lambda function failed: {err} - {body_json}")
+    body = json.loads(body_json)
+    if not body.get('Success', False):
+        reason = "`create_certificate` Lambda function failed"
+        if 'Reason' in body:
+            reason += ": " + body['Reason']
+        raise ValueError(reason)
+    print(f"Successfully renewed certificate {cert_parameter_name}")
+
+    output = event
+    index += 1
+    output['Index'] = index
+    output['IsFinished'] = index >= output['Count']
+    cert_parameter_name = certificate['CertParameterName']
+    return output
 
 
-def handle_request(event):
-    cert_parameters_paths = os.environ['CERT_PARAMETERS_PATHS'].split(",")
-    renew_before_days = int(os.environ['RENEW_BEFORE_DAYS'])
-    print(f"CERT_PARAMETERS_PATHS: {cert_parameters_paths}")
-    print(f"RENEW_BEFORE_DAYS: {renew_before_days}")
-
-    # Build a list of certificates to inspect
-    ssm = boto3.client("ssm")
-    parameters = []
-    for path in cert_parameters_paths:
-        parameters += collect_cert_parameters(ssm, path)
-
-    for parameter in parameters:
-        # Load this certificate
-        cert_parameter_name = parameter['Name']
-        cert_value = parameter['Value']
-        cert = x509.load_pem_x509_certificate(
-            cert_value.encode('utf8'),
-            backend=default_backend()
-        )
-
-        # Check if it is close to expiry
-        remaining_delta = cert.not_valid_after - datetime.datetime.utcnow()
-        remaining_days = remaining_delta.days
-        if remaining_days > renew_before_days:
-            print(f"Certificate {cert_parameter_name} has {remaining_days} left before expiry, no need for renewal")
-            continue
-
-        print(f"Certificate {cert_parameter_name} is close to expiry (only {remaining_days} left, min {renew_before_days}); renewing now")
-        # Inspect `dnQualifier` attributes for this certificate
-        key_parameter_name = None
-        ca_key_parameter_name = None
-        ca_cert_parameter_name = None
-        cert_parameters_paths = []
-        attributes = cert.subject.get_attributes_for_oid(NameOID.DN_QUALIFIER)
-        for attribute in attributes:
-            name, value = attribute.value.split(":", 1)
-            if name == "key":
-                key_parameter_name = value
-            elif name == "cakey":
-                ca_key_parameter_name = value
-            elif name == "cacert":
-                ca_cert_parameter_name = value
-            elif name == "path":
-                cert_parameters_paths.append(value)
-        if not key_parameter_name:
-            raise KeyError(f"Missing key parameter name in dnQualifier in certificate {cert_parameter_name}")
-
-        # Inspect private key to determine key type and size
-        print(f"Fetching private key {key_parameter_name}")
-        response = ssm.get_parameter(
-            Name=key_parameter_name,
-            WithDecryption=True
-        )
-        key_value = response['Parameter']['Value']
-        key = serialization.load_pem_private_key(
-            key_value.encode('utf8'),
-            password=None,
-            backend=default_backend()
-        )
-        if isinstance(key, rsa.RSAPrivateKey):
-            key_type = "RSA"
-            key_size = key.key_size
-        elif isinstance(key, dsa.DSAPrivateKey):
-            key_type = "DSA"
-            key_size = key.key_size
-        else:
-            raise ValueError(f"Unhandled private key type for {cert_parameter_name}")
-
-        validity_delta = cert.not_valid_after - cert.not_valid_before
-        validity_days = validity_delta.days
-
-        # Get tags for key and certificate parameters
-        response = ssm.list_tags_for_resource(
-            ResourceType="Parameter",
-            ResourceId=key_parameter_name
-        )
-        key_tags = response['TagList']
-        response = ssm.list_tags_for_resource(
-            ResourceType="Parameter",
-            ResourceId=cert_parameter_name
-        )
-        cert_tags = response['TagList']
-
-        print(f"Renewing certificate {cert_parameter_name}")
-        create_or_renew_cert(
-            key_type=key_type,
-            key_size=key_size,
-            validity_days=validity_days,
-            subject=cert.subject,
-            extensions=cert.extensions,
-            ca_key_parameter_name=ca_key_parameter_name,
-            ca_cert_parameter_name=ca_cert_parameter_name,
-            key_parameter_name=key_parameter_name,
-            cert_parameter_name=cert_parameter_name,
-            key_tags=key_tags,
-            cert_tags=cert_tags
-        )
-
-
-def collect_cert_parameters(ssm, path):
-    result = []
-    has_more = True
-    next_token = ""
-    while has_more:
-        # NB: AWS API doesn't allow to get more than 10 parameters at a time
-        if next_token:
-            response = ssm.get_parameters_by_path(
-                Path=path,
-                Recursive=True,
-                MaxResults=10,
-                NextToken=next_token
-            )
-        else:
-            response = ssm.get_parameters_by_path(
-                Path=path,
-                Recursive=True,
-                MaxResults=10
-            )
-        result += response['Parameters']
-        if 'NextToken' in response:
-            next_token = response['NextToken']
-        else:
-            has_more = False
-    return result
+def add_arg_if_present(args, name, event):
+    if name in event:
+        args[name] = event[name]

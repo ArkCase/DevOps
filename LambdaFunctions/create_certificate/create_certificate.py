@@ -40,7 +40,7 @@ def handler(event, context):
               "DigitalSignature",   # Can verify digital signatures
               "ContentCommitment",  # Non-repudiation
               "KeyEncipherment",    # Can encrypt keys
-              "DataEncipherment,    # Can encrypt data
+              "DataEncipherment",   # Can encrypt data
               "KeyAgreement",       # Key agreement (eg: DH)
               "KeyCertSign",        # Can sign certificates; if set, `BasicConstraints.CA` must be set to `true`
               "CrlSign",            # Can sign CRLs
@@ -57,8 +57,8 @@ def handler(event, context):
           "SelfSigned": false,
 
           # Name of the parameters storing the private key and certificate of
-          # the CA that will be used to sign this new certificate. If either
-          # is missing, a self-signed certificate will be issued.
+          # the CA that will be used to sign this new certificate. If
+          # `SelfSigned` is set to `false`, those fields are mandatory.
           "CaKeyParameterName": "XYZ",
           "CaCertParameterName": "XYZ",
 

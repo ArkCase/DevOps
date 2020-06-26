@@ -1,0 +1,31 @@
+{
+  "Comment": "Renew certificates",
+  "TimeoutSeconds": 3600,
+  "StartAt": "CheckCertificates",
+  "States": {
+    "CheckCertificates": {
+      "Type": "Task",
+      "Resource": "${CheckCertificatesLambdaArn}",
+      "Next": "RenewCertificate"
+    },
+    "RenewCertificate": {
+      "Type": "Task",
+      "Resource": "${RenewCertificateLambdaArn}",
+      "Next": "IsFinished"
+    },
+    "IsFinished": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.IsFinished",
+          "BooleanEquals": false,
+          "Next": "RenewCertificate"
+        }
+      ],
+      "Default": "Completed"
+    },
+    "Completed": {
+      "Type": "Succeed"
+    }
+  }
+}
