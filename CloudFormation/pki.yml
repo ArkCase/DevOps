@@ -126,10 +126,10 @@ Resources:
       Runtime: python3.7
       Role: !GetAtt CreateCertificateLambdaExecutionRole.Arn
       Handler: create_certificate.handler
-      Timeout: 900  # 15 minutes
+      Timeout: 60
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200626-1313/LambdaFunctions/create_certificate/create_certificate.zip
+        S3Key: DevOps/ACM-TMP-20200626-1412/LambdaFunctions/create_certificate/create_certificate.zip
       Tags:
         - Key: Name
           Value: !Sub create-certificate-lambda-${Project}-${Env}
@@ -224,7 +224,7 @@ Resources:
           S3_BUCKET: !Ref CheckCertificatesBucket
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200626-1313/LambdaFunctions/check_certificates/check_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200626-1412/LambdaFunctions/check_certificates/check_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub check-certificates-lambda-${Project}-${Env}
@@ -288,13 +288,13 @@ Resources:
       Runtime: python3.7
       Role: !GetAtt RenewCertificateLambdaExecutionRole.Arn
       Handler: renew_certificate.handler
-      Timeout: 30
+      Timeout: 60
       Environment:
         Variables:
           CREATE_CERTIFICATE_LAMBDA_ARN: !GetAtt CreateCertificateLambda.Arn
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200626-1313/LambdaFunctions/renew_certificate/renew_certificate.zip
+        S3Key: DevOps/ACM-TMP-20200626-1412/LambdaFunctions/renew_certificate/renew_certificate.zip
       Tags:
         - Key: Name
           Value: !Sub renew-certificate-lambda-${Project}-${Env}
@@ -367,7 +367,7 @@ Resources:
       RoleArn: !GetAtt RenewCertificatesStateMachineRole.Arn
       DefinitionS3Location:
         Bucket: !Sub arkcase-public-${AWS::Region}
-        Key: DevOps/ACM-TMP-20200626-1313/StepFunctions/renew_certificates/renew_certificates.asl.json
+        Key: DevOps/ACM-TMP-20200626-1412/StepFunctions/renew_certificates/renew_certificates.asl.json
       DefinitionSubstitutions:
         CheckCertificatesLambdaArn: !GetAtt CheckCertificatesLambda.Arn
         RenewCertificateLambdaArn: !GetAtt RenewCertificateLambda.Arn
@@ -496,13 +496,13 @@ Resources:
       Runtime: python3.7
       Role: !GetAtt CertificateResourceLambdaExecutionRole.Arn
       Handler: certificate_resource.handler
-      Timeout: 900  # 15 minutes
+      Timeout: 60
       Environment:
         Variables:
           CREATE_CERTIFICATE_LAMBDA_ARN: !GetAtt CreateCertificateLambda.Arn
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200626-1313/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200626-1412/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-resource-lambda-${Project}-${Env}

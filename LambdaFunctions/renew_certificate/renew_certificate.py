@@ -43,7 +43,7 @@ def handler(event, context):
     s3 = boto3.client("s3")
     response = s3.get_object(
         Bucket = event['S3Bucket'],
-        Key=event['Key']
+        Key=event['S3Key']
     )
     data = response['Body'].read().decode('utf8')
     cert_list = json.loads(data)
@@ -57,30 +57,31 @@ def handler(event, context):
         'ValidityDays': certificate['ValidityDays']
     }
 
-    add_arg_if_present(args, 'CountryName', event)
-    add_arg_if_present(args, 'StateOrProvinceName', event)
-    add_arg_if_present(args, 'LocalityName', event)
-    add_arg_if_present(args, 'OrganizationName', event)
-    add_arg_if_present(args, 'OrganizationalUnitName', event)
-    add_arg_if_present(args, 'EmailAddress', event)
-    add_arg_if_present(args, 'CommonName', event)
-    add_arg_if_present(args, 'BasicConstraints', event)
-    add_arg_if_present(args, 'KeyUsage', event)
-    add_arg_if_present(args, 'SelfSigned', event)
-    add_arg_if_present(args, 'CaKeyParameterName', event)
-    add_arg_if_present(args, 'CaCertParameterName', event)
+    add_arg_if_present(args, 'CountryName', certificate)
+    add_arg_if_present(args, 'StateOrProvinceName', certificate)
+    add_arg_if_present(args, 'LocalityName', certificate)
+    add_arg_if_present(args, 'OrganizationName', certificate)
+    add_arg_if_present(args, 'OrganizationalUnitName', certificate)
+    add_arg_if_present(args, 'EmailAddress', certificate)
+    add_arg_if_present(args, 'CommonName', certificate)
+    add_arg_if_present(args, 'BasicConstraints', certificate)
+    add_arg_if_present(args, 'KeyUsage', certificate)
+    add_arg_if_present(args, 'SelfSigned', certificate)
+    add_arg_if_present(args, 'CaKeyParameterName', certificate)
+    add_arg_if_present(args, 'CaCertParameterName', certificate)
 
-    args['KeyParameterName'] = event['KeyParameterName']
-    args['CertParameterName'] = event['CertParameterName']
+    args['KeyParameterName'] = certificate['KeyParameterName']
+    args['CertParameterName'] = certificate['CertParameterName']
 
-    add_arg_if_present(args, 'KeyTags', event)
-    add_arg_if_present(args, 'CertTags', event)
+    add_arg_if_present(args, 'KeyTags', certificate)
+    add_arg_if_present(args, 'CertTags', certificate)
 
     args['Cascade'] = False
 
     # Invoke the `create_certificate` Lambda function
+    cert_parameter_name = certificate['KeyParameterName']
     lambda_client = boto3.client("lambda")
-    print(f"Invoking the `create_certificate` Lambda function")
+    print(f"Invoking the `create_certificate` Lambda function for certificate {cert_parameter_name}")
     response = lambda_client.invoke(
         FunctionName=os.environ['CREATE_CERTIFICATE_LAMBDA_ARN'],
         LogType="Tail",
@@ -106,7 +107,7 @@ def handler(event, context):
     index += 1
     output['Index'] = index
     output['IsFinished'] = index >= output['Count']
-    cert_parameter_name = certificate['CertParameterName']
+    print(f"Output: {output}")
     return output
 
 
