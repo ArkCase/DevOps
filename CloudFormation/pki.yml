@@ -129,7 +129,7 @@ Resources:
       Timeout: 900  # 15 minutes
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200626-1148/LambdaFunctions/create_certificate/create_certificate.zip
+        S3Key: DevOps/ACM-TMP-20200626-1313/LambdaFunctions/create_certificate/create_certificate.zip
       Tags:
         - Key: Name
           Value: !Sub create-certificate-lambda-${Project}-${Env}
@@ -224,7 +224,7 @@ Resources:
           S3_BUCKET: !Ref CheckCertificatesBucket
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200626-1148/LambdaFunctions/check_certificates/check_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200626-1313/LambdaFunctions/check_certificates/check_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub check-certificates-lambda-${Project}-${Env}
@@ -294,7 +294,7 @@ Resources:
           CREATE_CERTIFICATE_LAMBDA_ARN: !GetAtt CreateCertificateLambda.Arn
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200626-1148/LambdaFunctions/renew_certificate/renew_certificate.zip
+        S3Key: DevOps/ACM-TMP-20200626-1313/LambdaFunctions/renew_certificate/renew_certificate.zip
       Tags:
         - Key: Name
           Value: !Sub renew-certificate-lambda-${Project}-${Env}
@@ -367,7 +367,7 @@ Resources:
       RoleArn: !GetAtt RenewCertificatesStateMachineRole.Arn
       DefinitionS3Location:
         Bucket: !Sub arkcase-public-${AWS::Region}
-        Key: DevOps/ACM-TMP-20200626-1148/StepFunctions/renew_certificates/renew_certificates.asl.json
+        Key: DevOps/ACM-TMP-20200626-1313/StepFunctions/renew_certificates/renew_certificates.asl.json
       DefinitionSubstitutions:
         CheckCertificatesLambdaArn: !GetAtt CheckCertificatesLambda.Arn
         RenewCertificateLambdaArn: !GetAtt RenewCertificateLambda.Arn
@@ -409,6 +409,10 @@ Resources:
       Targets:
         - Id: PostToSns
           Arn: !Ref AlertsSnsTopicArn
+          InputTransformer:
+            InputTemplate: "{ \"msg\": \"Failed to renew certificates: the AWS Step Functions state machine failed\", \"event\": <EVENT> }"
+            InputPathsMap:
+              EVENT: "$"
 
   RenewCertificatesStateMachineNotifyFailurePermission:
     Type: AWS::SNS::TopicPolicy
@@ -498,7 +502,7 @@ Resources:
           CREATE_CERTIFICATE_LAMBDA_ARN: !GetAtt CreateCertificateLambda.Arn
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200626-1148/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200626-1313/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-resource-lambda-${Project}-${Env}
