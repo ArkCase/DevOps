@@ -70,80 +70,6 @@ Metadata:
 
 Resources:
 
-  #########################################
-  # Lambda function to create certificate #
-  #########################################
-
-  CreateCertificateLambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      Policies:
-        - PolicyName: CertificateLambdaPolicy
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - ssm:PutParameter
-                  - ssm:GetParameter
-                  - ssm:GetParameters
-                  - ssm:GetParametersByPath
-                  - ssm:ListTagsForResource
-                  - ssm:RemoveTagsFromResource
-                  - ssm:AddTagsToResource
-                Resource: arn:aws:ssm:*:*:parameter/arkcase/pki/*
-
-              - Effect: Allow
-                Action: ssm:DescribeParameters
-                Resource: "*"
-      Tags:
-        - Key: Name
-          Value: !Sub create-certificate-lambda-execution-role-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: iam
-        - Key: ManagedBy
-          Value: CloudFormation
-
-  CreateCertificateLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      Description: Create or renew a certificate
-      Runtime: python3.7
-      Role: !GetAtt CreateCertificateLambdaExecutionRole.Arn
-      Handler: create_certificate.handler
-      Timeout: 60
-      Code:
-        S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200626-1412/LambdaFunctions/create_certificate/create_certificate.zip
-      Tags:
-        - Key: Name
-          Value: !Sub create-certificate-lambda-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: lambda
-        - Key: ManagedBy
-          Value: CloudFormation
-
   ##############################################################
   # Lambda function to compute a list of certificates to renew #
   ##############################################################
@@ -224,7 +150,7 @@ Resources:
           S3_BUCKET: !Ref CheckCertificatesBucket
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200626-1412/LambdaFunctions/check_certificates/check_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200629-1518/LambdaFunctions/check_certificates/check_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub check-certificates-lambda-${Project}-${Env}
@@ -265,8 +191,19 @@ Resources:
                 Resource: !Sub ${CheckCertificatesBucket.Arn}/*
 
               - Effect: Allow
-                Action: lambda:InvokeFunction
-                Resource: !GetAtt CreateCertificateLambda.Arn
+                Action:
+                  - ssm:PutParameter
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                  - ssm:ListTagsForResource
+                  - ssm:RemoveTagsFromResource
+                  - ssm:AddTagsToResource
+                Resource: arn:aws:ssm:*:*:parameter/arkcase/pki/*
+
+              - Effect: Allow
+                Action: ssm:DescribeParameters
+                Resource: "*"
       Tags:
         - Key: Name
           Value: !Sub renew-certificate-lambda-execution-role-${Project}-${Env}
@@ -289,12 +226,9 @@ Resources:
       Role: !GetAtt RenewCertificateLambdaExecutionRole.Arn
       Handler: renew_certificate.handler
       Timeout: 60
-      Environment:
-        Variables:
-          CREATE_CERTIFICATE_LAMBDA_ARN: !GetAtt CreateCertificateLambda.Arn
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200626-1412/LambdaFunctions/renew_certificate/renew_certificate.zip
+        S3Key: DevOps/ACM-TMP-20200629-1518/LambdaFunctions/renew_certificate/renew_certificate.zip
       Tags:
         - Key: Name
           Value: !Sub renew-certificate-lambda-${Project}-${Env}
@@ -367,7 +301,7 @@ Resources:
       RoleArn: !GetAtt RenewCertificatesStateMachineRole.Arn
       DefinitionS3Location:
         Bucket: !Sub arkcase-public-${AWS::Region}
-        Key: DevOps/ACM-TMP-20200626-1412/StepFunctions/renew_certificates/renew_certificates.asl.json
+        Key: DevOps/ACM-TMP-20200629-1518/StepFunctions/renew_certificates/renew_certificates.asl.json
       DefinitionSubstitutions:
         CheckCertificatesLambdaArn: !GetAtt CheckCertificatesLambda.Arn
         RenewCertificateLambdaArn: !GetAtt RenewCertificateLambda.Arn
@@ -467,12 +401,23 @@ Resources:
             Version: 2012-10-17
             Statement:
               - Effect: Allow
-                Action: ssm:DeleteParameter
+                Action:
+                  - ssm:PutParameter
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                  - ssm:ListTagsForResource
+                  - ssm:RemoveTagsFromResource
+                  - ssm:AddTagsToResource
                 Resource: arn:aws:ssm:*:*:parameter/arkcase/pki/*
 
               - Effect: Allow
-                Action: lambda:InvokeFunction
-                Resource: !GetAtt CreateCertificateLambda.Arn
+                Action: ssm:DescribeParameters
+                Resource: "*"
+
+              - Effect: Allow
+                Action: states:StartExecution
+                Resource: !Ref RenewCertificatesStateMachine
       Tags:
         - Key: Name
           Value: !Sub certificate-resource-lambda-execution-role-${Project}-${Env}
@@ -499,10 +444,10 @@ Resources:
       Timeout: 60
       Environment:
         Variables:
-          CREATE_CERTIFICATE_LAMBDA_ARN: !GetAtt CreateCertificateLambda.Arn
+          RENEW_CERTIFICATES_STATE_MACHINE_ARN: !Ref RenewCertificatesStateMachine
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200626-1412/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200629-1518/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-resource-lambda-${Project}-${Env}

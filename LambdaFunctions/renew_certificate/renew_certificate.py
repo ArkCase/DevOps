@@ -1,9 +1,7 @@
-#!/usr/bin/env python3
-
-import os
 import boto3
 import botocore
 import json
+from libarkcert import create_or_renew_cert
 
 
 def handler(event, context):
@@ -11,10 +9,6 @@ def handler(event, context):
 
     NB: This Lambda function is meant to be part of the `renew_certificates`
         state machine.
-
-    Required environment variables:
-      - CREATE_CERTIFICATE_LAMBDA_ARN: ARN of the `create_certificate` Lambda
-        function
 
     The input `event` should look like this:
 
@@ -48,69 +42,15 @@ def handler(event, context):
     data = response['Body'].read().decode('utf8')
     cert_list = json.loads(data)
 
-    # Build arguments to `create_certificate` Lambda function
+    # Renew certificate
     index = event['Index']
-    certificate = cert_list[index]
-    args = {
-        'KeyType': certificate['KeyType'],
-        'KeySize': certificate['KeySize'],
-        'ValidityDays': certificate['ValidityDays']
-    }
+    args = cert_list[index]
+    key_parameter_arn, cert_parameter_arn = create_or_renew_cert(args)
 
-    add_arg_if_present(args, 'CountryName', certificate)
-    add_arg_if_present(args, 'StateOrProvinceName', certificate)
-    add_arg_if_present(args, 'LocalityName', certificate)
-    add_arg_if_present(args, 'OrganizationName', certificate)
-    add_arg_if_present(args, 'OrganizationalUnitName', certificate)
-    add_arg_if_present(args, 'EmailAddress', certificate)
-    add_arg_if_present(args, 'CommonName', certificate)
-    add_arg_if_present(args, 'BasicConstraints', certificate)
-    add_arg_if_present(args, 'KeyUsage', certificate)
-    add_arg_if_present(args, 'SelfSigned', certificate)
-    add_arg_if_present(args, 'CaKeyParameterName', certificate)
-    add_arg_if_present(args, 'CaCertParameterName', certificate)
-
-    args['KeyParameterName'] = certificate['KeyParameterName']
-    args['CertParameterName'] = certificate['CertParameterName']
-
-    add_arg_if_present(args, 'KeyTags', certificate)
-    add_arg_if_present(args, 'CertTags', certificate)
-
-    args['Cascade'] = False
-
-    # Invoke the `create_certificate` Lambda function
-    cert_parameter_name = certificate['KeyParameterName']
-    lambda_client = boto3.client("lambda")
-    print(f"Invoking the `create_certificate` Lambda function for certificate {cert_parameter_name}")
-    response = lambda_client.invoke(
-        FunctionName=os.environ['CREATE_CERTIFICATE_LAMBDA_ARN'],
-        LogType="Tail",
-        Payload=json.dumps(args).encode('utf8')
-    )
-    print(f"`create_certificate` Lambda function returned: {response}")
-
-    # Process the response
-    body_json = response['Payload'].read().decode('utf8')
-    print(f"`create_certificate` Lambda function response payload: {body_json}")
-    if 'FunctionError' in response:
-        err = response['FunctionError']
-        raise ValueError(f"The `create_certificate` Lambda function failed: {err} - {body_json}")
-    body = json.loads(body_json)
-    if not body.get('Success', False):
-        reason = "`create_certificate` Lambda function failed"
-        if 'Reason' in body:
-            reason += ": " + body['Reason']
-        raise ValueError(reason)
-    print(f"Successfully renewed certificate {cert_parameter_name}")
-
+    # Done
     output = event
     index += 1
     output['Index'] = index
     output['IsFinished'] = index >= output['Count']
     print(f"Output: {output}")
     return output
-
-
-def add_arg_if_present(args, name, event):
-    if name in event:
-        args[name] = event[name]
