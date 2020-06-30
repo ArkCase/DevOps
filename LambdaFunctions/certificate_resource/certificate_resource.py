@@ -38,6 +38,14 @@ def handler(event, context):
             "EmailAddress": "bob@builder.com",   # Optional
             "CommonName": "arkcase.internal",    # Optional in theory, required in practice
 
+            "SubjectAlternativeName": {  # Subject alternative name extension, optional
+              "Critical": true,          # Whether this SAN is critical; optional, default to `false`
+              "DNS": [                   # Name type; currently, the only valid value is "DNS"
+                "name1.example.com",     # Alternative name
+                "name2.example.com"      # Alternative name
+              ]
+            },
+
             "BasicConstraints": {     # Basic constraints extension, optional
               "Critical": true,       # Whether these basic constraints are critical; optional, default to `false`
               "CA": true,             # Whether this certificate can sign certificates; optional, default to `false`
@@ -152,6 +160,10 @@ def upsert_certificate(event, request_type):
         ku = args['KeyUsage']
         if 'Critical' in ku:
             ku['Critical'] = ku['Critical'].lower() == "true"
+    if 'SubjectAlternativeName' in args:
+        san = args['SubjectAlternativeName']
+        if 'Critical' in san:
+            san['Critical'] = san['Critical'].lower() == "true"
     if 'SelfSigned' in args:
         args['SelfSigned'] = args['SelfSigned'].lower() == "true"
 

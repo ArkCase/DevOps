@@ -354,6 +354,18 @@ def serialize(ssm, certificates):
         add_subject_attribute_if_present(item, 'EmailAddress', cert.subject, NameOID.EMAIL_ADDRESS)
 
         try:
+            san = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+            tmp = {
+                'Critical': san.critical,
+                'DNS': []
+            }
+            for name in san.value.get_values_for_type(x509.DNSName):
+                tmp['DNS'].append(name)
+            item['SubjectAlternativeName'] = tmp
+        except x509.ExtensionNotFound:
+            pass
+
+        try:
             basic_constraints = cert.extensions.get_extension_for_oid(ExtensionOID.BASIC_CONSTRAINTS)
             tmp = {
                 'Critical': basic_constraints.critical,

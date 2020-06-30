@@ -27,6 +27,14 @@ def create_or_renew_cert(args: dict):
           "EmailAddress": "bob@example.com",   # Optional
           "CommonName": "arkcase.internal",    # Optional in theory, required in practice
 
+          "SubjectAlternativeName": {  # Subject alternative name extension, optional
+            "Critical": true,          # Whether this SAN is critical; optional, default to `false`
+            "DNS": [                   # Name type; currently, the only valid value is "DNS"
+              "name1.example.com",     # Alternative name
+              "name2.example.com"      # Alternative name
+            ]
+          },
+
           "BasicConstraints": {  # Basic constraints extension, optional
             "Critical": True,    # Whether these basic constraints are critical; optional, default to `False`
             "CA": True,          # Whether the certificate can sign certificates; optional, default to `False`
@@ -131,6 +139,20 @@ def create_or_renew_cert(args: dict):
     # Add extensions, if any
 
     extensions = []
+
+    if 'SubjectAlternativeName' in args:
+        print(f"Adding subject alternative name extension")
+        san = args['SubjectAlternativeName']
+        critical = san.get('Critical', False)
+        names = []
+        for name in san['DNS']:
+            names.append(x509.DNSName(name))
+        extension = x509.Extension(
+            oid=ExtensionOID.SUBJECT_ALTERNATIVE_NAME,
+            critical=critical,
+            value=x509.SubjectAlternativeName(names)
+        )
+        extensions.append(extension)
 
     if 'BasicConstraints' in args:
         print(f"Adding basic constraints extension")
