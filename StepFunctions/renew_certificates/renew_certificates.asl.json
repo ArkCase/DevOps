@@ -5,27 +5,83 @@
   "States": {
     "CheckCertificates": {
       "Type": "Task",
+      "InputPath": "$.Input",
       "Resource": "${CheckCertificatesLambdaArn}",
+      "ResultPath": "$.Work.CertList",
+      "Next": "AddIndex",
+      "Catch": [
+        {
+          "ErrorEquals": [ "States.ALL" ],
+          "ResultPath": "$.Error",
+          "Next": "NotifyCloudFormationFailure"
+        }
+      ]
+    },
+    "AddIndex": {
+      "Type": "Pass",
+      "Result": {
+        "Index": 0,
+        "IsFinished": false
+      },
+      "ResultPath": "$.Work.Iter",
       "Next": "RenewCertificate"
     },
     "RenewCertificate": {
       "Type": "Task",
+      "InputPath": "$.Work",
       "Resource": "${RenewCertificateLambdaArn}",
-      "Next": "IsFinished"
+      "ResultPath": "$.Work",
+      "Next": "IsFinished",
+      "Catch": [
+        {
+          "ErrorEquals": [ "States.ALL" ],
+          "ResultPath": "$.Error",
+          "Next": "NotifyCloudFormationFailure"
+        }
+      ]
     },
     "IsFinished": {
       "Type": "Choice",
       "Choices": [
         {
-          "Variable": "$.IsFinished",
+          "Variable": "$.Work.Iter.IsFinished",
           "BooleanEquals": false,
           "Next": "RenewCertificate"
         }
       ],
-      "Default": "Completed"
+      "Default": "NotifyCloudFormationSuccess"
+    },
+    "NotifyCloudFormationSuccess": {
+      "Type": "Pass",
+      "Result": {
+        "Success": true
+      },
+      "ResultPath": "$.Outcome",
+      "Next": "CallCertificateResourceSuccess"
+    },
+    "CallCertificateResourceSuccess": {
+      "Type": "Task",
+      "Resource": "${NotifyCertificateResourceLambdaArn}",
+      "Next": "Completed"
     },
     "Completed": {
       "Type": "Succeed"
+    },
+    "NotifyCloudFormationFailure": {
+      "Type": "Pass",
+      "Result": {
+        "Success": false
+      },
+      "ResultPath": "$.Outcome",
+      "Next": "CallCertificateResourceFailure"
+    },
+    "CallCertificateResourceFailure": {
+      "Type": "Task",
+      "Resource": "${NotifyCertificateResourceLambdaArn}",
+      "Next": "Failure"
+    },
+    "Failure": {
+      "Type": "Fail"
     }
   }
 }

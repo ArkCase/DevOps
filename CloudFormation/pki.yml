@@ -150,7 +150,7 @@ Resources:
           S3_BUCKET: !Ref CheckCertificatesBucket
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200629-1518/LambdaFunctions/check_certificates/check_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200630-1255/LambdaFunctions/check_certificates/check_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub check-certificates-lambda-${Project}-${Env}
@@ -182,7 +182,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
-        - PolicyName: RenewCertificates
+        - PolicyName: RenewCertificatesPolicy
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -228,10 +228,63 @@ Resources:
       Timeout: 60
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200629-1518/LambdaFunctions/renew_certificate/renew_certificate.zip
+        S3Key: DevOps/ACM-TMP-20200630-1255/LambdaFunctions/renew_certificate/renew_certificate.zip
       Tags:
         - Key: Name
           Value: !Sub renew-certificate-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  NotifyCertificateResourceLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Tags:
+        - Key: Name
+          Value: !Sub notify-certificate-resource-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  NotifyCertificateResourceLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: >
+        Notify CloudFormation of the success of failure to create/renew a
+        certificate
+      Runtime: python3.7
+      Role: !GetAtt NotifyCertificateResourceLambdaExecutionRole.Arn
+      Handler: notify_certificate_resource.handler
+      Timeout: 30
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20200630-1255/LambdaFunctions/notify_certificate_resource/notify_certificate_resource.zip
+      Tags:
+        - Key: Name
+          Value: !Sub notify-certificate-resource-lambda-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -259,7 +312,7 @@ Resources:
               Service: states.amazonaws.com
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: RenewCertificatesStateMachine
+        - PolicyName: RenewCertificatesStateMachinePolicy
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -268,6 +321,7 @@ Resources:
                 Resource:
                   - !GetAtt CheckCertificatesLambda.Arn
                   - !GetAtt RenewCertificateLambda.Arn
+                  - !GetAtt NotifyCertificateResourceLambda.Arn
 
               - Effect: Allow
                 Action:
@@ -301,10 +355,11 @@ Resources:
       RoleArn: !GetAtt RenewCertificatesStateMachineRole.Arn
       DefinitionS3Location:
         Bucket: !Sub arkcase-public-${AWS::Region}
-        Key: DevOps/ACM-TMP-20200629-1518/StepFunctions/renew_certificates/renew_certificates.asl.json
+        Key: DevOps/ACM-TMP-20200630-1255/StepFunctions/renew_certificates/renew_certificates.asl.json
       DefinitionSubstitutions:
         CheckCertificatesLambdaArn: !GetAtt CheckCertificatesLambda.Arn
         RenewCertificateLambdaArn: !GetAtt RenewCertificateLambda.Arn
+        NotifyCertificateResourceLambdaArn: !GetAtt NotifyCertificateResourceLambda.Arn
       LoggingConfiguration:
         Destinations:
           - CloudWatchLogsLogGroup:
@@ -361,23 +416,51 @@ Resources:
               Service: events.amazonaws.com
       Topics: [ !Ref AlertsSnsTopicArn ]
 
-#  RenewCertificatesRule:
-#    Type: AWS::Events::Rule
-#    Properties:
-#      Description: Periodically check for certificate renewals
-#      ScheduleExpression: !Sub cron(${RenewCertificatesCron})
-#      State: ENABLED
-#      Targets:
-#        - Id: RenewCertificates
-#          Arn: !GetAtt RenewCertificatesLambda.Arn
-#
-#  RenewCertificatesInvokePermission:
-#    Type: AWS::Lambda::Permission
-#    Properties:
-#      FunctionName: !Ref RenewCertificatesLambda
-#      Action: lambda:InvokeFunction
-#      Principal: events.amazonaws.com
-#      SourceArn: !GetAtt RenewCertificatesRule.Arn
+  RenewCertificatesRuleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: RenewCertificateRulePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: states:StartExecution
+                Resource: !Ref RenewCertificatesStateMachine
+      Tags:
+        - Key: Name
+          Value: !Sub renew-certificates-rule-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  RenewCertificatesRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: >
+        Periodically check which certificates are close to expiry and renew
+        them
+      ScheduleExpression: !Sub cron(${RenewCertificatesCron})
+      State: ENABLED
+      Targets:
+        - Id: RenewCertificates
+          Arn: !Ref RenewCertificatesStateMachine
+          RoleArn: !GetAtt RenewCertificatesRuleRole.Arn
+          Input: "{ \"Input\": {} }"  # An empty `Input` object is necessary
 
   #################################################################
   # Lambda function for the `Certificate` custom resource backend #
@@ -447,7 +530,7 @@ Resources:
           RENEW_CERTIFICATES_STATE_MACHINE_ARN: !Ref RenewCertificatesStateMachine
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200629-1518/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200630-1255/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-resource-lambda-${Project}-${Env}

@@ -27,7 +27,7 @@ def handler(event, context):
          that when a CA certificate is renewed, all certificates that
          ultimately depend on it are also renewed.
       2. "Renewal" mode: If no certificate ARN is provided as input, it will
-         build a list of certificates that approaching expiry and requires
+         build a list of certificates that are approaching expiry and require
          renewal. The list will also include any dependent certificate.
 
     In either case, the list is saved in an S3 bucket.
@@ -54,12 +54,9 @@ def handler(event, context):
 
         {
           "S3Bucket": "XYZ",  # S3 bucket where the output file is located
-          "S3Key": "XYZ"      # S3 key to the output file; the content will be in JSON
+          "S3Key": "XYZ",     # S3 key to the output file; the content will be in JSON
+          "Count": 17         # The number of certificates to be renewed (i.e. the length of the list)
         }
-
-    In actuality, a few more fields will be returned but are relevant only
-    when the `check_certificates` Lambda function is called from the
-    `renew_certificates` state machine.
     """
 
     print(f"Received event: {event}")
@@ -67,9 +64,7 @@ def handler(event, context):
     response = {
         'S3Bucket': os.environ['S3_BUCKET'],
         'S3Key': s3key,
-        'Count': count,
-        'Index': 0,
-        'IsFinished': False
+        'Count': count
     }
     return response
 

@@ -110,9 +110,7 @@ def handler(event, context):
     """
     print(f"Received event: {event}")
     try:
-        reason, key_parameter_arn, cert_parameter_arn = handle_request(event)
-        print(f"Success")
-        send_response(event, True, reason, key_parameter_arn, cert_parameter_arn)
+        handle_request(event)
     except Exception as e:
         traceback.print_exc()
         send_response(event, False, str(e))
@@ -122,16 +120,16 @@ def handle_request(event):
     request_type = event['RequestType']
     print(f"Received request type: {request_type}")
     if request_type == "Create" or request_type == "Update":
-        ret = upsert_certificate(event, request_type)
+        upsert_certificate(event, request_type)
     elif request_type == "Delete":
-        ret = delete_certificate(event)
+        delete_certificate(event)
     else:
         raise ValueError(f"Invalid request type: {request_type}")
-    return ret
 
 
 def upsert_certificate(event, request_type):
     args = event['ResourceProperties']
+    key_parameter_name = args['KeyParameterName']
     cert_parameter_name = args['CertParameterName']
     print(f"Creating/renewing certificate {cert_parameter_name}")
 
@@ -159,6 +157,7 @@ def upsert_certificate(event, request_type):
 
     # Create/renew the certificate
     key_parameter_arn, cert_parameter_arn = create_or_renew_cert(args)
+    print(f"Successfully created/renewed certificate: key_parameter_arn: {key_parameter_arn}, cert_parameter_arn: {cert_parameter_arn}")
 
     # Check if the key and/or certificate parameter name(s) have changed. If
     # yes, delete the old parameters.
@@ -174,26 +173,51 @@ def upsert_certificate(event, request_type):
             print(f"Certificate parameter name has changed; deleting old certificate parameter {old_cert_parameter_name}")
             ssm.delete_parameter(Name=old_cert_parameter_name)
 
-    if request_type == "Update":
-        # NB: When a certificate is renewed through the CloudFormation template
-        #     (eg: a parameter changes, such as `OrganizationalUnitName`) and
-        #     it is a CA, we need to renew certificates that depend on it as
-        #     well.
-        is_ca = args.get('BasicConstraints', {}).get('CA', False)
-        if is_ca:
-            print(f"This certificate is a CA, requesting renewals for dependent certificates")
-            sfn = boto3.client("stepfunctions")
-            data = {
-                'ParentCertParameterArn': cert_parameter_arn
+    # When a certificate is renewed through the CloudFormation template (eg: a
+    # parameter changes, such as `OrganizationalUnitName`) and it is a CA, we
+    # need to renew certificates that depend on it as well.
+    is_ca = args.get('BasicConstraints', {}).get('CA', False)
+    if request_type == "Update" and is_ca:
+        print(f"This certificate is a CA, requesting renewals for dependent certificates")
+        sfn = boto3.client("stepfunctions")
+        data = {
+            'Input': {
+                'ParentCertParameterArn': cert_parameter_arn,
+            },
+            'CloudFormationData': {
+              'ResponseURL': event['ResponseURL'],
+              'Response': build_response(
+                    event=event,
+                    success=True,
+                    reason="",
+                    key_parameter_name=key_parameter_name,
+                    cert_parameter_name=cert_parameter_name,
+                    key_parameter_arn=key_parameter_arn,
+                    cert_parameter_arn=cert_parameter_arn
+              )
             }
-            sfn.start_execution(
-                stateMachineArn=os.environ['RENEW_CERTIFICATES_STATE_MACHINE_ARN'],
-                input=json.dumps(data)
-            )
-
-    # Done
-    print(f"Successfully created/renewed certificate: key_parameter_arn: {key_parameter_arn}, cert_parameter_arn: {cert_parameter_arn}")
-    return "Success", key_parameter_arn, cert_parameter_arn
+        }
+        sfn.start_execution(
+            stateMachineArn=os.environ['RENEW_CERTIFICATES_STATE_MACHINE_ARN'],
+            input=json.dumps(data)
+        )
+        # **IMPORTANT NOTE**: Do not send the response to CloudFormation yet.
+        #                     The state machine will do it when it is finished
+        #                     renewing all the dependent certificates, which
+        #                     can take a significant amount of time if there
+        #                     are many.
+    else:
+        # Certificate successfully created/renewed, and we have nothing else to
+        # do
+        send_response(
+                event=event,
+                success=True,
+                reason="Certificate successfully created/renewed",
+                key_parameter_name=key_parameter_name,
+                cert_parameter_name=cert_parameter_name,
+                key_parameter_arn=key_parameter_arn,
+                cert_parameter_arn=cert_parameter_arn
+        )
 
 
 def delete_certificate(event):
@@ -214,28 +238,57 @@ def delete_certificate(event):
         except ssm.exceptions.ParameterNotFound as e:
             # Already deleted by the previous update
             pass
-    return "Success", "", ""
+    send_response(
+            event=event,
+            success="True",
+            reason="Certificate successfully deleted",
+            key_parameter_name=key_parameter_name,
+            cert_parameter_name=cert_parameter_name
+    )
 
 
-def send_response(event, success: bool, reason, key_parameter_arn="", cert_parameter_arn=""):
-    args = event['ResourceProperties']
-    if not 'KeyParameterName' in args or not 'CertParameterName' in args:
-        print(f"WARNING: Either KeyParameterName, CertParameterName, or both are absent from the arguments")
-        physical_id = ","
-    else:
-        physical_id = args['KeyParameterName'] + "," + args['CertParameterName']
+def build_response(
+        event,
+        success: bool,
+        reason: str,
+        key_parameter_name="",
+        cert_parameter_name="",
+        key_parameter_arn="",
+        cert_parameter_arn=""
+    ):
     response = {
         'Status': "SUCCESS" if success else "FAILED",
         'Reason': reason,
-        'PhysicalResourceId': physical_id,
         'StackId': event['StackId'],
         'RequestId': event['RequestId'],
         'LogicalResourceId': event['LogicalResourceId'],
+        'PhysicalResourceId': key_parameter_name + "," + cert_parameter_name,
         'Data': {
             'KeyParameterArn': key_parameter_arn,
             'CertParameterArn': cert_parameter_arn
         }
     }
+    return response
+
+
+def send_response(
+        event,
+        success: bool,
+        reason: str,
+        key_parameter_name="",
+        cert_parameter_name="",
+        key_parameter_arn="",
+        cert_parameter_arn=""
+    ):
+    response = build_response(
+            event=event,
+            success=success,
+            reason=reason,
+            key_parameter_name=key_parameter_name,
+            cert_parameter_name=cert_parameter_name,
+            key_parameter_arn=key_parameter_arn,
+            cert_parameter_arn=cert_parameter_arn
+    )
     headers = {
         'Content-Type': ""
     }
