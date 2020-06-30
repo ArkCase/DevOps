@@ -111,7 +111,7 @@ Resources:
                   - ssm:GetParameters
                   - ssm:GetParametersByPath
                   - ssm:ListTagsForResource
-                Resource: arn:aws:ssm:*:*:parameter/arkcase/pki/*
+                Resource: !Sub arn:aws:ssm:*:*:parameter/${AWS::StackName}/pki/*
 
               - Effect: Allow
                 Action: ssm:DescribeParameters
@@ -145,12 +145,12 @@ Resources:
       Timeout: 300  # 5 minutes
       Environment:
         Variables:
-          CERT_PARAMETERS_PATHS: /arkcase/pki/certs
+          CERT_PARAMETERS_PATHS: !Sub /${AWS::StackName}/pki/certs
           HOW_MANY_DAYS_LEFT_BEFORE_RENEWING: !Ref HowManyDaysLeftBeforeRenewing
           S3_BUCKET: !Ref CheckCertificatesBucket
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200630-1842/LambdaFunctions/check_certificates/check_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200630-1949/LambdaFunctions/check_certificates/check_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub check-certificates-lambda-${Project}-${Env}
@@ -199,7 +199,7 @@ Resources:
                   - ssm:ListTagsForResource
                   - ssm:RemoveTagsFromResource
                   - ssm:AddTagsToResource
-                Resource: arn:aws:ssm:*:*:parameter/arkcase/pki/*
+                Resource: !Sub arn:aws:ssm:*:*:parameter/${AWS::StackName}/pki/*
 
               - Effect: Allow
                 Action: ssm:DescribeParameters
@@ -228,7 +228,7 @@ Resources:
       Timeout: 60
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200630-1842/LambdaFunctions/renew_certificate/renew_certificate.zip
+        S3Key: DevOps/ACM-TMP-20200630-1949/LambdaFunctions/renew_certificate/renew_certificate.zip
       Tags:
         - Key: Name
           Value: !Sub renew-certificate-lambda-${Project}-${Env}
@@ -281,7 +281,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200630-1842/LambdaFunctions/notify_certificate_resource/notify_certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200630-1949/LambdaFunctions/notify_certificate_resource/notify_certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub notify-certificate-resource-lambda-${Project}-${Env}
@@ -355,7 +355,7 @@ Resources:
       RoleArn: !GetAtt RenewCertificatesStateMachineRole.Arn
       DefinitionS3Location:
         Bucket: !Sub arkcase-public-${AWS::Region}
-        Key: DevOps/ACM-TMP-20200630-1842/StepFunctions/renew_certificates/renew_certificates.asl.json
+        Key: DevOps/ACM-TMP-20200630-1949/StepFunctions/renew_certificates/renew_certificates.asl.json
       DefinitionSubstitutions:
         CheckCertificatesLambdaArn: !GetAtt CheckCertificatesLambda.Arn
         RenewCertificateLambdaArn: !GetAtt RenewCertificateLambda.Arn
@@ -492,7 +492,7 @@ Resources:
                   - ssm:ListTagsForResource
                   - ssm:RemoveTagsFromResource
                   - ssm:AddTagsToResource
-                Resource: arn:aws:ssm:*:*:parameter/arkcase/pki/*
+                Resource: !Sub arn:aws:ssm:*:*:parameter/${AWS::StackName}/pki/*
 
               - Effect: Allow
                 Action: ssm:DescribeParameters
@@ -530,7 +530,7 @@ Resources:
           RENEW_CERTIFICATES_STATE_MACHINE_ARN: !Ref RenewCertificatesStateMachine
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200630-1842/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200630-1949/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-resource-lambda-${Project}-${Env}
@@ -570,8 +570,8 @@ Resources:
         Critical: true
         Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
       SelfSigned: true
-      KeyParameterName: /arkcase/pki/private/root-ca-key
-      CertParameterName: /arkcase/pki/certs/root-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/root-ca-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/root-ca-cert
       KeyTags:
         - Key: Name
           Value: !Sub root-ca-private-key-${Project}-${Env}
@@ -634,10 +634,10 @@ Resources:
       KeyUsage:
         Critical: true
         Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
-      CaKeyParameterName: /arkcase/pki/private/root-ca-key
-      CaCertParameterName: /arkcase/pki/certs/root-ca-cert
-      KeyParameterName: /arkcase/pki/private/intermediate-ca-key
-      CertParameterName: /arkcase/pki/certs/intermediate-ca-cert
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/root-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/root-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert
       KeyTags:
         - Key: Name
           Value: !Sub intermediate-ca-private-key-${Project}-${Env}
@@ -698,10 +698,10 @@ Resources:
       KeyUsage:
         Critical: true
         Usages: [ DigitalSignature, KeyEncipherment ]
-      CaKeyParameterName: /arkcase/pki/private/intermediate-ca-key
-      CaCertParameterName: /arkcase/pki/certs/intermediate-ca-cert
-      KeyParameterName: /arkcase/pki/private/alfresco-key
-      CertParameterName: /arkcase/pki/certs/alfresco-cert
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/alfresco-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/alfresco-cert
       KeyTags:
         - Key: Name
           Value: !Sub alfresco-private-key-${Project}-${Env}
@@ -762,10 +762,10 @@ Resources:
       KeyUsage:
         Critical: true
         Usages: [ DigitalSignature, KeyEncipherment ]
-      CaKeyParameterName: /arkcase/pki/private/intermediate-ca-key
-      CaCertParameterName: /arkcase/pki/certs/intermediate-ca-cert
-      KeyParameterName: /arkcase/pki/private/pentaho-key
-      CertParameterName: /arkcase/pki/certs/pentaho-cert
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/pentaho-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/pentaho-cert
       KeyTags:
         - Key: Name
           Value: !Sub pentaho-private-key-${Project}-${Env}
@@ -833,8 +833,8 @@ Resources:
         Critical: true
         Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
       SelfSigned: true
-      KeyParameterName: /arkcase/pki/private/other-root-ca-key
-      CertParameterName: /arkcase/pki/certs/other-root-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/other-root-ca-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/other-root-ca-cert
       KeyTags:
         - Key: Name
           Value: !Sub other-root-ca-private-key-${Project}-${Env}
@@ -897,10 +897,10 @@ Resources:
       KeyUsage:
         Critical: true
         Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
-      CaKeyParameterName: /arkcase/pki/private/other-root-ca-key
-      CaCertParameterName: /arkcase/pki/certs/other-root-ca-cert
-      KeyParameterName: /arkcase/pki/private/first-intermediate-ca-key
-      CertParameterName: /arkcase/pki/certs/first-intermediate-ca-cert
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/other-root-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/other-root-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/first-intermediate-ca-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/first-intermediate-ca-cert
       KeyTags:
         - Key: Name
           Value: !Sub first-intermediate-ca-private-key-${Project}-${Env}
@@ -963,10 +963,10 @@ Resources:
       KeyUsage:
         Critical: true
         Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
-      CaKeyParameterName: /arkcase/pki/private/other-root-ca-key
-      CaCertParameterName: /arkcase/pki/certs/other-root-ca-cert
-      KeyParameterName: /arkcase/pki/private/second-intermediate-ca-key
-      CertParameterName: /arkcase/pki/certs/second-intermediate-ca-cert
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/other-root-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/other-root-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/second-intermediate-ca-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/second-intermediate-ca-cert
       KeyTags:
         - Key: Name
           Value: !Sub second-intermediate-ca-private-key-${Project}-${Env}
@@ -1027,10 +1027,10 @@ Resources:
       KeyUsage:
         Critical: true
         Usages: [ DigitalSignature, KeyEncipherment ]
-      CaKeyParameterName: /arkcase/pki/private/first-intermediate-ca-key
-      CaCertParameterName: /arkcase/pki/certs/first-intermediate-ca-cert
-      KeyParameterName: /arkcase/pki/private/first-service-key
-      CertParameterName: /arkcase/pki/certs/first-service-cert
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/first-intermediate-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/first-intermediate-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/first-service-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/first-service-cert
       KeyTags:
         - Key: Name
           Value: !Sub first-service-private-key-${Project}-${Env}
@@ -1091,10 +1091,10 @@ Resources:
       KeyUsage:
         Critical: true
         Usages: [ DigitalSignature, KeyEncipherment ]
-      CaKeyParameterName: /arkcase/pki/private/second-intermediate-ca-key
-      CaCertParameterName: /arkcase/pki/certs/second-intermediate-ca-cert
-      KeyParameterName: /arkcase/pki/private/second-service-key
-      CertParameterName: /arkcase/pki/certs/second-service-cert
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/second-intermediate-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/second-intermediate-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/second-service-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/second-service-cert
       KeyTags:
         - Key: Name
           Value: !Sub second-service-private-key-${Project}-${Env}
@@ -1160,10 +1160,10 @@ Resources:
       KeyUsage:
         Critical: true
         Usages: [ DigitalSignature, KeyEncipherment ]
-      CaKeyParameterName: /arkcase/pki/private/second-intermediate-ca-key
-      CaCertParameterName: /arkcase/pki/certs/second-intermediate-ca-cert
-      KeyParameterName: /arkcase/pki/private/third-service-key
-      CertParameterName: /arkcase/pki/certs/third-service-cert
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/second-intermediate-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/second-intermediate-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/third-service-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/third-service-cert
       KeyTags:
         - Key: Name
           Value: !Sub third-service-private-key-${Project}-${Env}
