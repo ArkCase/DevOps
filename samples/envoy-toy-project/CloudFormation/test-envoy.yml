@@ -325,7 +325,7 @@ Resources:
           Image: !Ref AppImage
           Essential: true
           HealthCheck:
-            Command: [ "CMD-SHELL", "curl -f http://localhost:8080/" ]
+            Command: [ CMD-SHELL, curl -f http://localhost:8080/ ]
             Interval: 10
             Retries: 2
             StartPeriod: 10
@@ -343,7 +343,7 @@ Resources:
           Image: !Ref EnvoyImage
           Essential: false
           HealthCheck:
-            Command: [ "CMD-SHELL", "curl -f http://localhost:8081/" ]
+            Command: [ CMD-SHELL, curl -f http://localhost:8081/ ]
             Interval: 10
             Retries: 2
             StartPeriod: 10
@@ -382,16 +382,16 @@ Resources:
           FromPort: 8443
           ToPort: 8443
           SourceSecurityGroupId: !GetAtt LoadBalancerSecurityGroup.GroupId
-#        - Description: HTTPS debug
-#          IpProtocol: tcp
-#          FromPort: 8443
-#          ToPort: 8443
-#          CidrIp: 0.0.0.0/0
-#        - Description: HTTP debug
-#          IpProtocol: tcp
-#          FromPort: 8080
-#          ToPort: 8080
-#          CidrIp: 0.0.0.0/0
+#       - Description: HTTPS debug
+#         IpProtocol: tcp
+#         FromPort: 8443
+#         ToPort: 8443
+#         CidrIp: 0.0.0.0/0
+#       - Description: HTTP debug
+#         IpProtocol: tcp
+#         FromPort: 8080
+#         ToPort: 8080
+#         CidrIp: 0.0.0.0/0
 
   Service:
     Type: AWS::ECS::Service
