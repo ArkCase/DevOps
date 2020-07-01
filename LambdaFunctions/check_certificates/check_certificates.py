@@ -255,11 +255,8 @@ def check_renewals(ssm, certificates, how_many_days_left_before_renewing):
     for certificate in certificates:
         if certificate.cert.subject == certificate.cert.issuer:
             # This is a self-signed certificate
-            if certificate.is_ca:
-                print(f"Found root certificate: {certificate.cert_parameter_name}")
-                root_certificates.append(certificate)
-            else:
-                print(f"WARNING: Certificate {certificate.cert_parameter_name} is self-signed but is marked as not being a CA; ignored")
+            print(f"Found self-signed certificate: {certificate.cert_parameter_name}")
+            root_certificates.append(certificate)
 
     # Build trees for each root certificate
     for root_certificate in root_certificates:
