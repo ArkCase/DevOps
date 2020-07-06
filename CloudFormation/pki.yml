@@ -150,7 +150,7 @@ Resources:
           S3_BUCKET: !Ref CheckCertificatesBucket
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200630-1949/LambdaFunctions/check_certificates/check_certificates.zip
+        S3Key: DevOps/ACM-DEV-20200706-1343/LambdaFunctions/check_certificates/check_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub check-certificates-lambda-${Project}-${Env}
@@ -228,7 +228,7 @@ Resources:
       Timeout: 60
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200630-1949/LambdaFunctions/renew_certificate/renew_certificate.zip
+        S3Key: DevOps/ACM-DEV-20200706-1343/LambdaFunctions/renew_certificate/renew_certificate.zip
       Tags:
         - Key: Name
           Value: !Sub renew-certificate-lambda-${Project}-${Env}
@@ -281,7 +281,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200630-1949/LambdaFunctions/notify_certificate_resource/notify_certificate_resource.zip
+        S3Key: DevOps/ACM-DEV-20200706-1343/LambdaFunctions/notify_certificate_resource/notify_certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub notify-certificate-resource-lambda-${Project}-${Env}
@@ -355,7 +355,7 @@ Resources:
       RoleArn: !GetAtt RenewCertificatesStateMachineRole.Arn
       DefinitionS3Location:
         Bucket: !Sub arkcase-public-${AWS::Region}
-        Key: DevOps/ACM-TMP-20200630-1949/StepFunctions/renew_certificates/renew_certificates.asl.json
+        Key: DevOps/ACM-DEV-20200706-1343/StepFunctions/renew_certificates/renew_certificates.asl.json
       DefinitionSubstitutions:
         CheckCertificatesLambdaArn: !GetAtt CheckCertificatesLambda.Arn
         RenewCertificateLambdaArn: !GetAtt RenewCertificateLambda.Arn
@@ -485,10 +485,11 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - ssm:PutParameter
                   - ssm:GetParameter
                   - ssm:GetParameters
                   - ssm:GetParametersByPath
+                  - ssm:PutParameter
+                  - ssm:DeleteParameter
                   - ssm:ListTagsForResource
                   - ssm:RemoveTagsFromResource
                   - ssm:AddTagsToResource
@@ -530,7 +531,7 @@ Resources:
           RENEW_CERTIFICATES_STATE_MACHINE_ARN: !Ref RenewCertificatesStateMachine
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200630-1949/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-DEV-20200706-1343/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-resource-lambda-${Project}-${Env}
