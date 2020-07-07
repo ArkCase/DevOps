@@ -30,8 +30,8 @@ def handler(event, context):
           }
         }
 
-    The ARNs of the private key and certificate parameters will be returned and
-    made available through `Fn::GetAtt`:
+    The ARNs of the private key and certificate SSM parameters will be returned
+    and made available through `Fn::GetAtt`:
 
         !GetAtt Certificate.KeyParameterArn
         !GetAtt Certificate.CertParameterArn

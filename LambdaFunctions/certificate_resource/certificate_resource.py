@@ -74,9 +74,10 @@ def handler(event, context):
             # Optional; default to `false`
             "SelfSigned": false,
 
-            # Name of the parameters storing the private key and certificate of
-            # the CA that will be used to sign this new certificate. If
-            # `SelfSigned` is set to `false`, those fields are mandatory.
+            # Name of the SSM parameters storing the private key and
+            # certificate of the CA that will be used to sign this new
+            # certificate. If `SelfSigned` is set to `false`, those fields are
+            # mandatory.
             "CaKeyParameterName": "XYZ",
             "CaCertParameterName": "XYZ",
 
@@ -85,7 +86,7 @@ def handler(event, context):
             # Name of the SSM parameter where to save the certificate
             "CertParameterName": "/arkcase/pki/certs/my-cert",
 
-            "KeyTags": [  # Tags for the private key parameter, optional
+            "KeyTags": [  # Tags for the private key SSM parameter, optional
               {
                 "Key": "tag key 1",
                 "Value": "tag value 1"
@@ -96,7 +97,7 @@ def handler(event, context):
               }
             ],
 
-            "CertTags": [  # Tags for the certificate parameter, optional
+            "CertTags": [  # Tags for the certificate SSM parameter, optional
               {
                 "Key": "tag key 1",
                 "Value": "tag value 1"
@@ -109,8 +110,8 @@ def handler(event, context):
           }
         }
 
-    The ARNs of the private key and certificate parameters will be returned and
-    made available through `Fn::GetAtt`:
+    The ARNs of the private key and certificate SSM parameters will be returned
+    and made available through `Fn::GetAtt`:
 
         !GetAtt Certificate.KeyParameterArn
         !GetAtt Certificate.CertParameterArn
@@ -173,6 +174,10 @@ def upsert_certificate(event, request_type):
 
     # Check if the key and/or certificate parameter name(s) have changed. If
     # yes, delete the old parameters.
+    #
+    # NB: For an `Update` operation only, CloudFormation sets the
+    #     `OldResourceProperties` to the parameters of the resource as they
+    #     were before the `Update` request.
     if 'OldResourceProperties' in event:
         ssm = boto3.client("ssm")
         old_args = event['OldResourceProperties']
@@ -190,7 +195,7 @@ def upsert_certificate(event, request_type):
     # need to renew certificates that depend on it as well.
     is_ca = args.get('BasicConstraints', {}).get('CA', False)
     if request_type == "Update" and is_ca:
-        print(f"This certificate is a CA, requesting renewals for dependent certificates")
+        print(f"This certificate {cert_parameter_name} is a CA, requesting renewals for dependent certificates")
         sfn = boto3.client("stepfunctions")
         data = {
             'Input': {
@@ -235,7 +240,7 @@ def upsert_certificate(event, request_type):
 def delete_certificate(event):
     physical_id = event['PhysicalResourceId']
     print(f"Deleting certificate; physical_id: {physical_id}")
-    # Parse the physical id to get the key and certificate parameter names
+    # Parse the physical id to get the key and certificate SSM parameter names
     key_parameter_name, cert_parameter_name = physical_id.split(",")
     ssm = boto3.client("ssm")
     if key_parameter_name:

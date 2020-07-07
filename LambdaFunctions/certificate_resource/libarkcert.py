@@ -63,8 +63,8 @@ def create_or_renew_cert(args: dict):
           # Optional; default to `False`
           "SelfSigned": False,
 
-          # Name of the parameters storing the private key and certificate of
-          # the CA that will be used to sign this new certificate. If
+          # Name of the SSM parameters storing the private key and certificate
+          # of the CA that will be used to sign this new certificate. If
           # `SelfSigned` is set to `False`, those fields are mandatory.
           "CaKeyParameterName": "XYZ",
           "CaCertParameterName": "XYZ",
@@ -74,7 +74,7 @@ def create_or_renew_cert(args: dict):
           # Name of the SSM parameter where to save the certificate
           "CertParameterName": "/arkcase/pki/certs/my-cert",
 
-          "KeyTags": [  # Tags for the private key parameter, optional
+          "KeyTags": [  # Tags for the private key SSM parameter, optional
             {
               "Key": "tag key 1",
               "Value": "tag value 1"
@@ -84,7 +84,7 @@ def create_or_renew_cert(args: dict):
               "Value": "tag value 2"
             }
           ],
-          "CertTags": [  # Tags for the certificate parameter, optional
+          "CertTags": [  # Tags for the certificate SSM parameter, optional
             {
               "Key": "tag key 1",
               "Value": "tag value 1"

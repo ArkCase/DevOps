@@ -43,10 +43,10 @@ def handler(event, context):
     The input event must look like this:
 
         {
-            # ARN of the certificate that has just be renewed; this field is
-            # optional and will operate the Lambda function in "cascade" mode;
-            # if this field is absent, the Lambda function will work in
-            # "renewal" mode.
+            # ARN of the SSM parameter that stores the certificate that has
+            # just be renewed; this field is optional and will operate the
+            # Lambda function in "cascade" mode; if this field is absent, the
+            # Lambda function will work in "renewal" mode.
             "ParentCertParameterArn": "arn:aws:..."
         }
 

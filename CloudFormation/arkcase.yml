@@ -125,7 +125,7 @@ Parameters:
 
   MariadbRdsDiskSizeGB:
     Type: Number
-    Description: Size of the disk for the MariaDB RDS instance
+    Description: Size of the disk for the MariaDB RDS instance, in GB
     MinValue: 20
     Default: 50
 
