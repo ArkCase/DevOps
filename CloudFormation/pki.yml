@@ -1,0 +1,1252 @@
+# Copyright (c) 2020 Armedia, LLC
+#
+# Please note this CloudFormation template has been written with the
+# expectation that it will "called" from another CloudFormation template.
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Deploy a PKI for ArkCase, with automated renewals
+
+Parameters:
+  Env:
+    Type: String
+    Description: Type of environment to provision
+    Default: prod
+    MinLength: 1
+    MaxLength: 30
+    AllowedPattern: ^[-_.a-zA-Z0-9]*$
+    ConstraintDescription: >
+      Up to 30 alpha-numeric characters; can use underscores,
+      dots and dashes
+
+  Project:
+    Type: String
+    Description: Name of the project (or product)
+    Default: arkcase
+    MinLength: 1
+    MaxLength: 30
+    AllowedPattern: ^[-_.a-zA-Z0-9]*$
+    ConstraintDescription: >
+      Up to 30 alpha-numeric characters; can use underscores,
+      dots and dashes
+
+  RenewCertificatesCron:
+    Type: String
+    Description: >
+      Cron specification of when to check for certificate renewals. This must
+      be specified using the AWS cron format and in UTC only.
+    Default: 0 8 ? * SUN *
+    MinLength: 11
+
+  HowManyDaysLeftBeforeRenewing:
+    Type: Number
+    Description: >
+      How many days left to expiry before a certificate should be renewed
+    MinValue: 0
+    Default: 15
+
+  AlertsSnsTopicArn:
+    Type: String
+    Description: ARN of the SNS topic to notify in case of errors
+    MinLength: 1
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: { default: Definition }
+        Parameters:
+          - Env
+          - Project
+
+      - Label: { default: Renewals configuration }
+        Parameters:
+          - RenewCertificatesCron
+          - HowManyDaysLeftBeforeRenewing
+
+    ParameterLabels:
+      Env: { default: Environment }
+      RenewCertificatesCron: { default: Renew certificates cron }
+      HowManyDaysLeftBeforeRenewing: { default: How many days to expiry before renewing a certificate }
+
+Resources:
+
+  ##############################################################
+  # Lambda function to compute a list of certificates to renew #
+  ##############################################################
+
+  CheckCertificatesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      LifecycleConfiguration:
+        Rules:
+          - ExpirationInDays: 1  # Delete temporary files after one day
+            Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub check-certificates-bucket-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: s3
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  CheckCertificatesLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CheckCertificatesLambdaPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                  - ssm:ListTagsForResource
+                Resource: !Sub arn:aws:ssm:*:*:parameter/${AWS::StackName}/pki/*
+
+              - Effect: Allow
+                Action: ssm:DescribeParameters
+                Resource: "*"
+
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub ${CheckCertificatesBucket.Arn}/*
+      Tags:
+        - Key: Name
+          Value: !Sub check-certificates-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  CheckCertificatesLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Check certificates for renewal
+      Runtime: python3.7
+      Role: !GetAtt CheckCertificatesLambdaExecutionRole.Arn
+      Handler: check_certificates.handler
+      MemorySize: 1024  # 1GiB
+      Timeout: 300  # 5 minutes
+      Environment:
+        Variables:
+          CERT_PARAMETERS_PATHS: !Sub /${AWS::StackName}/pki/certs
+          HOW_MANY_DAYS_LEFT_BEFORE_RENEWING: !Ref HowManyDaysLeftBeforeRenewing
+          S3_BUCKET: !Ref CheckCertificatesBucket
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20200707-1105/LambdaFunctions/check_certificates/check_certificates.zip
+      Tags:
+        - Key: Name
+          Value: !Sub check-certificates-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ############################################################################
+  # Step Functions state machine to periodically renew expiring certificates #
+  ############################################################################
+
+  RenewCertificateLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: RenewCertificatesPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub ${CheckCertificatesBucket.Arn}/*
+
+              - Effect: Allow
+                Action:
+                  - ssm:PutParameter
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                  - ssm:ListTagsForResource
+                  - ssm:RemoveTagsFromResource
+                  - ssm:AddTagsToResource
+                Resource: !Sub arn:aws:ssm:*:*:parameter/${AWS::StackName}/pki/*
+
+              - Effect: Allow
+                Action: ssm:DescribeParameters
+                Resource: "*"
+      Tags:
+        - Key: Name
+          Value: !Sub renew-certificate-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  RenewCertificateLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Renew the given certificate
+      Runtime: python3.7
+      Role: !GetAtt RenewCertificateLambdaExecutionRole.Arn
+      Handler: renew_certificate.handler
+      Timeout: 60
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20200707-1105/LambdaFunctions/renew_certificate/renew_certificate.zip
+      Tags:
+        - Key: Name
+          Value: !Sub renew-certificate-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  NotifyCertificateResourceLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Tags:
+        - Key: Name
+          Value: !Sub notify-certificate-resource-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  NotifyCertificateResourceLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: >
+        Notify CloudFormation of the success of failure to create/renew a
+        certificate
+      Runtime: python3.7
+      Role: !GetAtt NotifyCertificateResourceLambdaExecutionRole.Arn
+      Handler: notify_certificate_resource.handler
+      Timeout: 30
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20200707-1105/LambdaFunctions/notify_certificate_resource/notify_certificate_resource.zip
+      Tags:
+        - Key: Name
+          Value: !Sub notify-certificate-resource-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  RenewCertificatesStateMachineLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 120
+
+  RenewCertificatesStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: RenewCertificatesStateMachinePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource:
+                  - !GetAtt CheckCertificatesLambda.Arn
+                  - !GetAtt RenewCertificateLambda.Arn
+                  - !GetAtt NotifyCertificateResourceLambda.Arn
+
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogDelivery
+                  - logs:GetLogDelivery
+                  - logs:UpdateLogDelivery
+                  - logs:DeleteLogDelivery
+                  - logs:ListLogDeliveries
+                  - logs:PutResourcePolicy
+                  - logs:DescribeResourcePolicies
+                  - logs:DescribeLogGroups
+                Resource: "*"
+      Tags:
+        - Key: Name
+          Value: !Sub renew-certificates-state-machine-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  RenewCertificatesStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineType: STANDARD
+      RoleArn: !GetAtt RenewCertificatesStateMachineRole.Arn
+      DefinitionS3Location:
+        Bucket: !Sub arkcase-public-${AWS::Region}
+        Key: DevOps/ACM-TMP-20200707-1105/StepFunctions/renew_certificates/renew_certificates.asl.json
+      DefinitionSubstitutions:
+        CheckCertificatesLambdaArn: !GetAtt CheckCertificatesLambda.Arn
+        RenewCertificateLambdaArn: !GetAtt RenewCertificateLambda.Arn
+        NotifyCertificateResourceLambdaArn: !GetAtt NotifyCertificateResourceLambda.Arn
+      LoggingConfiguration:
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn: !GetAtt RenewCertificatesStateMachineLogGroup.Arn
+        IncludeExecutionData: true
+        Level: ALL  # All, ERROR, FATAL, OFF; default is OFF
+      Tags:
+        - Key: Name
+          Value: !Sub renew-certificates-state-machine-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: sfn
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  RenewCertificatesStateMachineNotifyFailureRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: >
+        Send an alert message to an SNS topic if the state machine failed
+      EventPattern:
+        source:
+          - aws.states
+        detail-type:
+          - Step Functions Execution Status Change
+        detail:
+          status: [ ABORTED, FAILED, TIMED_OUT ]
+          stateMachineArn:
+            - !Ref RenewCertificatesStateMachine
+      State: ENABLED
+      Targets:
+        - Id: PostToSns
+          Arn: !Ref AlertsSnsTopicArn
+          InputTransformer:
+            InputTemplate: "{ \"msg\": \"Failed to renew certificates: the AWS Step Functions state machine failed\", \"event\": <EVENT> }"
+            InputPathsMap:
+              EVENT: $
+
+  RenewCertificatesStateMachineNotifyFailurePermission:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: sns:Publish
+            Effect: Allow
+            Resource: !Ref AlertsSnsTopicArn
+            Principal:
+              Service: events.amazonaws.com
+      Topics: [ !Ref AlertsSnsTopicArn ]
+
+  RenewCertificatesRuleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: RenewCertificateRulePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: states:StartExecution
+                Resource: !Ref RenewCertificatesStateMachine
+      Tags:
+        - Key: Name
+          Value: !Sub renew-certificates-rule-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  RenewCertificatesRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: >
+        Periodically check which certificates are close to expiry and renew
+        them
+      ScheduleExpression: !Sub cron(${RenewCertificatesCron})
+      State: ENABLED
+      Targets:
+        - Id: RenewCertificates
+          Arn: !Ref RenewCertificatesStateMachine
+          RoleArn: !GetAtt RenewCertificatesRuleRole.Arn
+          Input: "{ \"Input\": {} }"  # An empty `Input` object is necessary
+
+  #################################################################
+  # Lambda function for the `Certificate` custom resource backend #
+  #################################################################
+
+  CertificateResourceLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CertificateResourceLambdaPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                  - ssm:PutParameter
+                  - ssm:DeleteParameter
+                  - ssm:ListTagsForResource
+                  - ssm:RemoveTagsFromResource
+                  - ssm:AddTagsToResource
+                Resource: !Sub arn:aws:ssm:*:*:parameter/${AWS::StackName}/pki/*
+
+              - Effect: Allow
+                Action: ssm:DescribeParameters
+                Resource: "*"
+
+              - Effect: Allow
+                Action: states:StartExecution
+                Resource: !Ref RenewCertificatesStateMachine
+      Tags:
+        - Key: Name
+          Value: !Sub certificate-resource-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  CertificateResourceLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: >
+        Backend for CloudFormation custom resources to create or delete a
+        certificate
+      Runtime: python3.7
+      Role: !GetAtt CertificateResourceLambdaExecutionRole.Arn
+      Handler: certificate_resource.handler
+      Timeout: 60
+      Environment:
+        Variables:
+          RENEW_CERTIFICATES_STATE_MACHINE_ARN: !Ref RenewCertificatesStateMachine
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20200707-1105/LambdaFunctions/certificate_resource/certificate_resource.zip
+      Tags:
+        - Key: Name
+          Value: !Sub certificate-resource-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: admin
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  #######
+  # PKI #
+  #######
+
+  RootCaCertificate:
+    Type: Custom::Certificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      KeyType: RSA
+      KeySize: 4096
+      ValidityDays: 7300  # About 20 years
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: Arkcase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: root-ca.arkcase.internal
+      BasicConstraints:
+        Critical: true
+        CA: true
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
+      SelfSigned: true
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/root-ca-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/root-ca-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub root-ca-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub root-ca-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub root-ca-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  IntermediateCaCertificate:
+    Type: Custom::Certificate
+    DependsOn: RootCaCertificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      KeyType: RSA
+      KeySize: 4096
+      ValidityDays: 730  # About 2 years
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: intermediate-ca.arkcase.internal
+      BasicConstraints:
+        Critical: true
+        CA: true
+        PathLength: 0
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/root-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/root-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub intermediate-ca-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub intermediate-ca-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub intermediate-ca-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  AlfrescoCertificate:
+    Type: Custom::Certificate
+    DependsOn: IntermediateCaCertificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      KeyType: RSA
+      KeySize: 2048
+      ValidityDays: 90
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: alfresco.arkcase.internal
+      BasicConstraints:
+        CA: false
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyEncipherment ]
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/alfresco-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/alfresco-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub alfresco-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub alfresco-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub alfresco-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  PentahoCertificate:
+    Type: Custom::Certificate
+    DependsOn: IntermediateCaCertificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      KeyType: RSA
+      KeySize: 2048
+      ValidityDays: 90
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: pentaho.arkcase.internal
+      BasicConstraints:
+        CA: false
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyEncipherment ]
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/pentaho-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/pentaho-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub pentaho-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub pentaho-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub pentaho-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  #################################
+  # Parallel PKI for testing only #
+  #################################
+
+  # TODO: remove parallel PKI when testing finished
+
+  OtherRootCaCertificate:
+    Type: Custom::Certificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      KeyType: RSA
+      KeySize: 4096
+      ValidityDays: 7300  # About 20 years
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: Arkcase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: other-root-ca.arkcase.internal
+      BasicConstraints:
+        Critical: true
+        CA: true
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
+      SelfSigned: true
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/other-root-ca-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/other-root-ca-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub other-root-ca-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub other-root-ca-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub other-root-ca-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  FirstIntermediateCaCertificate:
+    Type: Custom::Certificate
+    DependsOn: OtherRootCaCertificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      KeyType: RSA
+      KeySize: 4096
+      ValidityDays: 730  # About 2 years
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: first-intermediate-ca.arkcase.internal
+      BasicConstraints:
+        Critical: true
+        CA: true
+        PathLength: 0
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/other-root-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/other-root-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/first-intermediate-ca-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/first-intermediate-ca-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub first-intermediate-ca-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub first-intermediate-ca-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub first-intermediate-ca-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  SecondIntermediateCaCertificate:
+    Type: Custom::Certificate
+    DependsOn: OtherRootCaCertificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      KeyType: RSA
+      KeySize: 4096
+      ValidityDays: 3  # XXX
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: second-intermediate-ca.arkcase.internal
+      BasicConstraints:
+        Critical: true
+        CA: true
+        PathLength: 0
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/other-root-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/other-root-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/second-intermediate-ca-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/second-intermediate-ca-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub second-intermediate-ca-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub second-intermediate-ca-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub second-intermediate-ca-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  FirstServiceCertificate:
+    Type: Custom::Certificate
+    DependsOn: FirstIntermediateCaCertificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      KeyType: RSA
+      KeySize: 2048
+      ValidityDays: 90
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: first-service.arkcase.internal
+      BasicConstraints:
+        CA: false
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyEncipherment ]
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/first-intermediate-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/first-intermediate-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/first-service-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/first-service-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub first-service-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub first-service-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub first-service-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  SecondServiceCertificate:
+    Type: Custom::Certificate
+    DependsOn: SecondIntermediateCaCertificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      KeyType: RSA
+      KeySize: 2048
+      ValidityDays: 90
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: second-service.arkcase.internal
+      BasicConstraints:
+        CA: false
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyEncipherment ]
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/second-intermediate-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/second-intermediate-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/second-service-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/second-service-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub second-service-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub second-service-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub second-service-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ThirdServiceCertificate:
+    Type: Custom::Certificate
+    DependsOn: SecondIntermediateCaCertificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      KeyType: RSA
+      KeySize: 2048
+      ValidityDays: 90
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: third-service.arkcase.internal
+      SubjectAlternativeName:
+        Critical: true
+        DNS:
+          - test1.arkcase.internal
+          - test2.arkcase.internal
+      BasicConstraints:
+        CA: false
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyEncipherment ]
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/second-intermediate-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/second-intermediate-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/third-service-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/third-service-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub third-service-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub third-service-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub third-service-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+Outputs:
+  RootCaKeyParameterArn:
+    Description: ARN of the SSM parameter storing the root CA private key
+    Value: !GetAtt RootCaCertificate.KeyParameterArn
+
+  RootCaCertParameterArn:
+    Description: ARN of the SSM parameter storing the root CA certificate
+    Value: !GetAtt RootCaCertificate.CertParameterArn
+
+  IntermediateCaKeyParameterArn:
+    Description: ARN of the SSM parameter storing the intermediate CA private key
+    Value: !GetAtt IntermediateCaCertificate.KeyParameterArn
+
+  IntermediateCaCertParameterArn:
+    Description: ARN of the SSM parameter storing the intermediate CA certificate
+    Value: !GetAtt IntermediateCaCertificate.CertParameterArn
+
+  AlfrescoKeyParameterArn:
+    Description: ARN of the SSM parameter storing the Alfresco service private key
+    Value: !GetAtt AlfrescoCertificate.KeyParameterArn
+
+  AlfrescoCertParameterArn:
+    Description: ARN of the SSM parameter storing the Alfresco service certificate
+    Value: !GetAtt AlfrescoCertificate.CertParameterArn
+
+  PentahoKeyParameterArn:
+    Description: ARN of the SSM parameter storing the Pentaho service private key
+    Value: !GetAtt PentahoCertificate.KeyParameterArn
+
+  PentahoCertParameterArn:
+    Description: ARN of the SSM parameter storing the Pentaho service certificate
+    Value: !GetAtt PentahoCertificate.CertParameterArn

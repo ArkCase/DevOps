@@ -10,6 +10,10 @@ tmp=$(realpath "$0")
 dir=$(dirname "$tmp")
 cd "$dir/$lambda"
 
+if [ -x custom-package.sh ]; then
+    exec ./custom-package.sh
+fi
+
 if [ -e requirements.txt ]; then
     if [ -e /etc/debian_version ]; then
         extra_pip_args=--system
@@ -22,7 +26,7 @@ if [ -e requirements.txt ]; then
     zip -r9 "../${lambda}.zip" .
     cd ..
     rm -rf "$tmpdir"
-    zip -g "${lambda}.zip" "${lambda}.py"
+    zip -g "${lambda}.zip" *.py
 else
-    zip -r9 "${lambda}.zip" "${lambda}.py"
+    zip -r9 "${lambda}.zip" *.py
 fi

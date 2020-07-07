@@ -67,6 +67,12 @@ def compute_maintenance_windows(event):
     end = start.next(5)
     data['EndRotateUserPasswords'] = end.get_cron()
 
+    # 15' to renew certificates
+    start = end
+    data['StartRenewCertificates'] = start.get_cron()
+    end = start.next(15)
+    data['EndRenewCertificates'] = end.get_cron()
+
     # 30' window to perform backups on all RDS instances
     start = end
     data['StartRdsBackup'] = start.get_time()

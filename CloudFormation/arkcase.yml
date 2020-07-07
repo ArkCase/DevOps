@@ -125,6 +125,7 @@ Parameters:
 
   MariadbRdsDiskSizeGB:
     Type: Number
+    Description: Size of the disk for the MariaDB RDS instance, in GB
     MinValue: 20
     Default: 50
 
@@ -136,6 +137,12 @@ Parameters:
       will cost more. Please note this has no effect on performance.
     Default: true
     AllowedValues: [ true, false ]
+
+  DaysBeforeExpiryCertificateRenewal:
+    Type: Number
+    Description: The number of days before expiry to renew a certificate
+    MinValue: 1
+    Default: 14
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -172,6 +179,10 @@ Metadata:
           - ActivemqVersion
           - AmazonmqEnableAuditLogs
 
+      - Label: { default: PKI }
+        Parameters:
+          - DaysBeforeExpiryCertificateRenewal
+
     ParameterLabels:
       Env: { default: Environment }
       VpcCidr: { default: VPC CIDR block }
@@ -186,6 +197,7 @@ Metadata:
       MariadbRdsInstanceClass: { default: MariaDB RDS instance class }
       MariadbRdsDiskSizeGB: { default: "MariaDB RDS disk size, in GB" }
       MariadbRdsEnableHotStandby: { default: Enable MariaDB RDS hot standby }
+      DaysBeforeExpiryCertificateRenewal: { default: Days before expiry to renew a certificate }
 
 Resources:
 
@@ -989,6 +1001,34 @@ Resources:
           Value: admin
         - Key: Component
           Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ######################################
+  # Internal Public Key Infrastructure #
+  ######################################
+
+  Pki:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200622-1841/CloudFormation/pki.yml
+      TimeoutInMinutes: 15
+      Parameters:
+        Env: !Ref Env
+        Project: !Ref Project
+        RenewCertificatesCron: !GetAtt MaintenanceWindows.StartRenewCertificates
+        DaysBeforeExpiryCertificateRenewal: !Ref DaysBeforeExpiryCertificateRenewal
+      Tags:
+        - Key: Name
+          Value: !Sub pki-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: cfn
         - Key: ManagedBy
           Value: CloudFormation
 

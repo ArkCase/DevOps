@@ -68,10 +68,16 @@ templates = [
     "CloudFormation/mariadb-user-secret.yml",
     "CloudFormation/amazonmq.yml",
     "CloudFormation/amqsecretcfg.yml",
+    "CloudFormation/pki.yml"
 ]
 
 for i in templates:
     replace_package_version(i)
+
+# List of files related to Step Functions
+step_functions_files = [
+  "StepFunctions/renew_certificates/renew_certificates.asl.json"
+]
 
 # Push public files to public S3 buckets
 
@@ -95,7 +101,7 @@ default_regions = [
 ]
 
 regions = args.region if args.region else default_regions
-public_files = templates + [f"{lambda_dir}/{i}/{i}.zip" for i in lambda_functions]
+public_files = templates + [f"{lambda_dir}/{i}/{i}.zip" for i in lambda_functions] + step_functions_files
 s3 = boto3.client("s3")
 
 for f in public_files:
