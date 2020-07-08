@@ -1,0 +1,1864 @@
+# Copyright (c) 2020 Armedia, LLC
+#
+# Please note this CloudFormation template has been written with the
+# expectation that it will "called" from another CloudFormation template.
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >
+  Deploy a toy project demonstrating a full working example of using of AppMesh
+  with TLS
+
+Parameters:
+  Env:
+    Type: String
+    Description: Type of environment to provision
+    Default: dev
+    MinLength: 1
+    MaxLength: 30
+    AllowedPattern: ^[-_.a-zA-Z0-9]*$
+    ConstraintDescription: >
+      Up to 30 alpha-numeric characters; can use underscores,
+      dots and dashes
+
+  Project:
+    Type: String
+    Description: Name of the project (or product)
+    Default: toymesh
+    MinLength: 1
+    MaxLength: 30
+    AllowedPattern: ^[-_.a-zA-Z0-9]*$
+    ConstraintDescription: >
+      Up to 30 alpha-numeric characters; can use underscores,
+      dots and dashes
+
+  VpcCidr:
+    Type: String
+    Description: CIDR block for the VPC
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: ^\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}/\d{1,2}$
+    ConstraintDescription: Must be a valid CIDR range like "10.10.0.0/16"
+    Default: 10.220.0.0/16
+
+  Route53HostedZoneId:
+    Type: AWS::Route53::HostedZone::Id
+    Description: ID of the hosted zone for the domain name served by this app
+
+  DomainName:
+    Type: String
+    Description: Domain name served by this app
+    MinLength: 1
+    Default: test-appmesh.arkcaselab.com
+
+  CertificateArn:
+    Type: String
+    Description: >
+      ARN of the SSL certificate stored in ACM for the DomainName. You must
+      create an SSL certificate in ACM prior to creating this stack and
+      provide its ARN in this box.
+    MinLength: 1
+
+  RenewCertificatesCron:
+    Type: String
+    Description: >
+      Cron specification of when to check for certificate renewals. This must
+      be specified using the AWS cron format and in UTC only.
+    Default: 0 8 ? * SUN *
+    MinLength: 11
+
+  HowManyDaysLeftBeforeRenewing:
+    Type: Number
+    Description: >
+      How many days left to expiry before a certificate should be renewed
+    MinValue: 0
+    Default: 15
+
+  AlertsSnsTopicArn:
+    Type: String
+    Description: ARN of the SNS topic to notify in case of errors
+    MinLength: 1
+
+  BackendImage:
+    Type: String
+    Description: Name of the Docker image to use for the backend service
+    MinLength: 1
+    Default: 300674751221.dkr.ecr.us-west-1.amazonaws.com/toymesh-backend:1
+
+  WebImage:
+    Type: String
+    Description: Name of the Docker image to use for the web service
+    MinLength: 1
+    Default: 300674751221.dkr.ecr.us-west-1.amazonaws.com/toymesh-web:1
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: { default: Definition }
+        Parameters:
+          - Env
+          - Project
+
+      - Label: { default: Networking }
+        Parameters:
+          - VpcCidr
+          - Route53HostedZoneId
+          - DomainName
+          - CertificateArn
+
+      - Label: { default: Renewals configuration }
+        Parameters:
+          - RenewCertificatesCron
+          - HowManyDaysLeftBeforeRenewing
+          - AlertsSnsTopicArn
+
+    ParameterLabels:
+      Env: { default: Environment }
+      VpcCidr: { default: VPC CIDR block }
+      Route53HostedZoneId: { default: Route53 hosted zone ID }
+      DomainName: { default: DomainName }
+      CertificateArn: { default: Certificate ARN }
+      RenewCertificatesCron: { default: Renew certificates cron }
+      HowManyDaysLeftBeforeRenewing: { default: How many days to expiry before renewing a certificate }
+      AlertsSnsTopicArn: { default: Alerts SNS topic ARN }
+
+Resources:
+
+  #######
+  # VPC #
+  #######
+
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub vpc-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: network
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub internet-gateway-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: network
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Select [ 0, !Cidr [ !Ref VpcCidr, 4, 10 ] ]
+      AvailabilityZone: !Select [ 0, !GetAZs ]
+      Tags:
+        - Key: Name
+          Value: !Sub public-subnet-A-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: network
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Select [ 1, !Cidr [ !Ref VpcCidr, 4, 10 ] ]
+      AvailabilityZone: !Select [ 1, !GetAZs ]
+      Tags:
+        - Key: Name
+          Value: !Sub public-subnet-B-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: network
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Select [ 2, !Cidr [ !Ref VpcCidr, 4, 10 ] ]
+      AvailabilityZone: !Select [ 0, !GetAZs ]
+      Tags:
+        - Key: Name
+          Value: !Sub private-subnet-A-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: network
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Select [ 3, !Cidr [ !Ref VpcCidr, 4, 10 ] ]
+      AvailabilityZone: !Select [ 1, !GetAZs ]
+      Tags:
+        - Key: Name
+          Value: !Sub private-subnet-A-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: network
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ElasticIpForNatGateway:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub elastic-ip-for-nat-gateway-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: network
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt ElasticIpForNatGateway.AllocationId
+      SubnetId: !Ref PublicSubnetA
+      Tags:
+        - Key: Name
+          Value: !Sub nat-gateway-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: network
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub public-route-table-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: network
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub private-route-table-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: network
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  DefaultPrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  PrivateSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetB
+      RouteTableId: !Ref PrivateRouteTable
+
+  #################
+  # Load balancer #
+  #################
+
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for the load balancer
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - Description: http
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - Description: https
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub load-balancer-security-group-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: web
+        - Key: Component
+          Value: lb
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Scheme: internet-facing
+      SecurityGroups: [ !GetAtt LoadBalancerSecurityGroup.GroupId ]
+      Subnets: [ !Ref PublicSubnetA, !Ref PublicSubnetB ]
+      Tags:
+        - Key: Name
+          Value: !Sub load-balancer-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: web
+        - Key: Component
+          Value: lb
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Port: 443
+      Protocol: HTTPS
+      VpcId: !Ref Vpc
+      TargetType: ip
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 10
+      HealthCheckProtocol: HTTPS
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      Tags:
+        - Key: Name
+          Value: !Sub target-group-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: web
+        - Key: Component
+          Value: lb
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ListenerHttp:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Host: '#{host}'
+            Path: '/#{path}'
+            Query: '#{query}'
+            Port: 443
+            Protocol: HTTPS
+            StatusCode: HTTP_302
+
+  ListenerHttps:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      Certificates:
+        - CertificateArn: !Ref CertificateArn
+
+  ###########
+  # Route53 #
+  ###########
+
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Ref DomainName
+      Type: A
+      HostedZoneId: !Ref Route53HostedZoneId
+      AliasTarget:
+        DNSName: !GetAtt LoadBalancer.DNSName
+        EvaluateTargetHealth: false
+        HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
+
+  ##############################################################
+  # Lambda function to compute a list of certificates to renew #
+  ##############################################################
+
+  CheckCertificatesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      LifecycleConfiguration:
+        Rules:
+          - ExpirationInDays: 1  # Delete temporary files after one day
+            Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub check-certificates-bucket-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: s3
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  CheckCertificatesLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CheckCertificatesLambdaPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                  - ssm:ListTagsForResource
+                Resource: !Sub arn:aws:ssm:*:*:parameter/${AWS::StackName}/pki/*
+
+              - Effect: Allow
+                Action: ssm:DescribeParameters
+                Resource: "*"
+
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub ${CheckCertificatesBucket.Arn}/*
+      Tags:
+        - Key: Name
+          Value: !Sub check-certificates-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  CheckCertificatesLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Check certificates for renewal
+      Runtime: python3.7
+      Role: !GetAtt CheckCertificatesLambdaExecutionRole.Arn
+      Handler: check_certificates.handler
+      MemorySize: 1024  # 1GiB
+      Timeout: 300  # 5 minutes
+      Environment:
+        Variables:
+          CERT_PARAMETERS_PATHS: !Sub /${AWS::StackName}/pki/certs
+          HOW_MANY_DAYS_LEFT_BEFORE_RENEWING: !Ref HowManyDaysLeftBeforeRenewing
+          S3_BUCKET: !Ref CheckCertificatesBucket
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-DEV-20200706-1646/LambdaFunctions/check_certificates/check_certificates.zip
+      Tags:
+        - Key: Name
+          Value: !Sub check-certificates-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ############################################################################
+  # Step Functions state machine to periodically renew expiring certificates #
+  ############################################################################
+
+  RenewCertificateLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: RenewCertificatesPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub ${CheckCertificatesBucket.Arn}/*
+
+              - Effect: Allow
+                Action:
+                  - ssm:PutParameter
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                  - ssm:ListTagsForResource
+                  - ssm:RemoveTagsFromResource
+                  - ssm:AddTagsToResource
+                Resource: !Sub arn:aws:ssm:*:*:parameter/${AWS::StackName}/pki/*
+
+              - Effect: Allow
+                Action: ssm:DescribeParameters
+                Resource: "*"
+      Tags:
+        - Key: Name
+          Value: !Sub renew-certificate-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  RenewCertificateLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Renew the given certificate
+      Runtime: python3.7
+      Role: !GetAtt RenewCertificateLambdaExecutionRole.Arn
+      Handler: renew_certificate.handler
+      Timeout: 60
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-DEV-20200706-1646/LambdaFunctions/renew_certificate/renew_certificate.zip
+      Tags:
+        - Key: Name
+          Value: !Sub renew-certificate-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  NotifyCertificateResourceLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Tags:
+        - Key: Name
+          Value: !Sub notify-certificate-resource-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  NotifyCertificateResourceLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: >
+        Notify CloudFormation of the success of failure to create/renew a
+        certificate
+      Runtime: python3.7
+      Role: !GetAtt NotifyCertificateResourceLambdaExecutionRole.Arn
+      Handler: notify_certificate_resource.handler
+      Timeout: 30
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-DEV-20200706-1646/LambdaFunctions/notify_certificate_resource/notify_certificate_resource.zip
+      Tags:
+        - Key: Name
+          Value: !Sub notify-certificate-resource-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  RenewCertificatesStateMachineLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 120
+
+  RenewCertificatesStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: RenewCertificatesStateMachinePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource:
+                  - !GetAtt CheckCertificatesLambda.Arn
+                  - !GetAtt RenewCertificateLambda.Arn
+                  - !GetAtt NotifyCertificateResourceLambda.Arn
+
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogDelivery
+                  - logs:GetLogDelivery
+                  - logs:UpdateLogDelivery
+                  - logs:DeleteLogDelivery
+                  - logs:ListLogDeliveries
+                  - logs:PutResourcePolicy
+                  - logs:DescribeResourcePolicies
+                  - logs:DescribeLogGroups
+                Resource: "*"
+      Tags:
+        - Key: Name
+          Value: !Sub renew-certificates-state-machine-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  RenewCertificatesStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineType: STANDARD
+      RoleArn: !GetAtt RenewCertificatesStateMachineRole.Arn
+      DefinitionS3Location:
+        Bucket: !Sub arkcase-public-${AWS::Region}
+        Key: DevOps/ACM-DEV-20200706-1646/StepFunctions/renew_certificates/renew_certificates.asl.json
+      DefinitionSubstitutions:
+        CheckCertificatesLambdaArn: !GetAtt CheckCertificatesLambda.Arn
+        RenewCertificateLambdaArn: !GetAtt RenewCertificateLambda.Arn
+        NotifyCertificateResourceLambdaArn: !GetAtt NotifyCertificateResourceLambda.Arn
+      LoggingConfiguration:
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn: !GetAtt RenewCertificatesStateMachineLogGroup.Arn
+        IncludeExecutionData: true
+        Level: ALL  # All, ERROR, FATAL, OFF; default is OFF
+      Tags:
+        - Key: Name
+          Value: !Sub renew-certificates-state-machine-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: sfn
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  RenewCertificatesStateMachineNotifyFailureRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: >
+        Send an alert message to an SNS topic if the state machine failed
+      EventPattern:
+        source:
+          - aws.states
+        detail-type:
+          - Step Functions Execution Status Change
+        detail:
+          status: [ ABORTED, FAILED, TIMED_OUT ]
+          stateMachineArn:
+            - !Ref RenewCertificatesStateMachine
+      State: ENABLED
+      Targets:
+        - Id: PostToSns
+          Arn: !Ref AlertsSnsTopicArn
+          InputTransformer:
+            InputTemplate: "{ \"msg\": \"Failed to renew certificates: the AWS Step Functions state machine failed\", \"event\": <EVENT> }"
+            InputPathsMap:
+              EVENT: $
+
+  RenewCertificatesStateMachineNotifyFailurePermission:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: sns:Publish
+            Effect: Allow
+            Resource: !Ref AlertsSnsTopicArn
+            Principal:
+              Service: events.amazonaws.com
+      Topics: [ !Ref AlertsSnsTopicArn ]
+
+  RenewCertificatesRuleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: RenewCertificateRulePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: states:StartExecution
+                Resource: !Ref RenewCertificatesStateMachine
+      Tags:
+        - Key: Name
+          Value: !Sub renew-certificates-rule-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  RenewCertificatesRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: >
+        Periodically check which certificates are close to expiry and renew
+        them
+      ScheduleExpression: !Sub cron(${RenewCertificatesCron})
+      State: ENABLED
+      Targets:
+        - Id: RenewCertificates
+          Arn: !Ref RenewCertificatesStateMachine
+          RoleArn: !GetAtt RenewCertificatesRuleRole.Arn
+          Input: "{ \"Input\": {} }"  # An empty `Input` object is necessary
+
+  #################################################################
+  # Lambda function for the `Certificate` custom resource backend #
+  #################################################################
+
+  CertificateResourceLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CertificateResourceLambdaPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                  - ssm:PutParameter
+                  - ssm:DeleteParameter
+                  - ssm:ListTagsForResource
+                  - ssm:RemoveTagsFromResource
+                  - ssm:AddTagsToResource
+                Resource: !Sub arn:aws:ssm:*:*:parameter/${AWS::StackName}/pki/*
+
+              - Effect: Allow
+                Action: ssm:DescribeParameters
+                Resource: "*"
+
+              - Effect: Allow
+                Action: states:StartExecution
+                Resource: !Ref RenewCertificatesStateMachine
+      Tags:
+        - Key: Name
+          Value: !Sub certificate-resource-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  CertificateResourceLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: >
+        Backend for CloudFormation custom resources to create or delete a
+        certificate
+      Runtime: python3.7
+      Role: !GetAtt CertificateResourceLambdaExecutionRole.Arn
+      Handler: certificate_resource.handler
+      Timeout: 60
+      Environment:
+        Variables:
+          RENEW_CERTIFICATES_STATE_MACHINE_ARN: !Ref RenewCertificatesStateMachine
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-DEV-20200706-1646/LambdaFunctions/certificate_resource/certificate_resource.zip
+      Tags:
+        - Key: Name
+          Value: !Sub certificate-resource-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: admin
+        - Key: Component
+          Value: lambda
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  #######
+  # PKI #
+  #######
+
+  RootCaCertificate:
+    Type: Custom::Certificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      KeyType: RSA
+      KeySize: 4096
+      ValidityDays: 7300  # About 20 years
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: Arkcase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: !Sub root-ca.${Project}.lan
+      BasicConstraints:
+        Critical: true
+        CA: true
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
+      SelfSigned: true
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/root-ca-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/root-ca-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub root-ca-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub root-ca-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub root-ca-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  IntermediateCaCertificate:
+    Type: Custom::Certificate
+    DependsOn: RootCaCertificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      KeyType: RSA
+      KeySize: 4096
+      ValidityDays: 730  # About 2 years
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: !Sub intermediate-ca.${Project}.lan
+      BasicConstraints:
+        Critical: true
+        CA: true
+        PathLength: 0
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/root-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/root-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub intermediate-ca-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub intermediate-ca-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub intermediate-ca-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  BackendCertificate:
+    Type: Custom::Certificate
+    DependsOn: IntermediateCaCertificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      KeyType: RSA
+      KeySize: 2048
+      ValidityDays: 90
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: !Sub backend.${Project}.lan
+      BasicConstraints:
+        CA: false
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyEncipherment ]
+      SubjectAlternativeName:
+        Critical: true
+        DNS:
+          - !Sub backend.${Project}.lan  # Must match format SERVICE_NAME.SERVICE_DISCOVERY_NAMESPACE
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/backend-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/backend-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub backend-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub backend-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub backend-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  WebCertificate:
+    Type: Custom::Certificate
+    DependsOn: IntermediateCaCertificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      KeyType: RSA
+      KeySize: 2048
+      ValidityDays: 90
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: !Sub web.${Project}.lan
+      BasicConstraints:
+        CA: false
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyEncipherment ]
+      SubjectAlternativeName:
+        Critical: true
+        DNS:
+          - !Sub web.${Project}.lan  # Must match format SERVICE_NAME.SERVICE_DISCOVERY_NAMESPACE
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/web-key
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/web-cert
+      KeyTags:
+        - Key: Name
+          Value: !Sub web-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub web-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub web-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ###################
+  # Top-level stuff #
+  ###################
+
+  CloudMapNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Vpc: !Ref Vpc
+      Name: !Sub ${Project}.lan
+      Tags:
+        - Key: Name
+          Value: !Sub cloud-map-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: mesh
+        - Key: Component
+          Value: cloudmap
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ecs-cluster-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: mesh
+        - Key: Component
+          Value: ecs
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 30
+
+  ############
+  # App Mesh #
+  ############
+
+  Mesh:
+    Type: AWS::AppMesh::Mesh
+    Properties:
+      MeshName: !Sub mesh-${Project}-${Env}
+      Spec:
+        EgressFilter:
+          Type: DROP_ALL  # or ALLOW_ALL
+      Tags:
+        - Key: Name
+          Value: !Sub mesh-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: mesh
+        - Key: Component
+          Value: appmesh
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ###################
+  # Backend service #
+  ###################
+
+  CloudMapBackendService:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: backend
+      NamespaceId: !Ref CloudMapNamespace
+      DnsConfig:
+        DnsRecords:
+          - Type: A
+            TTL: 60
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+      Tags:
+        - Key: Name
+          Value: !Sub cloud-map-backend-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: backend
+        - Key: Component
+          Value: cloudmap
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  BackendVirtualNode:
+    Type: AWS::AppMesh::VirtualNode
+    Properties:
+      MeshName: !GetAtt Mesh.MeshName
+      VirtualNodeName: backend-vn
+      Spec:
+        Listeners:
+          - PortMapping:
+              Port: 8080
+              Protocol: http
+# TODO
+#            TLS:
+#              Mode: STRICT
+#              Certificate:
+#                File:
+#                  PrivateKey: /etc/tls/private/key.pem
+#                  CertificateChain: /etc/tls/certs/chain.pem
+            HealthCheck:
+              Protocol: http
+              Path: /
+              HealthyThreshold: 2
+              UnhealthyThreshold: 2
+              TimeoutMillis: 2000
+              IntervalMillis: 5000
+        ServiceDiscovery:
+          AWSCloudMap:
+            NamespaceName: !Ref CloudMapNamespace
+            ServiceName: !Ref CloudMapBackendService
+        Logging:
+          AccessLog:
+            File:
+              Path: /dev/stdout
+      Tags:
+        - Key: Name
+          Value: !Sub backend-virtual-node-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: backend
+        - Key: Component
+          Value: appmesh
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  BackendVirtualService:
+    Type: AWS::AppMesh::VirtualService
+    Properties:
+      MeshName: !GetAtt Mesh.MeshName
+      VirtualServiceName: backend-vs
+      Spec:
+        Provider:
+          VirtualNode:
+            VirtualNodeName: !GetAtt BackendVirtualNode.VirtualNodeName
+      Tags:
+        - Key: Name
+          Value: !Sub backend-virtual-service-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: backend
+        - Key: Component
+          Value: appmesh
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  BackendTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Tags:
+        - Key: Name
+          Value: !Sub backend-task-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: backend
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  BackendTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSAppMeshEnvoyAccess
+      Tags:
+        - Key: Name
+          Value: !Sub backend-task-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: backend
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  BackendTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${Project}-backend
+      Cpu: 256
+      Memory: 512
+      ExecutionRoleArn: !GetAtt BackendTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt BackendTaskRole.Arn
+      RequiresCompatibilities: [ FARGATE ]
+      NetworkMode: awsvpc
+      ProxyConfiguration:
+        Type: APPMESH
+        ContainerName: envoy
+        ProxyConfigurationProperties:
+          - Name: IgnoredUID
+            Value: 1337
+          - Name: ProxyIngressPort
+            Value: 15000
+          - Name: ProxyEgressPort
+            Value: 15001
+          - Name: AppPorts
+            Value: 8080
+          - Name: EgressIgnoredIPs
+            Value: 169.254.170.2,169.254.169.254
+      ContainerDefinitions:
+        - Name: backend
+          Image: !Ref BackendImage
+          HealthCheck:
+            Command: [ "CMD-SHELL", "curl -f http://localhost:8080" ]
+            Interval: 10
+            Retries: 2
+            StartPeriod: 10
+            Timeout: 2
+          PortMappings:
+            - ContainerPort: 8080
+              Protocol: tcp
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref LogGroup
+              awslogs-stream-prefix: backend
+          Essential: true
+          DependsOn:
+            - ContainerName: envoy
+              Condition: HEALTHY
+        - Name: envoy
+          Image: !Sub 840364872350.dkr.ecr.${AWS::Region}.amazonaws.com/aws-appmesh-envoy:v1.12.4.0-prod
+          User: 1337
+          HealthCheck:
+            Command: [ CMD-SHELL, "curl -s http://localhost:9901/server_info | grep state | grep -q LIVE" ]
+            Interval: 5
+            Retries: 3
+            Timeout: 2
+          PortMappings:
+            - ContainerPort: 9901
+              Protocol: tcp
+            - ContainerPort: 15000
+              Protocol: tcp
+            - ContainerPort: 15001
+              Protocol: tcp
+          Environment:
+            - Name: APPMESH_VIRTUAL_NODE_NAME
+              Value: !GetAtt BackendVirtualNode.VirtualNodeName
+            - Name: ENVOY_LOG_LEVEL
+              Value: info
+          Ulimits:
+            - Name: nofile
+              SoftLimit: 15000
+              HardLimit: 15000
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref LogGroup
+              awslogs-stream-prefix: backend-envoy
+          Essential: true
+      Tags:
+        - Key: Name
+          Value: !Sub backend-task-definition-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: backend
+        - Key: Component
+          Value: ecs
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  BackendSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for the backend ECS service
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - Description: Allow all traffic from inside the VPC  # TODO: tighten this up
+          IpProtocol: -1
+          CidrIp: !Ref VpcCidr
+      Tags:
+        - Key: Name
+          Value: !Sub backend-security-group-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: backend
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  BackendService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref BackendTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 2
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups: [ !GetAtt BackendSecurityGroup.GroupId ]
+          Subnets: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
+      ServiceRegistries:
+        - RegistryArn: !GetAtt CloudMapBackendService.Arn
+      Tags:
+        - Key: Name
+          Value: !Sub backend-ecs-service-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: backend
+        - Key: Component
+          Value: ecs
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ###############
+  # Web service #
+  ###############
+
+  CloudMapWebService:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: web
+      NamespaceId: !Ref CloudMapNamespace
+      DnsConfig:
+        DnsRecords:
+          - Type: A
+            TTL: 60
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+      Tags:
+        - Key: Name
+          Value: !Sub cloud-map-web-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: web
+        - Key: Component
+          Value: cloudmap
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  WebVirtualNode:
+    Type: AWS::AppMesh::VirtualNode
+    Properties:
+      MeshName: !GetAtt Mesh.MeshName
+      VirtualNodeName: web-vn
+      Spec:
+        Listeners:
+          - PortMapping:
+              Port: 8081
+              Protocol: http
+# TODO
+#            TLS:
+#              Mode: STRICT
+#              Certificate:
+#                File:
+#                  PrivateKey: /etc/tls/private/key.pem
+#                  CertificateChain: /etc/tls/certs/chain.pem
+            HealthCheck:
+              Protocol: http
+              Path: /
+              HealthyThreshold: 2
+              UnhealthyThreshold: 2
+              TimeoutMillis: 2000
+              IntervalMillis: 5000
+        ServiceDiscovery:
+          AWSCloudMap:
+            NamespaceName: !Ref CloudMapNamespace
+            ServiceName: !Ref CloudMapWebService
+        Logging:
+          AccessLog:
+            File:
+              Path: /dev/stdout
+        Backends:
+          - VirtualService:
+              VirtualServiceName: !GetAtt BackendVirtualService.VirtualServiceName
+      Tags:
+        - Key: Name
+          Value: !Sub web-virtual-node-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: web
+        - Key: Component
+          Value: appmesh
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  WebTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Tags:
+        - Key: Name
+          Value: !Sub web-task-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: web
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  WebTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSAppMeshEnvoyAccess
+      Tags:
+        - Key: Name
+          Value: !Sub web-task-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: web
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  WebTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${Project}-web
+      Cpu: 256
+      Memory: 512
+      ExecutionRoleArn: !GetAtt WebTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt WebTaskRole.Arn
+      RequiresCompatibilities: [ FARGATE ]
+      NetworkMode: awsvpc
+      ProxyConfiguration:
+        Type: APPMESH
+        ContainerName: envoy
+        ProxyConfigurationProperties:
+          - Name: IgnoredUID
+            Value: 1337
+          - Name: ProxyIngressPort
+            Value: 15000
+          - Name: ProxyEgressPort
+            Value: 15001
+          - Name: AppPorts
+            Value: 8081
+          - Name: EgressIgnoredIPs
+            Value: 169.254.170.2,169.254.169.254
+      ContainerDefinitions:
+        - Name: web
+          Image: !Ref WebImage
+          HealthCheck:
+            Command: [ "CMD-SHELL", "curl -f http://localhost:8081" ]
+            Interval: 10
+            Retries: 2
+            StartPeriod: 10
+            Timeout: 2
+          PortMappings:
+            - ContainerPort: 8081
+              Protocol: tcp
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref LogGroup
+              awslogs-stream-prefix: web
+          Essential: true
+          DependsOn:
+            - ContainerName: envoy
+              Condition: HEALTHY
+        - Name: envoy
+          Image: !Sub 840364872350.dkr.ecr.${AWS::Region}.amazonaws.com/aws-appmesh-envoy:v1.12.4.0-prod
+          User: 1337
+          HealthCheck:
+            Command: [ CMD-SHELL, "curl -s http://localhost:9901/server_info | grep state | grep -q LIVE" ]
+            Interval: 5
+            Retries: 3
+            Timeout: 2
+          PortMappings:
+            - ContainerPort: 9901
+              Protocol: tcp
+            - ContainerPort: 15000
+              Protocol: tcp
+            - ContainerPort: 15001
+              Protocol: tcp
+          Environment:
+            - Name: APPMESH_VIRTUAL_NODE_NAME
+              Value: !GetAtt WebVirtualNode.VirtualNodeName
+            - Name: ENVOY_LOG_LEVEL
+              Value: info
+          Ulimits:
+            - Name: nofile
+              SoftLimit: 15000
+              HardLimit: 15000
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref LogGroup
+              awslogs-stream-prefix: web-envoy
+          Essential: true
+      Tags:
+        - Key: Name
+          Value: !Sub web-task-definition-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: web
+        - Key: Component
+          Value: ecs
+        - Key: ManagedBy
+          Value: CloudFormation
+
+Outputs:
+  RootCaKeyParameterArn:
+    Description: ARN of the SSM parameter storing the root CA private key
+    Value: !GetAtt RootCaCertificate.KeyParameterArn
+
+  RootCaCertParameterArn:
+    Description: ARN of the SSM parameter storing the root CA certificate
+    Value: !GetAtt RootCaCertificate.CertParameterArn
+
+  IntermediateCaKeyParameterArn:
+    Description: ARN of the SSM parameter storing the intermediate CA private key
+    Value: !GetAtt IntermediateCaCertificate.KeyParameterArn
+
+  IntermediateCaCertParameterArn:
+    Description: ARN of the SSM parameter storing the intermediate CA certificate
+    Value: !GetAtt IntermediateCaCertificate.CertParameterArn
+
+  WebKeyParameterArn:
+    Description: ARN of the SSM parameter storing the "web" service private key
+    Value: !GetAtt WebCertificate.KeyParameterArn
+
+  WebCertParameterArn:
+    Description: ARN of the SSM parameter storing the "web" service certificate
+    Value: !GetAtt WebCertificate.CertParameterArn
+
+  BackendKeyParameterArn:
+    Description: ARN of the SSM parameter storing the "backend" service private key
+    Value: !GetAtt BackendCertificate.KeyParameterArn
+
+  BackendCertParameterArn:
+    Description: ARN of the SSM parameter storing the "backend" service certificate
+    Value: !GetAtt BackendCertificate.CertParameterArn
