@@ -1530,7 +1530,7 @@ Resources:
               Protocol: tcp
           Environment:
             - Name: APPMESH_VIRTUAL_NODE_NAME
-              Value: !GetAtt BackendVirtualNode.VirtualNodeName
+              Value: !Sub mesh/${BackendVirtualNode.MeshName}/virtualNode/${BackendVirtualNode.VirtualNodeName}
             - Name: ENVOY_LOG_LEVEL
               Value: info
           Ulimits:
@@ -1802,9 +1802,9 @@ Resources:
               Protocol: tcp
           Environment:
             - Name: APPMESH_VIRTUAL_NODE_NAME
-              Value: !GetAtt WebVirtualNode.VirtualNodeName
+              Value: !Sub mesh/${WebVirtualNode.MeshName}/virtualNode/${WebVirtualNode.VirtualNodeName}
             - Name: ENVOY_LOG_LEVEL
-              Value: info
+              Value: debug
           Ulimits:
             - Name: nofile
               SoftLimit: 15000
