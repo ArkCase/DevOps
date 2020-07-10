@@ -11,10 +11,10 @@ services:
       - 8080:8080
 
   toymesh-web:
-    image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/toymesh-web:1
+    image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/toymesh-web:4
     build:
       context: web
     environment:
-      - BACKEND_URL=http://backend:8080
+      - BACKEND_URL=http://toymesh-backend:8080
     ports:
       - 8081:8081

@@ -89,7 +89,7 @@ Parameters:
     Type: String
     Description: Name of the Docker image to use for the web service
     MinLength: 1
-    Default: 300674751221.dkr.ecr.us-west-1.amazonaws.com/toymesh-web:1
+    Default: 300674751221.dkr.ecr.us-west-1.amazonaws.com/toymesh-web:4
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -422,11 +422,15 @@ Resources:
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Port: 443
-      Protocol: HTTPS
+      Port: 8081
+      Protocol: HTTP
+# TODO
+#      Port: 443
+#      Protocol: HTTPS
       VpcId: !Ref Vpc
       TargetType: ip
       HealthCheckEnabled: true
+      HealthCheckPath: /target-group-ping
       HealthCheckIntervalSeconds: 10
       HealthCheckProtocol: HTTPS
       HealthCheckTimeoutSeconds: 5
@@ -453,26 +457,37 @@ Resources:
       Port: 80
       Protocol: HTTP
       DefaultActions:
-        - Type: redirect
-          RedirectConfig:
-            Host: '#{host}'
-            Path: '/#{path}'
-            Query: '#{query}'
-            Port: 443
-            Protocol: HTTPS
-            StatusCode: HTTP_302
-
-  ListenerHttps:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      LoadBalancerArn: !Ref LoadBalancer
-      Port: 443
-      Protocol: HTTPS
-      DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
-      Certificates:
-        - CertificateArn: !Ref CertificateArn
+
+# TODO
+#  ListenerHttp:
+#    Type: AWS::ElasticLoadBalancingV2::Listener
+#    Properties:
+#      LoadBalancerArn: !Ref LoadBalancer
+#      Port: 80
+#      Protocol: HTTP
+#      DefaultActions:
+#        - Type: redirect
+#          RedirectConfig:
+#            Host: '#{host}'
+#            Path: '/#{path}'
+#            Query: '#{query}'
+#            Port: 443
+#            Protocol: HTTPS
+#            StatusCode: HTTP_302
+#
+#  ListenerHttps:
+#    Type: AWS::ElasticLoadBalancingV2::Listener
+#    Properties:
+#      LoadBalancerArn: !Ref LoadBalancer
+#      Port: 443
+#      Protocol: HTTPS
+#      DefaultActions:
+#        - Type: forward
+#          TargetGroupArn: !Ref TargetGroup
+#      Certificates:
+#        - CertificateArn: !Ref CertificateArn
 
   ###########
   # Route53 #
@@ -1365,7 +1380,7 @@ Resources:
 #                  CertificateChain: /etc/tls/certs/chain.pem
             HealthCheck:
               Protocol: http
-              Path: /
+              Path: /virtual-node-ping
               HealthyThreshold: 2
               UnhealthyThreshold: 2
               TimeoutMillis: 2000
@@ -1392,6 +1407,58 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
+  BackendVirtualRouter:
+    Type: AWS::AppMesh::VirtualRouter
+    Properties:
+      MeshName: !GetAtt Mesh.MeshName
+      VirtualRouterName: backend-vr
+      Spec:
+        Listeners:
+          - PortMapping:
+              Port: 8080
+              Protocol: http
+      Tags:
+        - Key: Name
+          Value: !Sub backend-virtual-router-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: backend
+        - Key: Component
+          Value: appmesh
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  BackendRoute:
+    Type: AWS::AppMesh::Route
+    Properties:
+      MeshName: !GetAtt Mesh.MeshName
+      VirtualRouterName: !GetAtt BackendVirtualRouter.VirtualRouterName
+      RouteName: backend-route
+      Spec:
+        HttpRoute:
+          Match:
+            Prefix: /
+          Action:
+            WeightedTargets:
+              - VirtualNode: !GetAtt BackendVirtualNode.VirtualNodeName
+                Weight: 100
+      Tags:
+        - Key: Name
+          Value: !Sub backend-virtual-router-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: backend
+        - Key: Component
+          Value: appmesh
+        - Key: ManagedBy
+          Value: CloudFormation
+
   BackendVirtualService:
     Type: AWS::AppMesh::VirtualService
     Properties:
@@ -1399,8 +1466,8 @@ Resources:
       VirtualServiceName: backend-vs
       Spec:
         Provider:
-          VirtualNode:
-            VirtualNodeName: !GetAtt BackendVirtualNode.VirtualNodeName
+          VirtualRouter:
+            VirtualRouterName: !GetAtt BackendVirtualRouter.VirtualRouterName
       Tags:
         - Key: Name
           Value: !Sub backend-virtual-service-${Project}-${Env}
@@ -1452,7 +1519,7 @@ Resources:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AWSAppMeshEnvoyAccess
+        - arn:aws:iam::aws:policy/AWSAppMeshEnvoyAccess  # TODO: limit `appmesh:StreamAggregatedResource` to backend config
       Tags:
         - Key: Name
           Value: !Sub backend-task-role-${Project}-${Env}
@@ -1495,7 +1562,7 @@ Resources:
         - Name: backend
           Image: !Ref BackendImage
           HealthCheck:
-            Command: [ "CMD-SHELL", "curl -f http://localhost:8080" ]
+            Command: [ "CMD-SHELL", "curl -f http://localhost:8080/ecs-ping" ]
             Interval: 10
             Retries: 2
             StartPeriod: 10
@@ -1587,7 +1654,7 @@ Resources:
       Cluster: !Ref Cluster
       TaskDefinition: !Ref BackendTaskDefinition
       LaunchType: FARGATE
-      DesiredCount: 2
+      DesiredCount: 1
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: DISABLED
@@ -1613,30 +1680,31 @@ Resources:
   # Web service #
   ###############
 
-  CloudMapWebService:
-    Type: AWS::ServiceDiscovery::Service
-    Properties:
-      Name: web
-      NamespaceId: !Ref CloudMapNamespace
-      DnsConfig:
-        DnsRecords:
-          - Type: A
-            TTL: 60
-      HealthCheckCustomConfig:
-        FailureThreshold: 1
-      Tags:
-        - Key: Name
-          Value: !Sub cloud-map-web-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: web
-        - Key: Component
-          Value: cloudmap
-        - Key: ManagedBy
-          Value: CloudFormation
+#XXX
+#  CloudMapWebService:
+#    Type: AWS::ServiceDiscovery::Service
+#    Properties:
+#      Name: web
+#      NamespaceId: !Ref CloudMapNamespace
+#      DnsConfig:
+#        DnsRecords:
+#          - Type: A
+#            TTL: 60
+#      HealthCheckCustomConfig:
+#        FailureThreshold: 1
+#      Tags:
+#        - Key: Name
+#          Value: !Sub cloud-map-web-${Project}-${Env}
+#        - Key: Env
+#          Value: !Ref Env
+#        - Key: Project
+#          Value: !Ref Project
+#        - Key: Service
+#          Value: web
+#        - Key: Component
+#          Value: cloudmap
+#        - Key: ManagedBy
+#          Value: CloudFormation
 
   WebVirtualNode:
     Type: AWS::AppMesh::VirtualNode
@@ -1644,28 +1712,28 @@ Resources:
       MeshName: !GetAtt Mesh.MeshName
       VirtualNodeName: web-vn
       Spec:
-        Listeners:
-          - PortMapping:
-              Port: 8081
-              Protocol: http
-# TODO
-#            TLS:
-#              Mode: STRICT
-#              Certificate:
-#                File:
-#                  PrivateKey: /etc/tls/private/key.pem
-#                  CertificateChain: /etc/tls/certs/chain.pem
-            HealthCheck:
-              Protocol: http
-              Path: /
-              HealthyThreshold: 2
-              UnhealthyThreshold: 2
-              TimeoutMillis: 2000
-              IntervalMillis: 5000
-        ServiceDiscovery:
-          AWSCloudMap:
-            NamespaceName: !Ref CloudMapNamespace
-            ServiceName: !Ref CloudMapWebService
+#        Listeners:
+#          - PortMapping:
+#              Port: 8081
+#              Protocol: http
+## TODO
+##            TLS:
+##              Mode: STRICT
+##              Certificate:
+##                File:
+##                  PrivateKey: /etc/tls/private/key.pem
+##                  CertificateChain: /etc/tls/certs/chain.pem
+#            HealthCheck:
+#              Protocol: http
+#              Path: /virtual-node-ping
+#              HealthyThreshold: 2
+#              UnhealthyThreshold: 2
+#              TimeoutMillis: 2000
+#              IntervalMillis: 5000
+#        ServiceDiscovery:
+#          AWSCloudMap:
+#            NamespaceName: !Ref CloudMapNamespace
+#            ServiceName: !Ref CloudMapWebService
         Logging:
           AccessLog:
             File:
@@ -1724,7 +1792,7 @@ Resources:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AWSAppMeshEnvoyAccess
+        - arn:aws:iam::aws:policy/AWSAppMeshEnvoyAccess  # TODO: limit `appmesh:StreamAggregatedResource` to web config
       Tags:
         - Key: Name
           Value: !Sub web-task-role-${Project}-${Env}
@@ -1767,7 +1835,7 @@ Resources:
         - Name: web
           Image: !Ref WebImage
           HealthCheck:
-            Command: [ "CMD-SHELL", "curl -f http://localhost:8081" ]
+            Command: [ "CMD-SHELL", "curl -f http://localhost:8081/ecs-ping" ]
             Interval: 10
             Retries: 2
             StartPeriod: 10
@@ -1775,6 +1843,9 @@ Resources:
           PortMappings:
             - ContainerPort: 8081
               Protocol: tcp
+          Environment:
+            - Name: BACKEND_URL
+              Value: !Sub http://${CloudMapBackendService.Name}.${Project}.lan:8080/
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -1819,6 +1890,64 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub web-task-definition-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: web
+        - Key: Component
+          Value: ecs
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for the web ECS service
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - Description: Allow all traffic from inside the VPC  # TODO: tighten this up
+          IpProtocol: -1
+          CidrIp: !Ref VpcCidr
+      Tags:
+        - Key: Name
+          Value: !Sub web-security-group-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: backend
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  WebService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref WebTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 1
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups: [ !GetAtt WebSecurityGroup.GroupId ]
+          Subnets: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
+#XXX
+#      ServiceRegistries:
+#        - RegistryArn: !GetAtt CloudMapWebService.Arn
+#XXX
+#      HealthCheckGracePeriodSeconds: 120
+#      LoadBalancers:
+#        - ContainerName: web
+#          ContainerPort: 8081
+#          TargetGroupArn: !Ref TargetGroup
+      Tags:
+        - Key: Name
+          Value: !Sub web-ecs-service-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
