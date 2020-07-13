@@ -50,16 +50,30 @@ def handler(event, context):
     data = response['Body'].read().decode('utf8')
     cert_list = json.loads(data)
 
+    # Sanity checks
+    if event['Iter']['IsFinished'] or event['Iter']['Index'] >= event['CertList']['Count']:
+        print(f"Nothing to do")
+        return build_output(event)
+
     # Renew certificate
-    index = event['Iter']['Index']
-    args = cert_list[index]
+    args = cert_list[event['Iter']['Index']]
     key_parameter_arn, cert_parameter_arn = create_or_renew_cert(args)
 
     # Done
+    return build_output(event)
+
+
+def build_output(event):
+    index = event['Iter']['Index']
+    count = event['CertList']['Count']
+    if index < count:
+        index += 1
+    else:
+        index = count
+
     output = event
-    index += 1
     output['Iter']['Index'] = index
-    output['Iter']['IsFinished'] = index >= output['CertList']['Count']
+    output['Iter']['IsFinished'] = index >= count
     if 'CloudFormationData' in event:
         output['CloudFormationData'] = event['CloudFormationData']
     print(f"Output: {output}")
