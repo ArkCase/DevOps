@@ -1,7 +1,7 @@
 FROM ubuntu:18.04
 
-RUN apt-get -y update && \
-    apt-get -y install \
+RUN DEBIAN_FRONTEND=noninteractive apt-get -y update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y install \
         curl \
         python3 \
         python3-flask

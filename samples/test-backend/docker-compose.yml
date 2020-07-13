@@ -1,11 +1,12 @@
-version: "3"
+version: "2.4"  # docker-compose version 3 doesn't support "init: true"
 
 services:
   backend:
     image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/test-backend:1
+    init: true
     build:
       context: .
     environment:
-      - TEST_BACKEND_MESSAGE="Run from docker-compose"
+      - TEST_BACKEND_MESSAGE=Run from docker-compose
     ports:
       - 8080:8080
