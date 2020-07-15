@@ -163,7 +163,7 @@ Resources:
           S3_BUCKET: !Ref CheckCertificatesBucket
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200713-1734/LambdaFunctions/check_certificates/check_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200715-1420/LambdaFunctions/check_certificates/check_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub check-certificates-lambda-${Project}-${Env}
@@ -217,6 +217,12 @@ Resources:
               - Effect: Allow
                 Action: ssm:DescribeParameters
                 Resource: "*"
+
+              - Effect: Allow
+                Action:
+                  - iam:UploadServerCertificate
+                  - iam:DeleteServerCertificate
+                Resource: !Sub arn:aws:iam::${AWS::AccountId}:server-certificate/${AWS::StackName}/pki/*
       Tags:
         - Key: Name
           Value: !Sub renew-certificate-lambda-execution-role-${Project}-${Env}
@@ -241,7 +247,7 @@ Resources:
       Timeout: 60
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200713-1734/LambdaFunctions/renew_certificate/renew_certificate.zip
+        S3Key: DevOps/ACM-TMP-20200715-1420/LambdaFunctions/renew_certificate/renew_certificate.zip
       Tags:
         - Key: Name
           Value: !Sub renew-certificate-lambda-${Project}-${Env}
@@ -294,7 +300,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200713-1734/LambdaFunctions/notify_certificate_resource/notify_certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200715-1420/LambdaFunctions/notify_certificate_resource/notify_certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub notify-certificate-resource-lambda-${Project}-${Env}
@@ -368,7 +374,7 @@ Resources:
       RoleArn: !GetAtt RenewCertificatesStateMachineRole.Arn
       DefinitionS3Location:
         Bucket: !Sub arkcase-public-${AWS::Region}
-        Key: DevOps/ACM-TMP-20200713-1734/StepFunctions/renew_certificates/renew_certificates.asl.json
+        Key: DevOps/ACM-TMP-20200715-1420/StepFunctions/renew_certificates/renew_certificates.asl.json
       DefinitionSubstitutions:
         CheckCertificatesLambdaArn: !GetAtt CheckCertificatesLambda.Arn
         RenewCertificateLambdaArn: !GetAtt RenewCertificateLambda.Arn
@@ -513,6 +519,12 @@ Resources:
                 Resource: "*"
 
               - Effect: Allow
+                Action:
+                  - iam:UploadServerCertificate
+                  - iam:DeleteServerCertificate
+                Resource: !Sub arn:aws:iam::*:server-certificate/${AWS::StackName}/pki/*
+
+              - Effect: Allow
                 Action: states:StartExecution
                 Resource: !Ref RenewCertificatesStateMachine
       Tags:
@@ -544,7 +556,7 @@ Resources:
           RENEW_CERTIFICATES_STATE_MACHINE_ARN: !Ref RenewCertificatesStateMachine
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200713-1734/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200715-1420/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-resource-lambda-${Project}-${Env}
@@ -584,8 +596,8 @@ Resources:
         Critical: true
         Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
       SelfSigned: true
-      KeyParameterName: !Sub /${AWS::StackName}/pki/private/root-ca-key
-      CertParameterName: !Sub /${AWS::StackName}/pki/certs/root-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/root-ca-key-${AWS::StackName}
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/root-ca-cert-${AWS::StackName}
       KeyTags:
         - Key: Name
           Value: !Sub root-ca-private-key-${Project}-${Env}
@@ -648,10 +660,10 @@ Resources:
       KeyUsage:
         Critical: true
         Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
-      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/root-ca-key
-      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/root-ca-cert
-      KeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key
-      CertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/root-ca-key-${AWS::StackName}
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/root-ca-cert-${AWS::StackName}
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key-${AWS::StackName}
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert-${AWS::StackName}
       KeyTags:
         - Key: Name
           Value: !Sub intermediate-ca-private-key-${Project}-${Env}
@@ -712,10 +724,10 @@ Resources:
       KeyUsage:
         Critical: true
         Usages: [ DigitalSignature, KeyEncipherment ]
-      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key
-      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert
-      KeyParameterName: !Sub /${AWS::StackName}/pki/private/alfresco-key
-      CertParameterName: !Sub /${AWS::StackName}/pki/certs/alfresco-cert
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key-${AWS::StackName}
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert-${AWS::StackName}
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/alfresco-key-${AWS::StackName}
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/alfresco-cert-${AWS::StackName}
       KeyTags:
         - Key: Name
           Value: !Sub alfresco-private-key-${Project}-${Env}
@@ -776,10 +788,10 @@ Resources:
       KeyUsage:
         Critical: true
         Usages: [ DigitalSignature, KeyEncipherment ]
-      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key
-      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert
-      KeyParameterName: !Sub /${AWS::StackName}/pki/private/pentaho-key
-      CertParameterName: !Sub /${AWS::StackName}/pki/certs/pentaho-cert
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key-${AWS::StackName}
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert-${AWS::StackName}
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/pentaho-key-${AWS::StackName}
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/pentaho-cert-${AWS::StackName}
       KeyTags:
         - Key: Name
           Value: !Sub pentaho-private-key-${Project}-${Env}
@@ -840,10 +852,10 @@ Resources:
       KeyUsage:
         Critical: true
         Usages: [ DigitalSignature, KeyEncipherment ]
-      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key
-      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert
-      KeyParameterName: !Sub /${AWS::StackName}/pki/private/test-backend-key
-      CertParameterName: !Sub /${AWS::StackName}/pki/certs/test-backend-cert
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key-${AWS::StackName}
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert-${AWS::StackName}
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/test-backend-key-${AWS::StackName}
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/test-backend-cert-${AWS::StackName}
       KeyTags:
         - Key: Name
           Value: !Sub test-backend-private-key-${Project}-${Env}
@@ -909,6 +921,10 @@ Outputs:
     Description: ARN of the SSM parameter storing the Alfresco service certificate
     Value: !GetAtt AlfrescoCertificate.CertParameterArn
 
+  AlfrescoIamCertArn:
+    Description: ARN of the IAM certificate for Alfresco
+    Value: !GetAtt AlfrescoCertificate.IamCertArn
+
   PentahoKeyParameterArn:
     Description: ARN of the SSM parameter storing the Pentaho service private key
     Value: !GetAtt PentahoCertificate.KeyParameterArn
@@ -917,6 +933,10 @@ Outputs:
     Description: ARN of the SSM parameter storing the Pentaho service certificate
     Value: !GetAtt PentahoCertificate.CertParameterArn
 
+  PentahoIamCertArn:
+    Description: ARN of the IAM certificate for Pentaho
+    Value: !GetAtt PentahoCertificate.IamCertArn
+
   TestBackendKeyParameterArn:
     Description: ARN of the SSM parameter storing the test-backend service private key
     Value: !GetAtt TestBackendCertificate.KeyParameterArn
@@ -924,3 +944,7 @@ Outputs:
   TestBackendCertParameterArn:
     Description: ARN of the SSM parameter storing the test-backend service certificate
     Value: !GetAtt TestBackendCertificate.CertParameterArn
+
+  TestBackendIamCertArn:
+    Description: ARN of the IAM certificate for test-backend
+    Value: !GetAtt TestBackendCertificate.IamCertArn
