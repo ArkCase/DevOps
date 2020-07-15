@@ -18,10 +18,10 @@ Parameters:
     Default: arkcase
     MinLength: 1
     MaxLength: 30
-    AllowedPattern: ^[-_.a-zA-Z0-9]*$
+    AllowedPattern: ^[a-z][-a-z0-9]*[a-z0-9]$
     ConstraintDescription: >
-      Up to 30 alpha-numeric characters; can use underscores,
-      dots and dashes
+      Up to 30 alpha-numeric lowercase characters; can use dashes; must start
+      with a letter and end with an alphanumeric character
 
   VpcCidr:
     Type: String
@@ -442,6 +442,31 @@ Resources:
       SubnetId: !Ref PrivateSubnetB
       RouteTableId: !Ref PrivateRouteTable
 
+  ###############################
+  # Route53 private hosted zone #
+  ###############################
+
+  PrivateHostedZone:
+    Type: AWS::Route53::HostedZone
+    Properties:
+      Name: !Sub ${Project}.lan
+      VPCs:
+        - VPCId: !Ref Vpc
+          VPCRegion: !Ref AWS::Region
+      HostedZoneTags:
+        - Key: Name
+          Value: !Sub private-hosted-zone-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: admin
+        - Key: Component
+          Value: route53
+        - Key: ManagedBy
+          Value: CloudFormation
+
   ##############
   # Monitoring #
   ##############
@@ -503,7 +528,7 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200715-1713/LambdaFunctions/maintenance_windows/maintenance_windows.zip
+        S3Key: DevOps/ACM-TMP-20200715-1759/LambdaFunctions/maintenance_windows/maintenance_windows.zip
       Tags:
         - Key: Name
           Value: !Sub maintenance-windows-lambda-${Project}-${Env}
@@ -528,7 +553,7 @@ Resources:
       # the stack is updated. The reason is that CloudFormation doesn't call
       # the Lambda function during an update unless there is a change in the
       # input parameters.
-      RandomToken: ACM-TMP-20200715-1713
+      RandomToken: ACM-TMP-20200715-1759
 
   ######################################
   # Microsoft Active Directory Service #
@@ -554,7 +579,7 @@ Resources:
   Amazonmq:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200715-1713/CloudFormation/amazonmq.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200715-1759/CloudFormation/amazonmq.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -755,7 +780,7 @@ Resources:
           PASSWORD_LENGTH: !Ref PasswordsLength
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200715-1713/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200715-1759/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-rotation-lambda-${Project}-${Env}
@@ -838,7 +863,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200715-1713/LambdaFunctions/rotation_trigger/rotation_trigger.zip
+        S3Key: DevOps/ACM-TMP-20200715-1759/LambdaFunctions/rotation_trigger/rotation_trigger.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-trigger-lambda-${Project}-${Env}
@@ -1011,7 +1036,7 @@ Resources:
         SubnetIds: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200715-1713/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
+        S3Key: DevOps/ACM-TMP-20200715-1759/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-create-database-lambda-${Project}-${Env}
@@ -1033,7 +1058,7 @@ Resources:
   Pki:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200715-1713/CloudFormation/pki.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200715-1759/CloudFormation/pki.yml
       TimeoutInMinutes: 15
       Parameters:
         Env: !Ref Env
@@ -1192,7 +1217,7 @@ Resources:
     # Make sure the user is created after the database
     DependsOn: AlfrescoDatabase
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200715-1713/CloudFormation/mariadb-user-secret.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200715-1759/CloudFormation/mariadb-user-secret.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
@@ -1218,6 +1243,17 @@ Resources:
           Value: database
         - Key: ManagedBy
           Value: CloudFormation
+
+  TestBackendDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Sub test-backend.${Project}.lan
+      Type: A
+      HostedZoneId: !Ref PrivateHostedZone
+      AliasTarget:
+        DNSName: !GetAtt TestBackendLoadBalancer.DNSName
+        EvaluateTargetHealth: false
+        HostedZoneId: !GetAtt TestBackendLoadBalancer.CanonicalHostedZoneID
 
 Outputs:
   StartBlockTraffic:
