@@ -1,0 +1,27 @@
+version: "2.4"  # docker-compose version 3 doesn't support "init: true"
+
+services:
+  test-backend:
+    depends_on: [ envoy-tls ]
+    image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/test-backend:1
+    init: true
+    build:
+      context: test-backend
+    environment:
+      - TEST_BACKEND_MESSAGE=Running from docker-compose
+    ports:
+      - 8080:8080
+
+  envoy-tls:
+    image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/envoy-tls:1
+    build:
+      context: envoy-tls
+    environment:
+      ENVOY_TLS_DOMAIN_NAME: arkcase.lan
+      ENVOY_TLS_HTTPS_PORT: 8443
+      ENVOY_TLS_UPSTREAM_HOST: nginx
+      ENVOY_TLS_UPSTREAM_PORT: 8080
+      ENVOY_TLS_ADMIN_PORT: 8081
+    ports:
+      - 8443:8443
+      - 8081:8081

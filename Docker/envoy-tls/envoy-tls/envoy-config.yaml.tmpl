@@ -1,0 +1,51 @@
+static_resources:
+  listeners:
+    - address:
+        socket_address: { address: 0.0.0.0, port_value: ${ENVOY_TLS_HTTPS_PORT} }
+      filter_chains:
+        transport_socket:
+          name: envoy.transport_sockets.tls
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+            common_tls_context:
+              tls_certificates:
+                - certificate_chain:
+                    filename: /etc/ssl/certs/envoy.crt
+                  private_key:
+                    filename: /etc/ssl/private/envoy.key
+        filters:
+          - name: envoy.filters.network.http_connection_manager
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              codec_type: auto
+              stat_prefix: ingress_http
+              route_config:
+                name: local_route
+                virtual_hosts:
+                  - name: app
+                    domains: [ "*" ]
+                    routes:
+                      - match: { prefix: / }
+                        route: { cluster: app }
+              http_filters:
+                - name: envoy.filters.http.router
+
+  clusters:
+    - name: app
+      connect_timeout: 0.5s
+      type: strict_dns
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: app
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address: { address: ${ENVOY_TLS_UPSTREAM_HOST}, port_value: ${ENVOY_TLS_UPSTREAM_PORT} }
+
+admin:
+  access_log_path: /dev/stdout
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: ${ENVOY_TLS_ADMIN_PORT}
