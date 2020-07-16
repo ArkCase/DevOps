@@ -3,13 +3,13 @@ version: "2.4"  # docker-compose version 3 doesn't support "init: true"
 services:
   test-backend:
     depends_on: [ envoy-tls ]
-    image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/test-backend:1
+    image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/test-backend:2
     init: true
     restart: always
     build:
       context: test-backend
     environment:
-      - TEST_BACKEND_MESSAGE=Running from docker-compose
+      - HOSTNAME=your-computer
     ports:
       - 8080:8080
 

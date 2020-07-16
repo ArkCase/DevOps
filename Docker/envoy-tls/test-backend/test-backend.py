@@ -4,7 +4,7 @@ import os
 from flask import Flask
 import json
 
-msg = os.environ.get('TEST_BACKEND_MESSAGE', "Bugs Bunny was here")
+hostname = os.environ['HOSTNAME']
 
 app = Flask(__name__)
 
@@ -13,7 +13,7 @@ app = Flask(__name__)
 @app.route("/<path:path>")
 def main_route(path):
     data = {
-        'message': f"Message from test-backend: {msg}"
+        'message': f"Running from: {hostname}"
     }
     return json.dumps(data)
 
