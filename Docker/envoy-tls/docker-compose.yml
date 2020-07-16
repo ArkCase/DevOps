@@ -5,6 +5,7 @@ services:
     depends_on: [ envoy-tls ]
     image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/test-backend:1
     init: true
+    restart: always
     build:
       context: test-backend
     environment:
@@ -14,12 +15,14 @@ services:
 
   envoy-tls:
     image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/envoy-tls:1
+    init: true
+    restart: always
     build:
       context: envoy-tls
     environment:
       ENVOY_TLS_DOMAIN_NAME: arkcase.lan
       ENVOY_TLS_HTTPS_PORT: 8443
-      ENVOY_TLS_UPSTREAM_HOST: nginx
+      ENVOY_TLS_UPSTREAM_HOST: test-backend
       ENVOY_TLS_UPSTREAM_PORT: 8080
       ENVOY_TLS_ADMIN_PORT: 8081
     ports:
