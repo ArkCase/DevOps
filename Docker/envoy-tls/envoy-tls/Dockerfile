@@ -13,4 +13,4 @@ RUN chmod +x start_envoy.sh
 
 CMD ["/envoy/start_envoy.sh"]
 
-EXPOSE 8443 8081
+EXPOSE 8443 9901
