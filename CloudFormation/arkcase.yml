@@ -145,6 +145,18 @@ Parameters:
     MinValue: 0
     Default: 15
 
+  EnvoyDockerImage:
+    Type: String
+    Description: Docker image for the Envoy side-car proxy
+    MinLength: 1
+    Default: 300674751221.dkr.ecr.us-west-1.amazonaws.com/envoy-tls:2
+
+  TestBackendDockerImage:
+    Type: String
+    Description: Docker image for the test-backend service
+    MinLength: 1
+    Default: 300674751221.dkr.ecr.us-west-1.amazonaws.com/test-backend:2
+
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -461,7 +473,7 @@ Resources:
         - Key: Project
           Value: !Ref Project
         - Key: Service
-          Value: admin
+          Value: global
         - Key: Component
           Value: route53
         - Key: ManagedBy
@@ -512,7 +524,7 @@ Resources:
         - Key: Project
           Value: !Ref Project
         - Key: Service
-          Value: admin
+          Value: global
         - Key: Component
           Value: iam
         - Key: ManagedBy
@@ -528,7 +540,7 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200715-1759/LambdaFunctions/maintenance_windows/maintenance_windows.zip
+        S3Key: DevOps/ACM-TMP-20200720-0923/LambdaFunctions/maintenance_windows/maintenance_windows.zip
       Tags:
         - Key: Name
           Value: !Sub maintenance-windows-lambda-${Project}-${Env}
@@ -537,7 +549,7 @@ Resources:
         - Key: Project
           Value: !Ref Project
         - Key: Service
-          Value: admin
+          Value: global
         - Key: Component
           Value: lambda
         - Key: ManagedBy
@@ -553,7 +565,7 @@ Resources:
       # the stack is updated. The reason is that CloudFormation doesn't call
       # the Lambda function during an update unless there is a change in the
       # input parameters.
-      RandomToken: ACM-TMP-20200715-1759
+      RandomToken: ACM-TMP-20200720-0923
 
   ######################################
   # Microsoft Active Directory Service #
@@ -579,7 +591,7 @@ Resources:
   Amazonmq:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200715-1759/CloudFormation/amazonmq.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200720-0923/CloudFormation/amazonmq.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -780,7 +792,7 @@ Resources:
           PASSWORD_LENGTH: !Ref PasswordsLength
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200715-1759/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200720-0923/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-rotation-lambda-${Project}-${Env}
@@ -863,7 +875,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200715-1759/LambdaFunctions/rotation_trigger/rotation_trigger.zip
+        S3Key: DevOps/ACM-TMP-20200720-0923/LambdaFunctions/rotation_trigger/rotation_trigger.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-trigger-lambda-${Project}-${Env}
@@ -1017,7 +1029,7 @@ Resources:
         - Key: Project
           Value: !Ref Project
         - Key: Service
-          Value: admin
+          Value: database
         - Key: Component
           Value: iam
         - Key: ManagedBy
@@ -1036,7 +1048,7 @@ Resources:
         SubnetIds: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200715-1759/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
+        S3Key: DevOps/ACM-TMP-20200720-0923/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-create-database-lambda-${Project}-${Env}
@@ -1045,7 +1057,7 @@ Resources:
         - Key: Project
           Value: !Ref Project
         - Key: Service
-          Value: admin
+          Value: database
         - Key: Component
           Value: lambda
         - Key: ManagedBy
@@ -1058,7 +1070,7 @@ Resources:
   Pki:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200715-1759/CloudFormation/pki.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200720-0923/CloudFormation/pki.yml
       TimeoutInMinutes: 15
       Parameters:
         Env: !Ref Env
@@ -1080,9 +1092,32 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
+  ###############
+  # ECS cluster #
+  ###############
+
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ecs-cluster-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: global
+        - Key: Component
+          Value: ecs
+        - Key: ManagedBy
+          Value: CloudFormation
+
   ################
   # Test backend #
   ################
+
+  # Load balancer
 
   TestBackendLoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -1145,7 +1180,7 @@ Resources:
       HealthCheckEnabled: true
       HealthCheckIntervalSeconds: 10
       HealthCheckProtocol: HTTPS
-      HealthCheckPath: /health
+      HealthCheckPath: /lb-ping
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 2
@@ -1177,6 +1212,193 @@ Resources:
           TargetGroupArn: !Ref TestBackendTargetGroup
       Certificates:
         - CertificateArn: !GetAtt Pki.Outputs.TestBackendIamCertArn
+
+  # ECS cluster
+
+  TestBackendLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 365
+
+  TestBackendTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Tags:
+        - Key: Name
+          Value: !Sub test-backend-task-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: test-backend
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  TestBackendTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Tags:
+        - Key: Name
+          Value: !Sub test-backend-task-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: test-backend
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  TestBackendTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: test-backend
+      Cpu: 256
+      Memory: 512
+      ExecutionRoleArn: !GetAtt TestBackendTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TestBackendTaskRole.Arn
+      RequiresCompatibilities: [ FARGATE ]
+      NetworkMode: awsvpc
+      ContainerDefinitions:
+        - Name: test-backend
+          Image: !Ref TestBackendDockerImage
+          HealthCheck:
+            Command: [ CMD-SHELL, "curl -f http://localhost:8080/ecs-ping" ]
+            Interval: 10
+            Retries: 2
+            StartPeriod: 5
+            Timeout: 2
+          PortMappings:
+            - ContainerPort: 8080
+              Protocol: tcp
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref TestBackendLogGroup
+              awslogs-stream-prefix: test-backend
+          Essential: true
+        - Name: envoy-tls
+          Image: !Ref EnvoyDockerImage
+          HealthCheck:
+            Command: [ CMD-SHELL, "curl -s http://localhost:9901/server_info | grep state | grep -q LIVE" ]
+            Interval: 10
+            Retries: 2
+            StartPeriod: 5
+            Timeout: 2
+          PortMappings:
+            - ContainerPort: 8081
+              Protocol: tcp
+            - ContainerPort: 8443
+              Protocol: tcp
+          Environment:
+            - Name: ENVOY_LOG_LEVEL
+              Value: info
+            - Name: ENVOY_TLS_DOMAIN_NAME
+              Value: !Sub envoy-tls.test-backend.${Project}.lan  # This value is actually not important
+            - Name: ENVOY_TLS_UPSTREAM_HOST
+              Value: 127.0.0.1  # Containers in a task can access each others on localhost
+            - Name: ENVOY_TLS_UPSTREAM_PORT
+              Value: 8080
+          Ulimits:
+            - Name: nofile
+              SoftLimit: 15000
+              HardLimit: 15000
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref TestBackendLogGroup
+              awslogs-stream-prefix: envoy
+          Essential: true
+      Tags:
+        - Key: Name
+          Value: !Sub test-backend-task-defintion-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: test-backend
+        - Key: Component
+          Value: ecs
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  TestBackendSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for the test-backend task
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - Description: HTTPS from load balancer
+          IpProtocol: tcp
+          FromPort: 8443
+          ToPort: 8443
+          SourceSecurityGroupId: !GetAtt TestBackendLoadBalancerSecurityGroup.GroupId
+        - Description: HTTPS debug
+          IpProtocol: tcp
+          FromPort: 8443
+          ToPort: 8443
+          CidrIp: !Ref VpcCidr
+        - Description: Envoy admin
+          IpProtocol: tcp
+          FromPort: 9901
+          ToPort: 9901
+          CidrIp: !Ref VpcCidr
+      Tags:
+        - Key: Name
+          Value: !Sub test-backend-security-group-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: test-backend
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  TestBackendService:
+    Type: AWS::ECS::Service
+    DependsOn: TestBackendListenerHttps
+    Properties:
+      Cluster: !Ref EcsCluster
+      TaskDefinition: !Ref TestBackendTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 1
+      HealthCheckGracePeriodSeconds: 10
+      LoadBalancers:
+        - ContainerName: envoy-tls
+          ContainerPort: 8443
+          TargetGroupArn: !Ref TestBackendTargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups: [ !GetAtt TestBackendSecurityGroup.GroupId ]
+          Subnets: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
 
   ############
   # Alfresco #
@@ -1217,7 +1439,7 @@ Resources:
     # Make sure the user is created after the database
     DependsOn: AlfrescoDatabase
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200715-1759/CloudFormation/mariadb-user-secret.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200720-0923/CloudFormation/mariadb-user-secret.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
