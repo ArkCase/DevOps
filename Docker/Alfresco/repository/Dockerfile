@@ -6,9 +6,11 @@ ARG MARIADB_JDBC_VERSION=2.2.5
 
 USER root
 
-RUN    yum -y install \
+RUN yum -y install \
         curl \
         wget \
     && cd /usr/local/tomcat/lib \
     && wget https://downloads.mariadb.com/Connectors/java/connector-java-${MARIADB_JDBC_VERSION}/mariadb-java-client-${MARIADB_JDBC_VERSION}.jar \
     && chmod 644 mariadb-java-client-${MARIADB_JDBC_VERSION}.jar
+
+USER alfresco
