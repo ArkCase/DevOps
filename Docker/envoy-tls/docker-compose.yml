@@ -14,7 +14,7 @@ services:
       - 8080:8080
 
   envoy-tls:
-    image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/envoy-tls:2
+    image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/envoy-tls:3
     init: true
     restart: always
     build:

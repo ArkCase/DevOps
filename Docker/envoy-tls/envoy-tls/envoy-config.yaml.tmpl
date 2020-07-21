@@ -10,9 +10,9 @@ static_resources:
             common_tls_context:
               tls_certificates:
                 - certificate_chain:
-                    filename: /etc/ssl/certs/envoy.crt
+                    filename: /app/envoy.crt
                   private_key:
-                    filename: /etc/ssl/private/envoy.key
+                    filename: /app/envoy.key
         filters:
           - name: envoy.filters.network.http_connection_manager
             typed_config:
