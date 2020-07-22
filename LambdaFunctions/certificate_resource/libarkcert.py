@@ -97,7 +97,10 @@ def create_or_renew_cert(args: dict):
         }
 
     Returns a tuple:
-        (key_parameter_arn, cert_parameter_arn)
+        (key_parameter_arn, cert_parameter_arn, iam_cert_arn)
+
+        Please note that `iam_cert_arn` will be an empty string is the
+        certificate is a CA.
     """
     key_type = args.get('KeyType', "RSA")
     key_size = int(args['KeySize'])
@@ -298,9 +301,50 @@ def create_or_renew_cert(args: dict):
         cert_tags
     )
 
+    # Save the certificate in IAM, but only if it is not a CA
+    if not is_ca:
+        print(f"Saving non-CA certificate {cert_parameter_name} in IAM")
+        path_items = cert_parameter_name.split("/")
+        cert_name = path_items.pop()
+        cert_path = "/".join(path_items)
+
+        # IAM paths must start and end with "/"
+        if cert_path[0] != "/":
+            cert_path = "/" + cert_path
+        if not cert_path.endswith("/"):
+            cert_path += "/"
+
+        chain = ""
+        chain = chain_certificate(ssm, chain, ca_cert)
+
+        iam = boto3.client("iam")
+        try:
+            response = iam.upload_server_certificate(
+                Path=cert_path,
+                ServerCertificateName=cert_name,
+                CertificateBody=cert_value,
+                PrivateKey=key_value,
+                CertificateChain=chain
+            )
+        except iam.exceptions.EntityAlreadyExistsException as e:
+            print(f"Server certificate {cert_name} already exists; deleting old one")
+            iam.delete_server_certificate(ServerCertificateName=cert_name)
+            response = iam.upload_server_certificate(
+                Path=cert_path,
+                ServerCertificateName=cert_name,
+                CertificateBody=cert_value,
+                PrivateKey=key_value,
+                CertificateChain=chain
+            )
+
+        iam_cert_arn = response['ServerCertificateMetadata']['Arn']
+    else:
+        print(f"Certificate {cert_parameter_name} is a CA: not saving it to IAM")
+        iam_cert_arn = ""
+
     # Done
-    print(f"Successfully generated private key and certificate; key ARN: {key_parameter_arn}, certificate ARN: {cert_parameter_arn}")
-    return key_parameter_arn, cert_parameter_arn
+    print(f"Successfully generated private key and certificate; key ARN: {key_parameter_arn}, certificate ARN: {cert_parameter_arn}, IAM ARN: {iam_cert_arn}")
+    return key_parameter_arn, cert_parameter_arn, iam_cert_arn
 
 
 def add_attribute_if_present(event, key, attributes, name_oid):
@@ -378,3 +422,23 @@ def upsert_param(ssm, name: str, value: str, desc: str, param_type: str, tags: d
     response = ssm.get_parameter(Name=name)
     print(f"upsert_param: Success; ARN: {response['Parameter']['ARN']}")
     return response['Parameter']['ARN']
+
+
+def chain_certificate(ssm, chain, cert):
+    cert_value = cert.public_bytes(serialization.Encoding.PEM).decode('utf8')
+    chain += cert_value
+    if cert.subject == cert.issuer:
+        return chain  # This certificate is self-signed => end of the chain
+
+    attributes = cert.issuer.get_attributes_for_oid(NameOID.DN_QUALIFIER)
+    for attribute in attributes:
+        tmp = attribute.value.split(":", 1)
+        if tmp[0] == "cacert":
+            response = ssm.get_parameter(Name=tmp[1])
+            ca_cert_value = response['Parameter']['Value']
+            ca_cert = x509.load_pem_x509_certificate(
+                ca_cert_value.encode('utf8'),
+                backend=default_backend()
+            )
+            chain = chain_certificate(ssm, chain, ca_cert)
+    return chain

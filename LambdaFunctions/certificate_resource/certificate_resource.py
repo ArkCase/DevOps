@@ -169,7 +169,7 @@ def upsert_certificate(event, request_type):
         args['SelfSigned'] = args['SelfSigned'].lower() == "true"
 
     # Create/renew the certificate
-    key_parameter_arn, cert_parameter_arn = create_or_renew_cert(args)
+    key_parameter_arn, cert_parameter_arn, iam_cert_arn = create_or_renew_cert(args)
     print(f"Successfully created/renewed certificate: key_parameter_arn: {key_parameter_arn}, cert_parameter_arn: {cert_parameter_arn}")
 
     # Check if the key and/or certificate parameter name(s) have changed. If
@@ -210,7 +210,8 @@ def upsert_certificate(event, request_type):
                     key_parameter_name=key_parameter_name,
                     cert_parameter_name=cert_parameter_name,
                     key_parameter_arn=key_parameter_arn,
-                    cert_parameter_arn=cert_parameter_arn
+                    cert_parameter_arn=cert_parameter_arn,
+                    iam_cert_arn=iam_cert_arn
               )
             }
         }
@@ -233,7 +234,8 @@ def upsert_certificate(event, request_type):
                 key_parameter_name=key_parameter_name,
                 cert_parameter_name=cert_parameter_name,
                 key_parameter_arn=key_parameter_arn,
-                cert_parameter_arn=cert_parameter_arn
+                cert_parameter_arn=cert_parameter_arn,
+                iam_cert_arn=iam_cert_arn
         )
 
 
@@ -271,7 +273,8 @@ def build_response(
         key_parameter_name="",
         cert_parameter_name="",
         key_parameter_arn="",
-        cert_parameter_arn=""
+        cert_parameter_arn="",
+        iam_cert_arn=""
     ):
     response = {
         'Status': "SUCCESS" if success else "FAILED",
@@ -282,7 +285,8 @@ def build_response(
         'PhysicalResourceId': key_parameter_name + "," + cert_parameter_name,
         'Data': {
             'KeyParameterArn': key_parameter_arn,
-            'CertParameterArn': cert_parameter_arn
+            'CertParameterArn': cert_parameter_arn,
+            'IamCertArn': iam_cert_arn
         }
     }
     return response
@@ -295,7 +299,8 @@ def send_response(
         key_parameter_name="",
         cert_parameter_name="",
         key_parameter_arn="",
-        cert_parameter_arn=""
+        cert_parameter_arn="",
+        iam_cert_arn=""
     ):
     response = build_response(
             event=event,
@@ -304,8 +309,10 @@ def send_response(
             key_parameter_name=key_parameter_name,
             cert_parameter_name=cert_parameter_name,
             key_parameter_arn=key_parameter_arn,
-            cert_parameter_arn=cert_parameter_arn
+            cert_parameter_arn=cert_parameter_arn,
+            iam_cert_arn=iam_cert_arn
     )
+    print(f"Returning response {response}")
     headers = {
         'Content-Type': ""
     }

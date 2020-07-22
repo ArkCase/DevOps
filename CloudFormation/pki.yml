@@ -163,7 +163,7 @@ Resources:
           S3_BUCKET: !Ref CheckCertificatesBucket
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200713-0836/LambdaFunctions/check_certificates/check_certificates.zip
+        S3Key: DevOps/ACM-TMP-20200722-1257/LambdaFunctions/check_certificates/check_certificates.zip
       Tags:
         - Key: Name
           Value: !Sub check-certificates-lambda-${Project}-${Env}
@@ -217,6 +217,12 @@ Resources:
               - Effect: Allow
                 Action: ssm:DescribeParameters
                 Resource: "*"
+
+              - Effect: Allow
+                Action:
+                  - iam:UploadServerCertificate
+                  - iam:DeleteServerCertificate
+                Resource: !Sub arn:aws:iam::${AWS::AccountId}:server-certificate/${AWS::StackName}/pki/*
       Tags:
         - Key: Name
           Value: !Sub renew-certificate-lambda-execution-role-${Project}-${Env}
@@ -241,7 +247,7 @@ Resources:
       Timeout: 60
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200713-0836/LambdaFunctions/renew_certificate/renew_certificate.zip
+        S3Key: DevOps/ACM-TMP-20200722-1257/LambdaFunctions/renew_certificate/renew_certificate.zip
       Tags:
         - Key: Name
           Value: !Sub renew-certificate-lambda-${Project}-${Env}
@@ -294,7 +300,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200713-0836/LambdaFunctions/notify_certificate_resource/notify_certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200722-1257/LambdaFunctions/notify_certificate_resource/notify_certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub notify-certificate-resource-lambda-${Project}-${Env}
@@ -368,7 +374,7 @@ Resources:
       RoleArn: !GetAtt RenewCertificatesStateMachineRole.Arn
       DefinitionS3Location:
         Bucket: !Sub arkcase-public-${AWS::Region}
-        Key: DevOps/ACM-TMP-20200713-0836/StepFunctions/renew_certificates/renew_certificates.asl.json
+        Key: DevOps/ACM-TMP-20200722-1257/StepFunctions/renew_certificates/renew_certificates.asl.json
       DefinitionSubstitutions:
         CheckCertificatesLambdaArn: !GetAtt CheckCertificatesLambda.Arn
         RenewCertificateLambdaArn: !GetAtt RenewCertificateLambda.Arn
@@ -513,6 +519,12 @@ Resources:
                 Resource: "*"
 
               - Effect: Allow
+                Action:
+                  - iam:UploadServerCertificate
+                  - iam:DeleteServerCertificate
+                Resource: !Sub arn:aws:iam::*:server-certificate/${AWS::StackName}/pki/*
+
+              - Effect: Allow
                 Action: states:StartExecution
                 Resource: !Ref RenewCertificatesStateMachine
       Tags:
@@ -544,7 +556,7 @@ Resources:
           RENEW_CERTIFICATES_STATE_MACHINE_ARN: !Ref RenewCertificatesStateMachine
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200713-0836/LambdaFunctions/certificate_resource/certificate_resource.zip
+        S3Key: DevOps/ACM-TMP-20200722-1257/LambdaFunctions/certificate_resource/certificate_resource.zip
       Tags:
         - Key: Name
           Value: !Sub certificate-resource-lambda-${Project}-${Env}
@@ -584,8 +596,8 @@ Resources:
         Critical: true
         Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
       SelfSigned: true
-      KeyParameterName: !Sub /${AWS::StackName}/pki/private/root-ca-key
-      CertParameterName: !Sub /${AWS::StackName}/pki/certs/root-ca-cert
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/root-ca-key-${AWS::StackName}
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/root-ca-cert-${AWS::StackName}
       KeyTags:
         - Key: Name
           Value: !Sub root-ca-private-key-${Project}-${Env}
@@ -648,10 +660,10 @@ Resources:
       KeyUsage:
         Critical: true
         Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
-      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/root-ca-key
-      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/root-ca-cert
-      KeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key
-      CertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/root-ca-key-${AWS::StackName}
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/root-ca-cert-${AWS::StackName}
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key-${AWS::StackName}
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert-${AWS::StackName}
       KeyTags:
         - Key: Name
           Value: !Sub intermediate-ca-private-key-${Project}-${Env}
@@ -712,10 +724,10 @@ Resources:
       KeyUsage:
         Critical: true
         Usages: [ DigitalSignature, KeyEncipherment ]
-      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key
-      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert
-      KeyParameterName: !Sub /${AWS::StackName}/pki/private/alfresco-key
-      CertParameterName: !Sub /${AWS::StackName}/pki/certs/alfresco-cert
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key-${AWS::StackName}
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert-${AWS::StackName}
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/alfresco-key-${AWS::StackName}
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/alfresco-cert-${AWS::StackName}
       KeyTags:
         - Key: Name
           Value: !Sub alfresco-private-key-${Project}-${Env}
@@ -776,10 +788,10 @@ Resources:
       KeyUsage:
         Critical: true
         Usages: [ DigitalSignature, KeyEncipherment ]
-      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key
-      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert
-      KeyParameterName: !Sub /${AWS::StackName}/pki/private/pentaho-key
-      CertParameterName: !Sub /${AWS::StackName}/pki/certs/pentaho-cert
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key-${AWS::StackName}
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert-${AWS::StackName}
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/pentaho-key-${AWS::StackName}
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/pentaho-cert-${AWS::StackName}
       KeyTags:
         - Key: Name
           Value: !Sub pentaho-private-key-${Project}-${Env}
@@ -820,210 +832,9 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  #################################
-  # Parallel PKI for testing only #
-  #################################
-
-  # TODO: remove parallel PKI when testing finished
-
-  OtherRootCaCertificate:
+  TestBackendCertificate:
     Type: Custom::Certificate
-    Properties:
-      ServiceToken: !GetAtt CertificateResourceLambda.Arn
-      KeyType: RSA
-      KeySize: 4096
-      ValidityDays: 7300  # About 20 years
-      CountryName: US
-      StateOrProvinceName: VA
-      LocalityName: Vienna
-      OrganizationName: Arkcase
-      OrganizationalUnitName: Product Development
-      EmailAddress: info@arkcase.com
-      CommonName: other-root-ca.arkcase.internal
-      BasicConstraints:
-        Critical: true
-        CA: true
-      KeyUsage:
-        Critical: true
-        Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
-      SelfSigned: true
-      KeyParameterName: !Sub /${AWS::StackName}/pki/private/other-root-ca-key
-      CertParameterName: !Sub /${AWS::StackName}/pki/certs/other-root-ca-cert
-      KeyTags:
-        - Key: Name
-          Value: !Sub other-root-ca-private-key-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: ssm
-        - Key: ManagedBy
-          Value: CloudFormation
-      CertTags:
-        - Key: Name
-          Value: !Sub other-root-ca-certificate-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: ssm
-        - Key: ManagedBy
-          Value: CloudFormation
-      Tags:
-        - Key: Name
-          Value: !Sub other-root-ca-certificate-resource-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: admin
-        - Key: ManagedBy
-          Value: CloudFormation
-
-  FirstIntermediateCaCertificate:
-    Type: Custom::Certificate
-    DependsOn: OtherRootCaCertificate
-    Properties:
-      ServiceToken: !GetAtt CertificateResourceLambda.Arn
-      KeyType: RSA
-      KeySize: 4096
-      ValidityDays: 730  # About 2 years
-      CountryName: US
-      StateOrProvinceName: VA
-      LocalityName: Vienna
-      OrganizationName: ArkCase
-      OrganizationalUnitName: Product Development
-      EmailAddress: info@arkcase.com
-      CommonName: first-intermediate-ca.arkcase.internal
-      BasicConstraints:
-        Critical: true
-        CA: true
-        PathLength: 0
-      KeyUsage:
-        Critical: true
-        Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
-      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/other-root-ca-key
-      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/other-root-ca-cert
-      KeyParameterName: !Sub /${AWS::StackName}/pki/private/first-intermediate-ca-key
-      CertParameterName: !Sub /${AWS::StackName}/pki/certs/first-intermediate-ca-cert
-      KeyTags:
-        - Key: Name
-          Value: !Sub first-intermediate-ca-private-key-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: ssm
-        - Key: ManagedBy
-          Value: CloudFormation
-      CertTags:
-        - Key: Name
-          Value: !Sub first-intermediate-ca-certificate-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: ssm
-        - Key: ManagedBy
-          Value: CloudFormation
-      Tags:
-        - Key: Name
-          Value: !Sub first-intermediate-ca-certificate-resource-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: admin
-        - Key: ManagedBy
-          Value: CloudFormation
-
-  SecondIntermediateCaCertificate:
-    Type: Custom::Certificate
-    DependsOn: OtherRootCaCertificate
-    Properties:
-      ServiceToken: !GetAtt CertificateResourceLambda.Arn
-      KeyType: RSA
-      KeySize: 4096
-      ValidityDays: 300
-      CountryName: US
-      StateOrProvinceName: VA
-      LocalityName: Vienna
-      OrganizationName: ArkCase
-      OrganizationalUnitName: Product Development
-      EmailAddress: info@arkcase.com
-      CommonName: second-intermediate-ca.arkcase.internal
-      BasicConstraints:
-        Critical: true
-        CA: true
-        PathLength: 0
-      KeyUsage:
-        Critical: true
-        Usages: [ DigitalSignature, KeyCertSign, CrlSign ]
-      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/other-root-ca-key
-      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/other-root-ca-cert
-      KeyParameterName: !Sub /${AWS::StackName}/pki/private/second-intermediate-ca-key
-      CertParameterName: !Sub /${AWS::StackName}/pki/certs/second-intermediate-ca-cert
-      KeyTags:
-        - Key: Name
-          Value: !Sub second-intermediate-ca-private-key-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: ssm
-        - Key: ManagedBy
-          Value: CloudFormation
-      CertTags:
-        - Key: Name
-          Value: !Sub second-intermediate-ca-certificate-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: ssm
-        - Key: ManagedBy
-          Value: CloudFormation
-      Tags:
-        - Key: Name
-          Value: !Sub second-intermediate-ca-certificate-resource-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: admin
-        - Key: ManagedBy
-          Value: CloudFormation
-
-  FirstServiceCertificate:
-    Type: Custom::Certificate
-    DependsOn: FirstIntermediateCaCertificate
+    DependsOn: IntermediateCaCertificate
     Properties:
       ServiceToken: !GetAtt CertificateResourceLambda.Arn
       KeyType: RSA
@@ -1035,19 +846,19 @@ Resources:
       OrganizationName: ArkCase
       OrganizationalUnitName: Product Development
       EmailAddress: info@arkcase.com
-      CommonName: first-service.arkcase.internal
+      CommonName: test-backend.arkcase.internal
       BasicConstraints:
         CA: false
       KeyUsage:
         Critical: true
         Usages: [ DigitalSignature, KeyEncipherment ]
-      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/first-intermediate-ca-key
-      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/first-intermediate-ca-cert
-      KeyParameterName: !Sub /${AWS::StackName}/pki/private/first-service-key
-      CertParameterName: !Sub /${AWS::StackName}/pki/certs/first-service-cert
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key-${AWS::StackName}
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert-${AWS::StackName}
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/test-backend-key-${AWS::StackName}
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/test-backend-cert-${AWS::StackName}
       KeyTags:
         - Key: Name
-          Value: !Sub first-service-private-key-${Project}-${Env}
+          Value: !Sub test-backend-private-key-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -1060,7 +871,7 @@ Resources:
           Value: CloudFormation
       CertTags:
         - Key: Name
-          Value: !Sub first-service-certificate-${Project}-${Env}
+          Value: !Sub test-backend-certificate-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -1073,140 +884,7 @@ Resources:
           Value: CloudFormation
       Tags:
         - Key: Name
-          Value: !Sub first-service-certificate-resource-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: admin
-        - Key: ManagedBy
-          Value: CloudFormation
-
-  SecondServiceCertificate:
-    Type: Custom::Certificate
-    DependsOn: SecondIntermediateCaCertificate
-    Properties:
-      ServiceToken: !GetAtt CertificateResourceLambda.Arn
-      KeyType: RSA
-      KeySize: 2048
-      ValidityDays: 90
-      CountryName: US
-      StateOrProvinceName: VA
-      LocalityName: Vienna
-      OrganizationName: ArkCase
-      OrganizationalUnitName: Product Development
-      EmailAddress: info@arkcase.com
-      CommonName: second-service.arkcase.internal
-      BasicConstraints:
-        CA: false
-      KeyUsage:
-        Critical: true
-        Usages: [ DigitalSignature, KeyEncipherment ]
-      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/second-intermediate-ca-key
-      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/second-intermediate-ca-cert
-      KeyParameterName: !Sub /${AWS::StackName}/pki/private/second-service-key
-      CertParameterName: !Sub /${AWS::StackName}/pki/certs/second-service-cert
-      KeyTags:
-        - Key: Name
-          Value: !Sub second-service-private-key-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: ssm
-        - Key: ManagedBy
-          Value: CloudFormation
-      CertTags:
-        - Key: Name
-          Value: !Sub second-service-certificate-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: ssm
-        - Key: ManagedBy
-          Value: CloudFormation
-      Tags:
-        - Key: Name
-          Value: !Sub second-service-certificate-resource-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: admin
-        - Key: ManagedBy
-          Value: CloudFormation
-
-  ThirdServiceCertificate:
-    Type: Custom::Certificate
-    DependsOn: SecondIntermediateCaCertificate
-    Properties:
-      ServiceToken: !GetAtt CertificateResourceLambda.Arn
-      KeyType: RSA
-      KeySize: 2048
-      ValidityDays: 90
-      CountryName: US
-      StateOrProvinceName: VA
-      LocalityName: Vienna
-      OrganizationName: ArkCase
-      OrganizationalUnitName: Product Development
-      EmailAddress: info@arkcase.com
-      CommonName: third-service.arkcase.internal
-      SubjectAlternativeName:
-        Critical: true
-        DNS:
-          - test1.arkcase.internal
-          - test2.arkcase.internal
-      BasicConstraints:
-        CA: false
-      KeyUsage:
-        Critical: true
-        Usages: [ DigitalSignature, KeyEncipherment ]
-      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/second-intermediate-ca-key
-      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/second-intermediate-ca-cert
-      KeyParameterName: !Sub /${AWS::StackName}/pki/private/third-service-key
-      CertParameterName: !Sub /${AWS::StackName}/pki/certs/third-service-cert
-      KeyTags:
-        - Key: Name
-          Value: !Sub third-service-private-key-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: ssm
-        - Key: ManagedBy
-          Value: CloudFormation
-      CertTags:
-        - Key: Name
-          Value: !Sub third-service-certificate-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: ssm
-        - Key: ManagedBy
-          Value: CloudFormation
-      Tags:
-        - Key: Name
-          Value: !Sub third-service-certificate-resource-${Project}-${Env}
+          Value: !Sub test-backend-certificate-resource-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -1243,6 +921,10 @@ Outputs:
     Description: ARN of the SSM parameter storing the Alfresco service certificate
     Value: !GetAtt AlfrescoCertificate.CertParameterArn
 
+  AlfrescoIamCertArn:
+    Description: ARN of the IAM certificate for Alfresco
+    Value: !GetAtt AlfrescoCertificate.IamCertArn
+
   PentahoKeyParameterArn:
     Description: ARN of the SSM parameter storing the Pentaho service private key
     Value: !GetAtt PentahoCertificate.KeyParameterArn
@@ -1250,3 +932,19 @@ Outputs:
   PentahoCertParameterArn:
     Description: ARN of the SSM parameter storing the Pentaho service certificate
     Value: !GetAtt PentahoCertificate.CertParameterArn
+
+  PentahoIamCertArn:
+    Description: ARN of the IAM certificate for Pentaho
+    Value: !GetAtt PentahoCertificate.IamCertArn
+
+  TestBackendKeyParameterArn:
+    Description: ARN of the SSM parameter storing the test-backend service private key
+    Value: !GetAtt TestBackendCertificate.KeyParameterArn
+
+  TestBackendCertParameterArn:
+    Description: ARN of the SSM parameter storing the test-backend service certificate
+    Value: !GetAtt TestBackendCertificate.CertParameterArn
+
+  TestBackendIamCertArn:
+    Description: ARN of the IAM certificate for test-backend
+    Value: !GetAtt TestBackendCertificate.IamCertArn

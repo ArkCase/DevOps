@@ -57,7 +57,7 @@ def handler(event, context):
 
     # Renew certificate
     args = cert_list[event['Iter']['Index']]
-    key_parameter_arn, cert_parameter_arn = create_or_renew_cert(args)
+    create_or_renew_cert(args)
 
     # Done
     return build_output(event)
