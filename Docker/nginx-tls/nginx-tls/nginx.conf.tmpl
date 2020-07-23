@@ -19,11 +19,6 @@ http {
   gzip on;
 
   server {
-    listen *:8080 default_server;
-    return 301 https://$host$request_uri;
-  }
-
-  server {
     listen *:8443 default_server ssl;
     ssl_protocols TLSv1.3;
     ssl_certificate /etc/certs/cert.pem;
