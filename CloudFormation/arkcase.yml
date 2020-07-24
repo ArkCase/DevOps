@@ -1386,6 +1386,19 @@ Resources:
           SecurityGroups: [ !GetAtt TestBackendSecurityGroup.GroupId ]
           Subnets: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
 
+  # Route53
+
+  TestBackendDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Sub test-backend.${Project}.lan
+      Type: A
+      HostedZoneId: !Ref PrivateHostedZone
+      AliasTarget:
+        DNSName: !GetAtt TestBackendLoadBalancer.DNSName
+        EvaluateTargetHealth: false
+        HostedZoneId: !GetAtt TestBackendLoadBalancer.CanonicalHostedZoneID
+
   ############
   # Alfresco #
   ############
@@ -1451,17 +1464,6 @@ Resources:
           Value: database
         - Key: ManagedBy
           Value: CloudFormation
-
-  TestBackendDnsRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      Name: !Sub test-backend.${Project}.lan
-      Type: A
-      HostedZoneId: !Ref PrivateHostedZone
-      AliasTarget:
-        DNSName: !GetAtt TestBackendLoadBalancer.DNSName
-        EvaluateTargetHealth: false
-        HostedZoneId: !GetAtt TestBackendLoadBalancer.CanonicalHostedZoneID
 
 Outputs:
   StartBlockTraffic:
