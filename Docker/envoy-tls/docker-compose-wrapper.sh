@@ -14,6 +14,8 @@ usage() {
     echo "  -e TAG  Tag to use for the Envoy proxy Docker image (default: $envoy_tls_tag)"
     echo "  --      Stop parsing options; necessary only if you have pre-command options"
     echo "  OPTS    Docker-compose options"
+    echo
+    echo "Example: $0 up --build"
 }
 
 finished_parsing=no
