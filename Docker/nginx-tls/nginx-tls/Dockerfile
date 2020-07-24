@@ -5,7 +5,8 @@ RUN apk add \
         openssl
 
 WORKDIR /app
-COPY nginx.conf.tmpl .
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY default.conf.tmpl .
 COPY start_nginx.sh .
 
 CMD ["/app/start_nginx.sh"]

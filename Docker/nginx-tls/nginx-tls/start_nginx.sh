@@ -10,8 +10,8 @@ openssl req -x509 -nodes -days 9000 -newkey rsa:2048 -keyout /etc/keys/key.pem -
 chmod 700 /etc/keys/key.pem
 
 cd /app
-cat nginx.conf.tmpl \
+cat default.conf.tmpl \
     | envsubst '${ACM_NGINX_UPSTREAM_HOST} ${ACM_NGINX_UPSTREAM_PORT}' \
-    > nginx.conf
+    > /etc/nginx/conf.d/default.conf
 
-exec nginx -c /app/nginx.conf
+exec nginx
