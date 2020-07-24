@@ -528,7 +528,7 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200722-1257/LambdaFunctions/maintenance_windows/maintenance_windows.zip
+        S3Key: DevOps/ACM-TMP-20200724-0702/LambdaFunctions/maintenance_windows/maintenance_windows.zip
       Tags:
         - Key: Name
           Value: !Sub maintenance-windows-lambda-${Project}-${Env}
@@ -553,7 +553,7 @@ Resources:
       # the stack is updated. The reason is that CloudFormation doesn't call
       # the Lambda function during an update unless there is a change in the
       # input parameters.
-      RandomToken: ACM-TMP-20200722-1257
+      RandomToken: ACM-TMP-20200724-0702
 
   ######################################
   # Microsoft Active Directory Service #
@@ -579,7 +579,7 @@ Resources:
   Amazonmq:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200722-1257/CloudFormation/amazonmq.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200724-0702/CloudFormation/amazonmq.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -780,7 +780,7 @@ Resources:
           PASSWORD_LENGTH: !Ref PasswordsLength
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200722-1257/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200724-0702/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-rotation-lambda-${Project}-${Env}
@@ -863,7 +863,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200722-1257/LambdaFunctions/rotation_trigger/rotation_trigger.zip
+        S3Key: DevOps/ACM-TMP-20200724-0702/LambdaFunctions/rotation_trigger/rotation_trigger.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-trigger-lambda-${Project}-${Env}
@@ -1036,7 +1036,7 @@ Resources:
         SubnetIds: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200722-1257/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
+        S3Key: DevOps/ACM-TMP-20200724-0702/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-create-database-lambda-${Project}-${Env}
@@ -1058,7 +1058,7 @@ Resources:
   Pki:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200722-1257/CloudFormation/pki.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200724-0702/CloudFormation/pki.yml
       TimeoutInMinutes: 15
       Parameters:
         Env: !Ref Env
@@ -1200,6 +1200,7 @@ Resources:
           TargetGroupArn: !Ref TestBackendTargetGroup
       Certificates:
         - CertificateArn: !GetAtt Pki.Outputs.TestBackendIamCertArn
+      SslPolicy: ELBSecurityPolicy-FS-1-2-Res-2019-08
 
   # ECS cluster
 
@@ -1287,27 +1288,29 @@ Resources:
               awslogs-group: !Ref TestBackendLogGroup
               awslogs-stream-prefix: test-backend
           Essential: true
-        - Name: envoy-tls
-          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/envoy-tls:3
+        - Name: nginx-tls
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/nginx-tls:4
           HealthCheck:
-            Command: [ CMD-SHELL, "curl -s http://localhost:9901/server_info | grep state | grep -q LIVE" ]
+            Command: [ CMD-SHELL, "curl -sk https://localhost:8443/nginx-ecs-ping" ]
             Interval: 10
             Retries: 2
             StartPeriod: 5
             Timeout: 2
           PortMappings:
-            - ContainerPort: 8081
-              Protocol: tcp
             - ContainerPort: 8443
               Protocol: tcp
           Environment:
-            - Name: ENVOY_LOG_LEVEL
-              Value: info
-            - Name: ENVOY_TLS_DOMAIN_NAME
-              Value: !Sub envoy-tls.test-backend.${Project}.lan  # This value is actually not important
-            - Name: ENVOY_TLS_UPSTREAM_HOST
-              Value: 127.0.0.1  # Containers in a task can access each others on localhost
-            - Name: ENVOY_TLS_UPSTREAM_PORT
+            - Name: ACM_NGINX_DOMAIN_NAME
+              # NB: `ACM_NGINX_DOMAIN_NAME` is only used for self-signed
+              #     certificate, so its value is not important.
+              Value: !Sub test-backend.${Project}.lan
+
+            - Name: ACM_NGINX_UPSTREAM_HOST
+              # NB: Containers in an `awsvpc` task can access each other on
+              #     `localhost`
+              Value: localhost
+
+            - Name: ACM_NGINX_UPSTREAM_PORT
               Value: 8080
           Ulimits:
             - Name: nofile
@@ -1318,7 +1321,7 @@ Resources:
             Options:
               awslogs-region: !Ref AWS::Region
               awslogs-group: !Ref TestBackendLogGroup
-              awslogs-stream-prefix: envoy
+              awslogs-stream-prefix: nginx
           Essential: true
       Tags:
         - Key: Name
@@ -1350,11 +1353,6 @@ Resources:
           FromPort: 8443
           ToPort: 8443
           CidrIp: !Ref VpcCidr
-        - Description: Envoy admin
-          IpProtocol: tcp
-          FromPort: 9901
-          ToPort: 9901
-          CidrIp: !Ref VpcCidr
       Tags:
         - Key: Name
           Value: !Sub test-backend-security-group-${Project}-${Env}
@@ -1376,10 +1374,10 @@ Resources:
       Cluster: !Ref EcsCluster
       TaskDefinition: !Ref TestBackendTaskDefinition
       LaunchType: FARGATE
-      DesiredCount: 1
-      HealthCheckGracePeriodSeconds: 10
+      DesiredCount: 2
+      HealthCheckGracePeriodSeconds: 20
       LoadBalancers:
-        - ContainerName: envoy-tls
+        - ContainerName: nginx-tls
           ContainerPort: 8443
           TargetGroupArn: !Ref TestBackendTargetGroup
       NetworkConfiguration:
@@ -1427,7 +1425,7 @@ Resources:
     # Make sure the user is created after the database
     DependsOn: AlfrescoDatabase
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200722-1257/CloudFormation/mariadb-user-secret.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200724-0702/CloudFormation/mariadb-user-secret.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
