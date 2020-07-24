@@ -14,6 +14,8 @@ usage() {
     echo "  -n TAG  Tag to use for the NGINX Docker image (default: $nginx_tls_tag)"
     echo "  --      Stop parsing options; necessary only if you have pre-command options"
     echo "  OPTS    Docker-compose options"
+    echo
+    echo "Example: $0 up --build"
 }
 
 finished_parsing=no
@@ -38,7 +40,7 @@ while [ $finished_parsing == no ]; do
             test_backend_tag="$1"
             shift
             ;;
-        -e)
+        -n)
             shift
             nginx_tls_tag="$1"
             shift
