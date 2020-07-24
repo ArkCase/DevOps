@@ -1,0 +1,24 @@
+version: "2.4"  # docker-compose version 3 doesn't support "init: true"
+
+services:
+  test-backend:
+    # NB: The `test-backend` image is build in "../envoy-tls"
+    image: ${account_id}.dkr.ecr.${region}.amazonaws.com/test-backend:${test_backend_tag}
+    init: true
+    environment:
+      - HOSTNAME=your-computer
+    ports:
+      - 8080:8080
+
+  nginx-tls:
+    image: ${account_id}.dkr.ecr.${region}.amazonaws.com/nginx-tls:${nginx_tls_tag}
+    depends_on: [ test-backend ]
+    init: true
+    build:
+      context: nginx-tls
+    environment:
+      ACM_NGINX_DOMAIN_NAME: test-backend.arkcase.lan  # Only used in the certificate
+      ACM_NGINX_UPSTREAM_HOST: test-backend
+      ACM_NGINX_UPSTREAM_PORT: 8080
+    ports:
+      - 8443:8443

@@ -1,0 +1,20 @@
+version: "3"
+
+services:
+  toymesh-backend:
+    image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/toymesh-backend:1
+    build:
+      context: backend
+    environment:
+      - HOSTNAME=bugs_bunny
+    ports:
+      - 8080:8080
+
+  toymesh-web:
+    image: 300674751221.dkr.ecr.us-west-1.amazonaws.com/toymesh-web:4
+    build:
+      context: web
+    environment:
+      - BACKEND_URL=http://toymesh-backend:8080
+    ports:
+      - 8081:8081
