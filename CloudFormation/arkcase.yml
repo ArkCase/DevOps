@@ -528,7 +528,7 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200728-1441/LambdaFunctions/maintenance_windows/maintenance_windows.zip
+        S3Key: DevOps/ACM-TMP-20200729-0706/LambdaFunctions/maintenance_windows/maintenance_windows.zip
       Tags:
         - Key: Name
           Value: !Sub maintenance-windows-lambda-${Project}-${Env}
@@ -553,7 +553,7 @@ Resources:
       # the stack is updated. The reason is that CloudFormation doesn't call
       # the Lambda function during an update unless there is a change in the
       # input parameters.
-      RandomToken: ACM-TMP-20200728-1441
+      RandomToken: ACM-TMP-20200729-0706
 
   ######################################
   # Microsoft Active Directory Service #
@@ -579,7 +579,7 @@ Resources:
   Amazonmq:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200728-1441/CloudFormation/amazonmq.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200729-0706/CloudFormation/amazonmq.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -780,7 +780,7 @@ Resources:
           PASSWORD_LENGTH: !Ref PasswordsLength
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200728-1441/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200729-0706/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-rotation-lambda-${Project}-${Env}
@@ -863,7 +863,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200728-1441/LambdaFunctions/rotation_trigger/rotation_trigger.zip
+        S3Key: DevOps/ACM-TMP-20200729-0706/LambdaFunctions/rotation_trigger/rotation_trigger.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-trigger-lambda-${Project}-${Env}
@@ -1036,7 +1036,7 @@ Resources:
         SubnetIds: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200728-1441/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
+        S3Key: DevOps/ACM-TMP-20200729-0706/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-create-database-lambda-${Project}-${Env}
@@ -1058,7 +1058,7 @@ Resources:
   Pki:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200728-1441/CloudFormation/pki.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200729-0706/CloudFormation/pki.yml
       TimeoutInMinutes: 15
       Parameters:
         Env: !Ref Env
@@ -1441,7 +1441,7 @@ Resources:
     # Make sure the user is created after the database
     DependsOn: AlfrescoDatabase
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200728-1441/CloudFormation/mariadb-user-secret.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200729-0706/CloudFormation/mariadb-user-secret.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
@@ -1567,63 +1567,62 @@ Resources:
 
   # EFS filesystem
 
-#XXX
-#  AlfrescoEfsMountTargetSecurityGroup:
-#    Type: AWS::EC2::SecurityGroup
-#    Properties:
-#      GroupDescription: Security group for the Alfresco EFS mount targets
-#      VpcId: !Ref Vpc
-#      SecurityGroupIngress:
-#        - Description: NFSv4 from this VPC
-#          IpProtocol: tcp
-#          FromPort: 2049
-#          ToPort: 2049
-#          SourceSecurityGroupId: !GetAtt AlfrescoTaskSecurityGroup.GroupId
-#      Tags:
-#        - Key: Name
-#          Value: !Sub alfresco-efs-security-group-${Project}-${Env}
-#        - Key: Env
-#          Value: !Ref Env
-#        - Key: Project
-#          Value: !Ref Project
-#        - Key: Service
-#          Value: alfresco
-#        - Key: Component
-#          Value: vpc
-#        - Key: ManagedBy
-#          Value: CloudFormation
-#
-#  AlfrescoEfs:
-#    Type: AWS::EFS::FileSystem
-#    Properties:
-#      Encrypted: true
-#      FileSystemTags:
-#        - Key: Name
-#          Value: !Sub alfresco-efs-${Project}-${Env}
-#        - Key: Env
-#          Value: !Ref Env
-#        - Key: Project
-#          Value: !Ref Project
-#        - Key: Service
-#          Value: alfresco
-#        - Key: Component
-#          Value: efs
-#        - Key: ManagedBy
-#          Value: CloudFormation
-#
-#  AlfrescoEfsMountTargetA:
-#    Type: AWS::EFS::MountTarget
-#    Properties:
-#      FileSystemId: !Ref AlfrescoEfs
-#      SubnetId: !Ref PrivateSubnetA
-#      SecurityGroups: [ !GetAtt AlfrescoEfsMountTargetSecurityGroup.GroupId ]
-#
-#  AlfrescoEfsMountTargetB:
-#    Type: AWS::EFS::MountTarget
-#    Properties:
-#      FileSystemId: !Ref AlfrescoEfs
-#      SubnetId: !Ref PrivateSubnetB
-#      SecurityGroups: [ !GetAtt AlfrescoEfsMountTargetSecurityGroup.GroupId ]
+  AlfrescoEfsMountTargetSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for the Alfresco EFS mount targets
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - Description: NFSv4 from this VPC
+          IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !GetAtt AlfrescoTaskSecurityGroup.GroupId
+      Tags:
+        - Key: Name
+          Value: !Sub alfresco-efs-security-group-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: alfresco
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  AlfrescoEfs:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      Encrypted: true
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub alfresco-efs-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: alfresco
+        - Key: Component
+          Value: efs
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  AlfrescoEfsMountTargetA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref AlfrescoEfs
+      SubnetId: !Ref PrivateSubnetA
+      SecurityGroups: [ !GetAtt AlfrescoEfsMountTargetSecurityGroup.GroupId ]
+
+  AlfrescoEfsMountTargetB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref AlfrescoEfs
+      SubnetId: !Ref PrivateSubnetB
+      SecurityGroups: [ !GetAtt AlfrescoEfsMountTargetSecurityGroup.GroupId ]
 
   # ECS cluster
 
@@ -1776,37 +1775,38 @@ Resources:
 #          Value: ecs
 #        - Key: ManagedBy
 #          Value: CloudFormation
-#
-#  AlfrescoTaskSecurityGroup:
-#    Type: AWS::EC2::SecurityGroup
-#    Properties:
-#      GroupDescription: Security group for the Alfresco Repository task
-#      VpcId: !Ref Vpc
-#      SecurityGroupIngress:
-#        - Description: HTTPS from load balancer
-#          IpProtocol: tcp
-#          FromPort: 8443
-#          ToPort: 8443
-#          SourceSecurityGroupId: !GetAtt TestBackendLoadBalancerSecurityGroup.GroupId
-#        - Description: HTTPS debug
-#          IpProtocol: tcp
-#          FromPort: 8443
-#          ToPort: 8443
-#          CidrIp: !Ref VpcCidr
-#      Tags:
-#        - Key: Name
-#          Value: !Sub alfresco-task-security-group-${Project}-${Env}
-#        - Key: Env
-#          Value: !Ref Env
-#        - Key: Project
-#          Value: !Ref Project
-#        - Key: Service
-#          Value: alfresco
-#        - Key: Component
-#          Value: vpc
-#        - Key: ManagedBy
-#          Value: CloudFormation
-#
+
+  AlfrescoTaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for the Alfresco Repository task
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - Description: HTTPS from load balancer
+          IpProtocol: tcp
+          FromPort: 8443
+          ToPort: 8443
+          SourceSecurityGroupId: !GetAtt TestBackendLoadBalancerSecurityGroup.GroupId
+        - Description: HTTPS debug
+          IpProtocol: tcp
+          FromPort: 8443
+          ToPort: 8443
+          CidrIp: !Ref VpcCidr
+      Tags:
+        - Key: Name
+          Value: !Sub alfresco-task-security-group-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: alfresco
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+#XXX
 #  TestBackendService:
 #    Type: AWS::ECS::Service
 #    DependsOn: TestBackendListenerHttps, AlfrescoEfsMountTargetA, AlfrescoEfsMountTargetB
