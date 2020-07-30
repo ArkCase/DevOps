@@ -42,7 +42,7 @@ services:
         -Dshare.port=8080
         -Dalfresco.host=${domain_name}
         -Dalfresco.port=8080
-        -Daos.baseUrlOverwrite=http://${domain_name}:8080/alfresco/aos
+        -Daos.baseUrlOverwrite=https://${domain_name}:8080/alfresco/aos
         -Dmessaging.broker.url="failover:(nio://activemq:61616)?timeout=3000&jms.useCompression=true"
         -Ddeployment.method=DOCKER_COMPOSE
         -Dcsrf.filter.enabled=false
@@ -68,32 +68,31 @@ services:
         -Dtransferservice.receiver.enabled=false
         -Dsystem.thumbnail.generate=false
 
-  acs-share:
-    image: alfresco/alfresco-governance-share-community:V3.3.1.x-latest
-    init: true
-    environment:
-      REPO_HOST: acs-repository
-      REPO_PORT: 8080
-      JAVA_OPTS: >
-        -Xms500m
-        -Xmx500m
-        -Dalfresco.host=${domain_name}
-        -Dalfresco.port=8080
-        -Dalfresco.context=alfresco
-        -Dalfresco.protocol=http
+#  acs-share:
+#    image: alfresco/alfresco-governance-share-community:V3.3.1.x-latest
+#    init: true
+#    environment:
+#      REPO_HOST: acs-repository
+#      REPO_PORT: 8080
+#      JAVA_OPTS: >
+#        -Xms500m
+#        -Xmx500m
+#        -Dalfresco.host=${domain_name}
+#        -Dalfresco.port=8080
+#        -Dalfresco.context=alfresco
+#        -Dalfresco.protocol=http
 
-  nginx-acs:
-    image: ${account_id}.dkr.ecr.${region}.amazonaws.com/nginx-acs:${nginx_acs_tag}
+  nginx-acs-repository:
+    image: ${account_id}.dkr.ecr.${region}.amazonaws.com/nginx-acs-repository:${nginx_acs_repository_tag}
     init: true
     build:
-      context: ./nginx-acs
+      context: ./nginx-acs-repository
     environment:
       ACM_NGINX_DOMAIN_NAME: localhost
       ACM_NGINX_ACS_REPO_HOST: acs-repository
       ACM_NGINX_ACS_REPO_PORT: 8080
-      ACM_NGINX_ACS_SHARE_HOST: acs-share
-      ACM_NGINX_ACS_SHARE_PORT: 8080
     ports:
+      - 8080:8080
       - 8443:8443
 
 volumes:
