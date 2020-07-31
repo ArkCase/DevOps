@@ -1,4 +1,5 @@
-FROM alfresco/alfresco-governance-repository-community:V3.3.1.x-latest
+# XXX FROM alfresco/alfresco-governance-repository-community:V3.3.1.x-latest
+FROM alfresco/alfresco-content-repository-community:latest
 
 # NB: Alfresco CE 2018-06 does not work with higher versions of
 #     MariaDB JDBC; specifically, it does not work with 2.4.2.

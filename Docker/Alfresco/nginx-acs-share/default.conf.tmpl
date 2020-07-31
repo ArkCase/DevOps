@@ -1,10 +1,10 @@
 server {
- listen *:8080 default_server;
-  return 301 https://$host:8443$request_uri;
+  listen *:9080 default_server;
+  return 301 https://$host:9443$request_uri;
 }
 
 server {
-  listen *:8443 default_server ssl;
+  listen *:9443 default_server ssl;
   ssl_protocols TLSv1.2 TLSv1.3;
   ssl_certificate /etc/certs/cert.pem;
   ssl_certificate_key /etc/keys/key.pem;
@@ -27,11 +27,11 @@ server {
   location ~ ^(/.*/proxy/alfresco/api/solr/.*)$ { return 403; }
   location ~ ^(/.*/-default-/proxy/alfresco/api/.*)$ { return 403; }
 
-  # Alfresco Repository
+  # Alfresco Share
   location / {
-    proxy_pass http://${ACM_NGINX_ACS_REPO_HOST}:${ACM_NGINX_ACS_REPO_PORT};
+    proxy_pass http://${ACM_NGINX_ACS_SHARE_HOST}:${ACM_NGINX_ACS_SHARE_PORT};
   }
-  location /alfresco/ {
-    proxy_pass http://${ACM_NGINX_ACS_REPO_HOST}:${ACM_NGINX_ACS_REPO_PORT};
+  location /share/ {
+    proxy_pass http://${ACM_NGINX_ACS_SHARE_HOST}:${ACM_NGINX_ACS_SHARE_PORT};
   }
 }

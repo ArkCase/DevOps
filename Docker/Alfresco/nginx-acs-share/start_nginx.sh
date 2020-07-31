@@ -11,7 +11,7 @@ chmod 700 /etc/keys/key.pem
 
 cd /app
 cat default.conf.tmpl \
-    | envsubst '${ACM_NGINX_ACS_REPO_HOST} ${ACM_NGINX_ACS_REPO_PORT}' \
+    | envsubst '${ACM_NGINX_ACS_SHARE_HOST} ${ACM_NGINX_ACS_SHARE_PORT}' \
     > /etc/nginx/conf.d/default.conf
 
 exec nginx
