@@ -39,10 +39,12 @@ services:
         -Ddb.url="jdbc:mariadb://mariadb:3306/alfresco?autoReconnect=true&useUnicode=true&characterEncoding=UTF-8"
         -Dindex.subsystem.name=noindex
         -Dshare.host=${domain_name}
-        -Dshare.port=8080
+        -Dshare.port=9443
+        -Dshare.protocol=https
         -Dalfresco.host=${domain_name}
-        -Dalfresco.port=8080
-        -Daos.baseUrlOverwrite=http://${domain_name}:8080/alfresco/aos
+        -Dalfresco.port=8443
+        -Dalfresco.protocol=https
+        -Daos.baseUrlOverwrite=https://${domain_name}:8443/alfresco/aos
         -Dmessaging.broker.url="failover:(nio://activemq:61616)?timeout=3000&jms.useCompression=true"
         -Ddeployment.method=DOCKER_COMPOSE
         -Dcsrf.filter.enabled=false
@@ -68,33 +70,46 @@ services:
         -Dtransferservice.receiver.enabled=false
         -Dsystem.thumbnail.generate=false
 
-  acs-share:
-    image: alfresco/alfresco-governance-share-community:V3.3.1.x-latest
-    init: true
-    environment:
-      REPO_HOST: acs-repository
-      REPO_PORT: 8080
-      JAVA_OPTS: >
-        -Xms500m
-        -Xmx500m
-        -Dalfresco.host=${domain_name}
-        -Dalfresco.port=8080
-        -Dalfresco.context=alfresco
-        -Dalfresco.protocol=http
-
-  nginx-acs:
-    image: ${account_id}.dkr.ecr.${region}.amazonaws.com/nginx-acs:${nginx_acs_tag}
+  nginx-acs-repository:
+    image: ${account_id}.dkr.ecr.${region}.amazonaws.com/nginx-acs-repository:${nginx_acs_repository_tag}
     init: true
     build:
-      context: ./nginx-acs
+      context: ./nginx-acs-repository
     environment:
       ACM_NGINX_DOMAIN_NAME: localhost
       ACM_NGINX_ACS_REPO_HOST: acs-repository
       ACM_NGINX_ACS_REPO_PORT: 8080
+    ports:
+      - 8080:8080
+      - 8443:8443
+
+  acs-share:
+    # XXX image: alfresco/alfresco-governance-share-community:V3.3.1.x-latest
+    image: alfresco/alfresco-share:6.2.2
+    init: true
+    environment:
+      REPO_HOST: nginx-acs-repository
+      REPO_PORT: 8443
+      JAVA_OPTS: >
+        -Xms500m
+        -Xmx500m
+        -Dalfresco.host=${domain_name}
+        -Dalfresco.port=8443
+        -Dalfresco.protocol=https
+        -Dalfresco.context=alfresco
+
+  nginx-acs-share:
+    image: ${account_id}.dkr.ecr.${region}.amazonaws.com/nginx-acs-share:${nginx_acs_share_tag}
+    init: true
+    build:
+      context: ./nginx-acs-share
+    environment:
+      ACM_NGINX_DOMAIN_NAME: localhost
       ACM_NGINX_ACS_SHARE_HOST: acs-share
       ACM_NGINX_ACS_SHARE_PORT: 8080
     ports:
-      - 8443:8443
+      - 9080:9080
+      - 9443:9443
 
 volumes:
   mariadb-volume:
