@@ -528,7 +528,7 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200729-0706/LambdaFunctions/maintenance_windows/maintenance_windows.zip
+        S3Key: DevOps/ACM-TMP-20200803-1025/LambdaFunctions/maintenance_windows/maintenance_windows.zip
       Tags:
         - Key: Name
           Value: !Sub maintenance-windows-lambda-${Project}-${Env}
@@ -553,7 +553,7 @@ Resources:
       # the stack is updated. The reason is that CloudFormation doesn't call
       # the Lambda function during an update unless there is a change in the
       # input parameters.
-      RandomToken: ACM-TMP-20200729-0706
+      RandomToken: ACM-TMP-20200803-1025
 
   ######################################
   # Microsoft Active Directory Service #
@@ -579,7 +579,7 @@ Resources:
   Amazonmq:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200729-0706/CloudFormation/amazonmq.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200803-1025/CloudFormation/amazonmq.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -604,6 +604,79 @@ Resources:
           Value: amazonmq
         - Key: Component
           Value: cfn
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ###########################################################
+  # Task definition custom resource with EFS specifications #
+  ###########################################################
+
+  TaskDefinitionResourceLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: TaskDefinitionResourceLambaPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - ecs:RegisterTaskDefinition
+                  - ecs:DeregisterTaskDefinition
+                Resource: "*"
+                Effect: Allow
+
+              - Action:
+                  - iam:GetRole
+                  - iam:PassRole
+                Resource: "*"
+                Effect: Allow
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Tags:
+        - Key: Name
+          Value: !Sub task-definition-resource-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: global
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  TaskDefinitionResourceLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: >
+        CloudFormation custom resource backend to create a task definition that
+        also supports EFS mounts
+      Runtime: python3.6
+      Role: !GetAtt TaskDefinitionResourceLambdaExecutionRole.Arn
+      Handler: task_definition_resource.handler
+      Timeout: 30
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20200803-1025/LambdaFunctions/task_definition_resource/task_definition_resource.zip
+      Tags:
+        - Key: Name
+          Value: !Sub task-definition-resource-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: global
+        - Key: Component
+          Value: lambda
         - Key: ManagedBy
           Value: CloudFormation
 
@@ -780,7 +853,7 @@ Resources:
           PASSWORD_LENGTH: !Ref PasswordsLength
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200729-0706/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200803-1025/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-rotation-lambda-${Project}-${Env}
@@ -863,7 +936,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200729-0706/LambdaFunctions/rotation_trigger/rotation_trigger.zip
+        S3Key: DevOps/ACM-TMP-20200803-1025/LambdaFunctions/rotation_trigger/rotation_trigger.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-trigger-lambda-${Project}-${Env}
@@ -1036,7 +1109,7 @@ Resources:
         SubnetIds: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200729-0706/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
+        S3Key: DevOps/ACM-TMP-20200803-1025/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-create-database-lambda-${Project}-${Env}
@@ -1058,7 +1131,7 @@ Resources:
   Pki:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200729-0706/CloudFormation/pki.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200803-1025/CloudFormation/pki.yml
       TimeoutInMinutes: 15
       Parameters:
         Env: !Ref Env
@@ -1441,7 +1514,7 @@ Resources:
     # Make sure the user is created after the database
     DependsOn: AlfrescoDatabase
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200729-0706/CloudFormation/mariadb-user-secret.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200803-1025/CloudFormation/mariadb-user-secret.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
@@ -1680,6 +1753,12 @@ Resources:
           Value: iam
         - Key: ManagedBy
           Value: CloudFormation
+
+#  AlfrescoTaskDefinition:
+#    Type: Custom::TaskDefinition
+#    Properties:
+#      ServiceToken: !GetAtt TaskDefinitionResourceLambda.Arn
+#      family: alfresco
 
 #XXX
 #  AlfrescoTaskDefinition:
