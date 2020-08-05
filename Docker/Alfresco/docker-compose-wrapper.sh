@@ -4,8 +4,8 @@ export domain_name=localhost
 export account_id=300674751221
 export region=us-west-1
 export acs_repository_tag=1
-export nginx_acs_repository_tag=2
-export nginx_acs_share_tag=2
+export nginx_acs_repository_tag=4
+export nginx_acs_share_tag=1
 
 usage() {
     echo "Usage: $0 [-h] [-d NAM] [-i ACC] [-l REG] [-r TAG] [-R TAG] [-S TAG] [--] OPTS"

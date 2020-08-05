@@ -80,7 +80,7 @@ services:
       ACM_NGINX_ACS_REPO_HOST: acs-repository
       ACM_NGINX_ACS_REPO_PORT: 8080
     ports:
-      - 8080:8080
+      - 8180:8180
       - 8443:8443
 
   acs-share:
@@ -108,7 +108,7 @@ services:
       ACM_NGINX_ACS_SHARE_HOST: acs-share
       ACM_NGINX_ACS_SHARE_PORT: 8080
     ports:
-      - 9080:9080
+      - 9180:9180
       - 9443:9443
 
 volumes:

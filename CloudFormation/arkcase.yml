@@ -1832,7 +1832,7 @@ Resources:
             initProcessEnabled: true
 
         - name: nginx-acs-repository
-          image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/nginx-acs-repository:3
+          image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/nginx-acs-repository:4
           healthCheck:
             command: [ CMD-SHELL, "curl -sk https://localhost:8443/nginx-ecs-ping.html" ]
             interval: 10

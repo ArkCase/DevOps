@@ -5,4 +5,4 @@ COPY start_nginx.sh .
 
 CMD ["/app/start_nginx.sh"]
 
-EXPOSE 8080 8443
+EXPOSE 8180 8443
