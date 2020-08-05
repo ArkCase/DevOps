@@ -27,6 +27,11 @@ server {
   location ~ ^(/.*/proxy/alfresco/api/solr/.*)$ { return 403; }
   location ~ ^(/.*/-default-/proxy/alfresco/api/.*)$ { return 403; }
 
+  # ECS health check
+  location = /nginx-ecs-ping.html {
+    root /app/html;
+  }
+
   # Alfresco Repository
   location / {
     proxy_pass http://${ACM_NGINX_ACS_REPO_HOST}:${ACM_NGINX_ACS_REPO_PORT};
