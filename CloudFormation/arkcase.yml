@@ -528,7 +528,7 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200729-0706/LambdaFunctions/maintenance_windows/maintenance_windows.zip
+        S3Key: DevOps/ACM-TMP-20200804-0841/LambdaFunctions/maintenance_windows/maintenance_windows.zip
       Tags:
         - Key: Name
           Value: !Sub maintenance-windows-lambda-${Project}-${Env}
@@ -553,7 +553,7 @@ Resources:
       # the stack is updated. The reason is that CloudFormation doesn't call
       # the Lambda function during an update unless there is a change in the
       # input parameters.
-      RandomToken: ACM-TMP-20200729-0706
+      RandomToken: ACM-TMP-20200804-0841
 
   ######################################
   # Microsoft Active Directory Service #
@@ -579,7 +579,7 @@ Resources:
   Amazonmq:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200729-0706/CloudFormation/amazonmq.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200804-0841/CloudFormation/amazonmq.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -604,6 +604,79 @@ Resources:
           Value: amazonmq
         - Key: Component
           Value: cfn
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ###########################################################
+  # Task definition custom resource with EFS specifications #
+  ###########################################################
+
+  TaskDefinitionResourceLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: TaskDefinitionResourceLambaPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - ecs:RegisterTaskDefinition
+                  - ecs:DeregisterTaskDefinition
+                Resource: "*"
+                Effect: Allow
+
+              - Action:
+                  - iam:GetRole
+                  - iam:PassRole
+                Resource: "*"
+                Effect: Allow
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Tags:
+        - Key: Name
+          Value: !Sub task-definition-resource-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: global
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  TaskDefinitionResourceLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: >
+        CloudFormation custom resource backend to create a task definition that
+        also supports EFS mounts
+      Runtime: python3.6
+      Role: !GetAtt TaskDefinitionResourceLambdaExecutionRole.Arn
+      Handler: task_definition_resource.handler
+      Timeout: 30
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20200804-0841/LambdaFunctions/task_definition_resource/task_definition_resource.zip
+      Tags:
+        - Key: Name
+          Value: !Sub task-definition-resource-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: global
+        - Key: Component
+          Value: lambda
         - Key: ManagedBy
           Value: CloudFormation
 
@@ -780,7 +853,7 @@ Resources:
           PASSWORD_LENGTH: !Ref PasswordsLength
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200729-0706/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200804-0841/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-rotation-lambda-${Project}-${Env}
@@ -863,7 +936,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200729-0706/LambdaFunctions/rotation_trigger/rotation_trigger.zip
+        S3Key: DevOps/ACM-TMP-20200804-0841/LambdaFunctions/rotation_trigger/rotation_trigger.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-trigger-lambda-${Project}-${Env}
@@ -1036,7 +1109,7 @@ Resources:
         SubnetIds: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200729-0706/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
+        S3Key: DevOps/ACM-TMP-20200804-0841/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-create-database-lambda-${Project}-${Env}
@@ -1058,7 +1131,7 @@ Resources:
   Pki:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200729-0706/CloudFormation/pki.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200804-0841/CloudFormation/pki.yml
       TimeoutInMinutes: 15
       Parameters:
         Env: !Ref Env
@@ -1441,7 +1514,7 @@ Resources:
     # Make sure the user is created after the database
     DependsOn: AlfrescoDatabase
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200729-0706/CloudFormation/mariadb-user-secret.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200804-0841/CloudFormation/mariadb-user-secret.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
@@ -1577,7 +1650,7 @@ Resources:
           IpProtocol: tcp
           FromPort: 2049
           ToPort: 2049
-          SourceSecurityGroupId: !GetAtt AlfrescoTaskSecurityGroup.GroupId
+          SourceSecurityGroupId: !GetAtt AlfrescoRepositoryTaskSecurityGroup.GroupId
       Tags:
         - Key: Name
           Value: !Sub alfresco-efs-security-group-${Project}-${Env}
@@ -1624,14 +1697,14 @@ Resources:
       SubnetId: !Ref PrivateSubnetB
       SecurityGroups: [ !GetAtt AlfrescoEfsMountTargetSecurityGroup.GroupId ]
 
-  # ECS cluster
+  # ECS stuff for Alfresco Repository
 
-  AlfrescoLogGroup:
+  AlfrescoRepositoryLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       RetentionInDays: 365
 
-  AlfrescoTaskExecutionRole:
+  AlfrescoRepositoryTaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -1645,7 +1718,7 @@ Resources:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
       Tags:
         - Key: Name
-          Value: !Sub alfresco-task-execution-role-${Project}-${Env}
+          Value: !Sub alfresco-repository-task-execution-role-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -1657,7 +1730,7 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  AlfrescoTaskRole:
+  AlfrescoRepositoryTaskRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -1669,7 +1742,7 @@ Resources:
             Action: sts:AssumeRole
       Tags:
         - Key: Name
-          Value: !Sub alfresco-task-role-${Project}-${Env}
+          Value: !Sub alfresco-repository-task-role-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
@@ -1681,102 +1754,135 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-#XXX
-#  AlfrescoTaskDefinition:
-#    Type: AWS::ECS::TaskDefinition
-#    Properties:
-#      Family: alfresco
-#      Cpu: 256
-#      Memory: 512
-#      ExecutionRoleArn: !GetAtt AlfrescoTaskExecutionRole.Arn
-#      TaskRoleArn: !GetAtt AlfrescoTaskRole.Arn
-#      RequiresCompatibilities: [ FARGATE ]
-#      NetworkMode: awsvpc
-#      ContainerDefinitions:
-#        - Name: acs-repository
-#          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/acs-repository:1
-#          HealthCheck:
-#            Command: [ CMD-SHELL, "curl -f http://localhost:8080/alfresco/" ]
-#            Interval: 10
-#            Retries: 2
-#            StartPeriod: 600  # 10 minutes; Alfresco is very slow to start
-#            Timeout: 2
-#          PortMappings:
-#            - ContainerPort: 8080
-#              Protocol: tcp
-#          Environment:
-#            - Name: JAVA_OPTS
-#              Value: !Sub >
-#                -Ddb.driver=org.mariadb.jdbc.Driver
-#                -Ddb.username='{{resolve:secretsmanager:${AlfrescoDatabaseUser.UserSecretArn}:SecretString:username}}'
-#                -Ddb.password='{{resolve:secretsmanager:${AlfrescoDatabaseUser.UserSecretArn}:SecretString:username}}'
-#                -Ddb.url="jdbc:mariadb://${MariadbInstance.Endpoint.Address}:${MariadbInstance.Endpoint.Port}/alfresco?autoReconnect=true&useUnicode=true&characterEncoding=UTF-8"
-#                -Dindex.subsystem.name=noindex
-#                -Dshare.host=alfresco.${Project}.lan
-#                -Dshare.port=8080
-#                -Dalfresco.host=alfresco.${Project}.lan
-#                -Dalfresco.port=8080
-#                -Daos.baseUrlOverwrite=https://alfresco.${Project}.lan:8080/alfresco/aos
-#                -Dmessaging.broker.url="failover:(nio://activemq:61616)?timeout=3000&jms.useCompression=true"  # TODO: AWS ActiveMQ gives a list of endpoints, and doesn't have "nio" protocol (which apparently is equivalent to "tcp")
-#                -Ddeployment.method=DOCKER_COMPOSE  # TODO
-#          LogConfiguration:
-#            LogDriver: awslogs
-#            Options:
-#              awslogs-region: !Ref AWS::Region
-#              awslogs-group: !Ref AlfrescoLogGroup
-#              awslogs-stream-prefix: acs-repository
-#          Essential: true
-#
-#        - Name: nginx-tls
-#          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/nginx-tls:3
-#          HealthCheck:
-#            Command: [ CMD-SHELL, "curl -sk https://localhost:8443/nginx-ecs-ping" ]
-#            Interval: 10
-#            Retries: 2
-#            StartPeriod: 5
-#            Timeout: 2
-#          PortMappings:
-#            - ContainerPort: 8443
-#              Protocol: tcp
-#          Environment:
-#            - Name: ACM_NGINX_DOMAIN_NAME
-#              # NB: `ACM_NGINX_DOMAIN_NAME` is only used for self-signed
-#              #     certificate, so its value is not important.
-#              Value: !Sub test-backend.${Project}.lan
-#
-#            - Name: ACM_NGINX_UPSTREAM_HOST
-#              # NB: Containers in an `awsvpc` task can access each other on
-#              #     `localhost`
-#              Value: localhost
-#
-#            - Name: ACM_NGINX_UPSTREAM_PORT
-#              Value: 8080
-#          Ulimits:
-#            - Name: nofile
-#              SoftLimit: 15000
-#              HardLimit: 15000
-#          LogConfiguration:
-#            LogDriver: awslogs
-#            Options:
-#              awslogs-region: !Ref AWS::Region
-#              awslogs-group: !Ref TestBackendLogGroup
-#              awslogs-stream-prefix: nginx
-#          Essential: true
-#      Tags:
-#        - Key: Name
-#          Value: !Sub test-backend-task-defintion-${Project}-${Env}
-#        - Key: Env
-#          Value: !Ref Env
-#        - Key: Project
-#          Value: !Ref Project
-#        - Key: Service
-#          Value: test-backend
-#        - Key: Component
-#          Value: ecs
-#        - Key: ManagedBy
-#          Value: CloudFormation
+  AlfrescoRepositoryTaskDefinition:
+    Type: Custom::TaskDefinition
+    Properties:
+      ServiceToken: !GetAtt TaskDefinitionResourceLambda.Arn
+      family: acs-repository
+      cpu: 2048
+      memory: 8192
+      executionRoleArn: !GetAtt AlfrescoRepositoryTaskExecutionRole.Arn
+      taskRoleArn: !GetAtt AlfrescoRepositoryTaskRole.Arn
+      requiresCompatibilities: [ FARGATE ]
+      networkMode: awsvpc
+      volumes:
+        - name: alfresco-efs
+          efsVolumeConfiguration:
+            fileSystemId: !Ref AlfrescoEfs
+      containerDefinitions:
+        - name: acs-repository
+          image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/acs-repository:1
+          healthCheck:
+            command: [ CMD-SHELL, "curl -f http://localhost:8080/alfresco/" ]
+            interval: 10
+            retries: 2
+            startPeriod: 300  # 5 minutes; Alfresco is very slow to start but 300 seconds is the maximum allowed value
+            timeout: 3
+          portMappings:
+            - containerPort: 8080
+              protocol: tcp
+          environment:
+            - name: JAVA_OPTS
+              value: !Sub >
+                -Ddb.driver=org.mariadb.jdbc.Driver
+                -Ddb.username='{{resolve:secretsmanager:${AlfrescoDatabaseUser.Outputs.UserSecretArn}:SecretString:username}}'
+                -Ddb.password='{{resolve:secretsmanager:${AlfrescoDatabaseUser.Outputs.UserSecretArn}:SecretString:password}}'
+                -Ddb.url="jdbc:mariadb://${MariadbInstance.Endpoint.Address}:${MariadbInstance.Endpoint.Port}/alfresco?autoReconnect=true&useUnicode=true&characterEncoding=UTF-8"
+                -Dindex.subsystem.name=noindex
+                -Dshare.host=alfresco.${Project}.lan
+                -Dshare.port=8080
+                -Dalfresco.host=alfresco.${Project}.lan
+                -Dalfresco.port=8080
+                -Daos.baseUrlOverwrite=https://alfresco.${Project}.lan:8080/alfresco/aos
+                -Dmessaging.broker.connections.max=8
+                -Dmessaging.broker.username='{{resolve:secretsmanager:${Amazonmq.Outputs.AlfrescoUserSecretArn}:SecretString:username}}'
+                -Dmessaging.broker.password='{{resolve:secretsmanager:${Amazonmq.Outputs.AlfrescoUserSecretArn}:SecretString:password}}'
+                -Dmessaging.broker.url=\"failover:(${Amazonmq.Outputs.OpenwireEndpoints})\"
+                -Dcsrf.filter.enabled=false
+                -Djodconverter.enabled=false
+                -Djodconverter.officeHome=null
+                -Xms1500m
+                -Xmx1500m
+                -Dlocal.transform.service.enabled=false
+                -Dtransform.service.enabled=false
+                -Dlegacy.transform.service.enabled=false
+                -DsyncService.mode=OFF
+                -Dsync.mode=OFF
+                -Dsync.pullJob.enabled=false
+                -Dsync.pushJob.enabled=false
+                -Dsystem.usages.enabled=false
+                -Dsystem.usages.clearBatchSize=0
+                -Dactivities.feed.notifier.enabled=false
+                -Dactivities.feed.cleaner.enabled=false
+                -Dactivities.post.cleaner.enabled=false
+                -Dactivities.feed.generator.enabled=false
+                -Dactivities.post.lookup.enabled=false
+                -Dreplication.enabled=false
+                -Dtransferservice.receiver.enabled=false
+                -Dsystem.thumbnail.generate=false
+          logConfiguration:
+            logDriver: awslogs
+            options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref AlfrescoRepositoryLogGroup
+              awslogs-stream-prefix: acs-repository
+          essential: true
+          linuxParameters:
+            initProcessEnabled: true
 
-  AlfrescoTaskSecurityGroup:
+        - name: nginx-acs-repository
+          image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/nginx-acs-repository:1
+          healthCheck:
+            command: [ CMD-SHELL, "curl -sk https://localhost:8443/nginx-ecs-ping" ]
+            interval: 10
+            retries: 2
+            startPeriod: 5
+            timeout: 2
+          portMappings:
+            - containerPort: 8443
+              protocol: tcp
+          environment:
+            - name: ACM_NGINX_DOMAIN_NAME
+              # NB: `ACM_NGINX_DOMAIN_NAME` is only used for self-signed
+              #     certificate, so its value is not important.
+              value: !Sub alfresco-repository.${Project}.lan
+
+            - name: ACM_NGINX_UPSTREAM_HOST
+              # NB: Containers in an `awsvpc` task can access each other on
+              #     `localhost`
+              value: localhost
+
+            - name: ACM_NGINX_UPSTREAM_PORT
+              value: 8080
+          ulimits:
+            - name: nofile
+              softLimit: 15000
+              hardLimit: 15000
+          logConfiguration:
+            logDriver: awslogs
+            options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref AlfrescoRepositoryLogGroup
+              awslogs-stream-prefix: nginx
+          essential: true
+          linuxParameters:
+            initProcessEnabled: true
+
+      tags:
+        - key: Name
+          value: !Sub alfresco-repository-task-defintion-${Project}-${Env}
+        - key: Env
+          value: !Ref Env
+        - key: Project
+          value: !Ref Project
+        - key: Service
+          value: test-backend
+        - key: Component
+          value: ecs
+        - key: ManagedBy
+          value: CloudFormation
+
+  AlfrescoRepositoryTaskSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Security group for the Alfresco Repository task
@@ -1786,7 +1892,7 @@ Resources:
           IpProtocol: tcp
           FromPort: 8443
           ToPort: 8443
-          SourceSecurityGroupId: !GetAtt TestBackendLoadBalancerSecurityGroup.GroupId
+          SourceSecurityGroupId: !GetAtt AlfrescoLoadBalancerSecurityGroup.GroupId
         - Description: HTTPS debug
           IpProtocol: tcp
           FromPort: 8443
@@ -1794,7 +1900,7 @@ Resources:
           CidrIp: !Ref VpcCidr
       Tags:
         - Key: Name
-          Value: !Sub alfresco-task-security-group-${Project}-${Env}
+          Value: !Sub alfresco-repository-task-security-group-${Project}-${Env}
         - Key: Env
           Value: !Ref Env
         - Key: Project
