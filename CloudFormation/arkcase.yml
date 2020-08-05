@@ -528,7 +528,7 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200804-0841/LambdaFunctions/maintenance_windows/maintenance_windows.zip
+        S3Key: DevOps/ACM-TMP-20200805-1102/LambdaFunctions/maintenance_windows/maintenance_windows.zip
       Tags:
         - Key: Name
           Value: !Sub maintenance-windows-lambda-${Project}-${Env}
@@ -553,7 +553,7 @@ Resources:
       # the stack is updated. The reason is that CloudFormation doesn't call
       # the Lambda function during an update unless there is a change in the
       # input parameters.
-      RandomToken: ACM-TMP-20200804-0841
+      RandomToken: ACM-TMP-20200805-1102
 
   ######################################
   # Microsoft Active Directory Service #
@@ -579,7 +579,7 @@ Resources:
   Amazonmq:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200804-0841/CloudFormation/amazonmq.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200805-1102/CloudFormation/amazonmq.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -665,7 +665,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200804-0841/LambdaFunctions/task_definition_resource/task_definition_resource.zip
+        S3Key: DevOps/ACM-TMP-20200805-1102/LambdaFunctions/task_definition_resource/task_definition_resource.zip
       Tags:
         - Key: Name
           Value: !Sub task-definition-resource-lambda-${Project}-${Env}
@@ -853,7 +853,7 @@ Resources:
           PASSWORD_LENGTH: !Ref PasswordsLength
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200804-0841/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200805-1102/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-rotation-lambda-${Project}-${Env}
@@ -936,7 +936,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200804-0841/LambdaFunctions/rotation_trigger/rotation_trigger.zip
+        S3Key: DevOps/ACM-TMP-20200805-1102/LambdaFunctions/rotation_trigger/rotation_trigger.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-trigger-lambda-${Project}-${Env}
@@ -1109,7 +1109,7 @@ Resources:
         SubnetIds: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200804-0841/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
+        S3Key: DevOps/ACM-TMP-20200805-1102/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-create-database-lambda-${Project}-${Env}
@@ -1131,7 +1131,7 @@ Resources:
   Pki:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200804-0841/CloudFormation/pki.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200805-1102/CloudFormation/pki.yml
       TimeoutInMinutes: 15
       Parameters:
         Env: !Ref Env
@@ -1514,7 +1514,7 @@ Resources:
     # Make sure the user is created after the database
     DependsOn: AlfrescoDatabase
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200804-0841/CloudFormation/mariadb-user-secret.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200805-1102/CloudFormation/mariadb-user-secret.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
@@ -1594,7 +1594,7 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  AlfrescoTargetGroup:
+  AlfrescoRepositoryTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Port: 443
@@ -1633,7 +1633,7 @@ Resources:
       Protocol: HTTPS
       DefaultActions:
         - Type: forward
-          TargetGroupArn: !Ref AlfrescoTargetGroup
+          TargetGroupArn: !Ref AlfrescoRepositoryTargetGroup
       Certificates:
         - CertificateArn: !GetAtt Pki.Outputs.AlfrescoIamCertArn
       SslPolicy: ELBSecurityPolicy-FS-1-2-Res-2019-08
@@ -1783,26 +1783,27 @@ Resources:
               protocol: tcp
           environment:
             - name: JAVA_OPTS
+              # TODO: from here: '{{resolve:...}}' doesn't work here... I need to use `awscli` when the container starts
+              # TODO: Add -Dshare.host=xyz etc. when Alfresco Share is ready
               value: !Sub >
                 -Ddb.driver=org.mariadb.jdbc.Driver
                 -Ddb.username='{{resolve:secretsmanager:${AlfrescoDatabaseUser.Outputs.UserSecretArn}:SecretString:username}}'
                 -Ddb.password='{{resolve:secretsmanager:${AlfrescoDatabaseUser.Outputs.UserSecretArn}:SecretString:password}}'
                 -Ddb.url="jdbc:mariadb://${MariadbInstance.Endpoint.Address}:${MariadbInstance.Endpoint.Port}/alfresco?autoReconnect=true&useUnicode=true&characterEncoding=UTF-8"
                 -Dindex.subsystem.name=noindex
-                -Dshare.host=alfresco.${Project}.lan
-                -Dshare.port=8080
-                -Dalfresco.host=alfresco.${Project}.lan
-                -Dalfresco.port=8080
-                -Daos.baseUrlOverwrite=https://alfresco.${Project}.lan:8080/alfresco/aos
+                -Dalfresco.host=acs-repository.${Project}.lan
+                -Dalfresco.port=443
+                -Dalfresco.protocol=https
+                -Daos.baseUrlOverwrite=https://acs-repository.${Project}.lan:443/alfresco/aos
                 -Dmessaging.broker.connections.max=8
                 -Dmessaging.broker.username='{{resolve:secretsmanager:${Amazonmq.Outputs.AlfrescoUserSecretArn}:SecretString:username}}'
                 -Dmessaging.broker.password='{{resolve:secretsmanager:${Amazonmq.Outputs.AlfrescoUserSecretArn}:SecretString:password}}'
-                -Dmessaging.broker.url=\"failover:(${Amazonmq.Outputs.OpenwireEndpoints})\"
+                -Dmessaging.broker.url="failover:(${Amazonmq.Outputs.OpenwireEndpoints})"
                 -Dcsrf.filter.enabled=false
                 -Djodconverter.enabled=false
                 -Djodconverter.officeHome=null
-                -Xms1500m
-                -Xmx1500m
+                -Xms3500m
+                -Xmx3500m
                 -Dlocal.transform.service.enabled=false
                 -Dtransform.service.enabled=false
                 -Dlegacy.transform.service.enabled=false
@@ -1831,9 +1832,9 @@ Resources:
             initProcessEnabled: true
 
         - name: nginx-acs-repository
-          image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/nginx-acs-repository:1
+          image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/nginx-acs-repository:3
           healthCheck:
-            command: [ CMD-SHELL, "curl -sk https://localhost:8443/nginx-ecs-ping" ]
+            command: [ CMD-SHELL, "curl -sk https://localhost:8443/nginx-ecs-ping.html" ]
             interval: 10
             retries: 2
             startPeriod: 5
@@ -1845,14 +1846,14 @@ Resources:
             - name: ACM_NGINX_DOMAIN_NAME
               # NB: `ACM_NGINX_DOMAIN_NAME` is only used for self-signed
               #     certificate, so its value is not important.
-              value: !Sub alfresco-repository.${Project}.lan
+              value: !Sub acs-repository.${Project}.lan
 
-            - name: ACM_NGINX_UPSTREAM_HOST
+            - name: ACM_NGINX_ACS_REPO_HOST
               # NB: Containers in an `awsvpc` task can access each other on
               #     `localhost`
               value: localhost
 
-            - name: ACM_NGINX_UPSTREAM_PORT
+            - name: ACM_NGINX_ACS_REPO_PORT
               value: 8080
           ulimits:
             - name: nofile
@@ -1912,28 +1913,34 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
+  AlfrescoRepositoryService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - AlfrescoListenerHttps
+      - AlfrescoEfsMountTargetA
+      - AlfrescoEfsMountTargetB
+    Properties:
+      Cluster: !Ref EcsCluster
+      TaskDefinition: !Ref AlfrescoRepositoryTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 1  # NB: Alfresco CE doesn't support clustering
+      HealthCheckGracePeriodSeconds: 300
+      PlatformVersion: 1.4.0
+      LoadBalancers:
+        - ContainerName: nginx-acs-repository
+          ContainerPort: 8443
+          TargetGroupArn: !Ref AlfrescoRepositoryTargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups: 
+            - !GetAtt AlfrescoRepositoryTaskSecurityGroup.GroupId
+            - !GetAtt MariadbAllowedSecurityGroup.GroupId
+          Subnets: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
+
+  # Route53
+
 #XXX
-#  TestBackendService:
-#    Type: AWS::ECS::Service
-#    DependsOn: TestBackendListenerHttps, AlfrescoEfsMountTargetA, AlfrescoEfsMountTargetB
-#    Properties:
-#      Cluster: !Ref EcsCluster
-#      TaskDefinition: !Ref TestBackendTaskDefinition
-#      LaunchType: FARGATE
-#      DesiredCount: 2
-#      HealthCheckGracePeriodSeconds: 20
-#      LoadBalancers:
-#        - ContainerName: nginx-tls
-#          ContainerPort: 8443
-#          TargetGroupArn: !Ref TestBackendTargetGroup
-#      NetworkConfiguration:
-#        AwsvpcConfiguration:
-#          AssignPublicIp: DISABLED
-#          SecurityGroups: [ !GetAtt TestBackendSecurityGroup.GroupId ]
-#          Subnets: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
-#
-#  # Route53
-#
 #  TestBackendDnsRecord:
 #    Type: AWS::Route53::RecordSet
 #    Properties:
