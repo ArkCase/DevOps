@@ -1,0 +1,16 @@
+[Unit]
+Description=Test backend
+Requires=network.target
+
+[Service]
+Type=simple
+ExecStart=/app/test-backend.py
+WorkingDirectory=/app
+User=app
+Group=app
+Restart=always
+RestartSec=5
+ExecStop=/usr/bin/killall -9 test-backend.py
+
+[Install]
+WantedBy=multi-user.target
