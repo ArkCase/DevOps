@@ -31,6 +31,9 @@ sudo systemctl enable test-backend.service
 
 sudo useradd -M -s /usr/sbin/nologin -U app
 
+sudo mkdir /app/data
+sudo chown app.app /app/data
+
 # Secure the AMI
 
 rm -f ~/.ssh/authorized_keys
