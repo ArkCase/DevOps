@@ -30,3 +30,8 @@ sudo systemctl daemon-reload
 sudo systemctl enable test-backend.service
 
 sudo useradd -M -s /usr/sbin/nologin -U app
+
+# Secure the AMI
+
+rm -f ~/.ssh/authorized_keys
+sudo rm -f /root/.ssh/authorized_keys

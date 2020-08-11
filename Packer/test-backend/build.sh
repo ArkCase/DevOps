@@ -3,7 +3,7 @@
 set -eu -o pipefail
 
 function usage() {
-    echo "Usage: AWS_PROFILE=armedia $0"
+    echo "Usage: AWS_PROFILE=marketplace $0"
     echo
     echo "Make sure you set either the AWS_PROFILE or AWS_DEFAULT_REGION"
     echo "environment variable prior to calling this script."
@@ -22,15 +22,16 @@ tmp=$(realpath "$0")
 dir=$(dirname "$tmp")
 cd "$dir"
 
-timestamp=$(date '+%Y%m%d-%H%M')
-
-if [[ -v AWS_PROFILE ]]; then
-    profile="$AWS_PROFILE"
+if [[ -v AWS_DEFAULT_REGION ]]; then
+    aws_region="$AWS_DEFAULT_REGION"
 else
-    profile=""
+    aws_region=$(aws configure get region --profile "$AWS_PROFILE")
 fi
+
+timestamp=$(date '+%Y%m%d-%H%M')
 
 packer build \
     -color=false \
+    -var region="$aws_region" \
     -var timestamp="$timestamp" \
     test-backend.json
