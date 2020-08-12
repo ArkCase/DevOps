@@ -64,6 +64,7 @@ if [ -v ARK_DB_SECRET_ARN ]; then
     username=$(echo "$value" | jq -r .username)
     password=$(echo "$value" | jq -r .password)
     JAVA_OPTS="$JAVA_OPTS -Ddb.username=$username -Ddb.password=$password"
+    echo 'Added `-Ddb.username` and `-Ddb.password` to `JAVA_OPTS`'
 fi
  
 exec "$PRGDIR"/"$EXECUTABLE" start "$@"
