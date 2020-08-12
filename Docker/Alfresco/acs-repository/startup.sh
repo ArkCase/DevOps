@@ -66,5 +66,15 @@ if [ -v ARK_DB_SECRET_ARN ]; then
     JAVA_OPTS="$JAVA_OPTS -Ddb.username=$username -Ddb.password=$password"
     echo 'Added `-Ddb.username` and `-Ddb.password` to `JAVA_OPTS`'
 fi
+
+# Fetch the ActiveMQ credentials and stuck them in JAVA_OPTS
+if [ -v ARK_ACTIVEMQ_SECRET_ARN ]; then
+    response=$(aws secretsmanager get-secret-value --secret-id "$ARK_ACTIVEMQ_SECRET_ARN")
+    value=$(echo "$response" | jq -r .SecretString)
+    username=$(echo "$value" | jq -r .username)
+    password=$(echo "$value" | jq -r .password)
+    JAVA_OPTS="$JAVA_OPTS -Dmessaging.broker.username=$username -Dmessaging.broker.password=$password"
+    echo 'Added `-Dmessaging.broker.username` and `-Dmessaging.broker.password` to `JAVA_OPTS`'
+fi
  
 exec "$PRGDIR"/"$EXECUTABLE" start "$@"
