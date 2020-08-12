@@ -9,9 +9,16 @@ USER root
 
 RUN yum -y install \
         curl \
+        python3 \
+        python3-pip \
         wget \
+    && pip3 install awscli \
     && cd /usr/local/tomcat/lib \
     && wget https://downloads.mariadb.com/Connectors/java/connector-java-${MARIADB_JDBC_VERSION}/mariadb-java-client-${MARIADB_JDBC_VERSION}.jar \
     && chmod 644 mariadb-java-client-${MARIADB_JDBC_VERSION}.jar
 
-USER alfresco
+COPY startup.sh /usr/local/tomcat/bin/startup.sh
+RUN chown root.Alfresco /usr/local/tomcat/bin/startup.sh \
+    && chmod 755 /usr/local/tomcat/bin/startup.sh
+
+# XXX USER alfresco
