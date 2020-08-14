@@ -111,10 +111,12 @@ def handler(event, context):
         }
 
     The ARNs of the private key and certificate SSM parameters will be returned
-    and made available through `Fn::GetAtt`:
+    and made available through `Fn::GetAtt`, along with the IAM server
+    certificate name:
 
         !GetAtt Certificate.KeyParameterArn
         !GetAtt Certificate.CertParameterArn
+        !GetAtt Certificate.IamCertName
 
     """
     print(f"Received event: {event}")
@@ -169,8 +171,9 @@ def upsert_certificate(event, request_type):
         args['SelfSigned'] = args['SelfSigned'].lower() == "true"
 
     # Create/renew the certificate
-    key_parameter_arn, cert_parameter_arn, iam_cert_arn = create_or_renew_cert(args)
-    print(f"Successfully created/renewed certificate: key_parameter_arn: {key_parameter_arn}, cert_parameter_arn: {cert_parameter_arn}")
+    # NB: This will also save it in SSM and IAM
+    key_parameter_arn, cert_parameter_arn, iam_cert_name, iam_cert_arn = create_or_renew_cert(args)
+    print(f"Successfully created/renewed certificate: key_parameter_arn: {key_parameter_arn}, cert_parameter_arn: {cert_parameter_arn}, iam_cert_arn: {iam_cert_arn}")
 
     # Check if the key and/or certificate parameter name(s) have changed. If
     # yes, delete the old parameters.
@@ -181,14 +184,21 @@ def upsert_certificate(event, request_type):
     if 'OldResourceProperties' in event:
         ssm = boto3.client("ssm")
         old_args = event['OldResourceProperties']
+
         old_key_parameter_name = old_args['KeyParameterName']
         if args['KeyParameterName'] != old_key_parameter_name:
             print(f"Key parameter name has changed; deleting old key parameter {old_key_parameter_name}")
             ssm.delete_parameter(Name=old_key_parameter_name)
+
         old_cert_parameter_name = old_args['CertParameterName']
         if args['CertParameterName'] != old_cert_parameter_name:
             print(f"Certificate parameter name has changed; deleting old certificate parameter {old_cert_parameter_name}")
             ssm.delete_parameter(Name=old_cert_parameter_name)
+
+            path_items = cert_parameter_name.split("/")
+            old_cert_name = path_items.pop()
+            iam = boto3.client("iam")
+            iam.delete_server_certificate(ServerCertificateName=old_cert_name)
 
     # When a certificate is renewed through the CloudFormation template (eg: a
     # parameter changes, such as `OrganizationalUnitName`) and it is a CA, we
@@ -209,6 +219,7 @@ def upsert_certificate(event, request_type):
                     reason="",
                     key_parameter_name=key_parameter_name,
                     cert_parameter_name=cert_parameter_name,
+                    iam_cert_name=iam_cert_name,
                     key_parameter_arn=key_parameter_arn,
                     cert_parameter_arn=cert_parameter_arn,
                     iam_cert_arn=iam_cert_arn
@@ -233,6 +244,7 @@ def upsert_certificate(event, request_type):
                 reason="Certificate successfully created/renewed",
                 key_parameter_name=key_parameter_name,
                 cert_parameter_name=cert_parameter_name,
+                iam_cert_name=iam_cert_name,
                 key_parameter_arn=key_parameter_arn,
                 cert_parameter_arn=cert_parameter_arn,
                 iam_cert_arn=iam_cert_arn
@@ -243,7 +255,12 @@ def delete_certificate(event):
     physical_id = event['PhysicalResourceId']
     print(f"Deleting certificate; physical_id: {physical_id}")
     # Parse the physical id to get the key and certificate SSM parameter names
-    key_parameter_name, cert_parameter_name = physical_id.split(",")
+    try:
+        key_parameter_name, cert_parameter_name, iam_cert_name = physical_id.split(",")
+    except ValueError:
+        key_parameter_name = ""
+        cert_parameter_name = ""
+        iam_cert_name = ""
     ssm = boto3.client("ssm")
     if key_parameter_name:
         try:
@@ -257,10 +274,18 @@ def delete_certificate(event):
         except ssm.exceptions.ParameterNotFound as e:
             # Already deleted by the previous update
             pass
+    if iam_cert_name:
+        iam = boto3.client("iam")
+        try:
+            iam.delete_server_certificate(ServerCertificateName=iam_cert_name)
+        except iam.exceptions.NoSuchEntityException as e:
+            # Already deleted by the previous update
+            pass
     send_response(
             event=event,
             success="True",
             reason="Certificate successfully deleted",
+            iam_cert_name=iam_cert_name,
             key_parameter_name=key_parameter_name,
             cert_parameter_name=cert_parameter_name
     )
@@ -272,17 +297,19 @@ def build_response(
         reason: str,
         key_parameter_name="",
         cert_parameter_name="",
+        iam_cert_name="",
         key_parameter_arn="",
         cert_parameter_arn="",
         iam_cert_arn=""
     ):
+    physical_id = ",".join([key_parameter_name, cert_parameter_name, iam_cert_name])
     response = {
         'Status': "SUCCESS" if success else "FAILED",
         'Reason': reason,
         'StackId': event['StackId'],
         'RequestId': event['RequestId'],
         'LogicalResourceId': event['LogicalResourceId'],
-        'PhysicalResourceId': key_parameter_name + "," + cert_parameter_name,
+        'PhysicalResourceId': physical_id,
         'Data': {
             'KeyParameterArn': key_parameter_arn,
             'CertParameterArn': cert_parameter_arn,
@@ -298,6 +325,7 @@ def send_response(
         reason: str,
         key_parameter_name="",
         cert_parameter_name="",
+        iam_cert_name="",
         key_parameter_arn="",
         cert_parameter_arn="",
         iam_cert_arn=""
@@ -308,6 +336,7 @@ def send_response(
             reason=reason,
             key_parameter_name=key_parameter_name,
             cert_parameter_name=cert_parameter_name,
+            iam_cert_name=iam_cert_name,
             key_parameter_arn=key_parameter_arn,
             cert_parameter_arn=cert_parameter_arn,
             iam_cert_arn=iam_cert_arn

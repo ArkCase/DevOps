@@ -97,9 +97,9 @@ def create_or_renew_cert(args: dict):
         }
 
     Returns a tuple:
-        (key_parameter_arn, cert_parameter_arn, iam_cert_arn)
+        (key_parameter_arn, cert_parameter_arn, iam_cert_name, iam_cert_arn)
 
-        Please note that `iam_cert_arn` will be an empty string is the
+        Please note that `iam_cert_arn` will be an empty string if the
         certificate is a CA.
     """
     key_type = args.get('KeyType', "RSA")
@@ -129,6 +129,7 @@ def create_or_renew_cert(args: dict):
     add_attribute_if_present(args, 'CommonName', attributes, NameOID.COMMON_NAME)
 
     # Use `dnQualifier` to store custom information
+
     value = "key:" + args['KeyParameterName']
     attributes.append(x509.NameAttribute(NameOID.DN_QUALIFIER, value))
     if ca_key_parameter_name:
@@ -204,6 +205,7 @@ def create_or_renew_cert(args: dict):
         extensions.append(extension)
 
     # Extract and check key and certificate parameter information
+
     key_parameter_name = args['KeyParameterName']
     if "," in key_parameter_name:
         raise ValueError(f"Key parameter name can't have commas: {key_parameter_name}")
@@ -214,6 +216,7 @@ def create_or_renew_cert(args: dict):
     cert_tags = args.get('CertTags', [])
 
     # Generate private key
+
     print(f"Generating private key {key_parameter_name}: {key_type} {key_size} bits")
     if key_type == "RSA":
         key = rsa.generate_private_key(
@@ -231,6 +234,7 @@ def create_or_renew_cert(args: dict):
     print(f"Successfully generated private key {key_parameter_name}")
 
     # Get the CA private key and certificate
+
     ssm = boto3.client("ssm")
     if ca_key_parameter_name:
         # Sign with CA key
@@ -302,7 +306,12 @@ def create_or_renew_cert(args: dict):
     )
 
     # Save the certificate in IAM, but only if it is not a CA
-    if not is_ca:
+
+    if is_ca:
+        print(f"Certificate {cert_parameter_name} is a CA: not saving it to IAM")
+        iam_cert_name = ""
+        iam_cert_arn = ""
+    else:
         print(f"Saving non-CA certificate {cert_parameter_name} in IAM")
         path_items = cert_parameter_name.split("/")
         cert_name = path_items.pop()
@@ -337,14 +346,12 @@ def create_or_renew_cert(args: dict):
                 CertificateChain=chain
             )
 
+        iam_cert_name = cert_name
         iam_cert_arn = response['ServerCertificateMetadata']['Arn']
-    else:
-        print(f"Certificate {cert_parameter_name} is a CA: not saving it to IAM")
-        iam_cert_arn = ""
 
     # Done
     print(f"Successfully generated private key and certificate; key ARN: {key_parameter_arn}, certificate ARN: {cert_parameter_arn}, IAM ARN: {iam_cert_arn}")
-    return key_parameter_arn, cert_parameter_arn, iam_cert_arn
+    return key_parameter_arn, cert_parameter_arn, iam_cert_name, iam_cert_arn
 
 
 def add_attribute_if_present(event, key, attributes, name_oid):
