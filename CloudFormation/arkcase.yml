@@ -102,9 +102,9 @@ Parameters:
     Type: Number
     Description: >
       How long passwords should be for various AWS services
-    Default: 50
+    Default: 40
     MinValue: 12
-    MaxValue: 200
+    MaxValue: 40
 
   MariadbRdsInstanceClass:
     Type: String
@@ -528,7 +528,7 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200813-0952/LambdaFunctions/maintenance_windows/maintenance_windows.zip
+        S3Key: DevOps/ACM-TMP-20200815-0749/LambdaFunctions/maintenance_windows/maintenance_windows.zip
       Tags:
         - Key: Name
           Value: !Sub maintenance-windows-lambda-${Project}-${Env}
@@ -553,7 +553,7 @@ Resources:
       # the stack is updated. The reason is that CloudFormation doesn't call
       # the Lambda function during an update unless there is a change in the
       # input parameters.
-      RandomToken: ACM-TMP-20200813-0952
+      RandomToken: ACM-TMP-20200815-0749
 
   ######################################
   # Microsoft Active Directory Service #
@@ -579,7 +579,7 @@ Resources:
   Amazonmq:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200813-0952/CloudFormation/amazonmq.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200815-0749/CloudFormation/amazonmq.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -665,7 +665,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200813-0952/LambdaFunctions/task_definition_resource/task_definition_resource.zip
+        S3Key: DevOps/ACM-TMP-20200815-0749/LambdaFunctions/task_definition_resource/task_definition_resource.zip
       Tags:
         - Key: Name
           Value: !Sub task-definition-resource-lambda-${Project}-${Env}
@@ -761,10 +761,11 @@ Resources:
     Properties:
       Description: Master secret
       GenerateSecretString:
-        SecretStringTemplate: !Sub '{"username": "master"}'
+        SecretStringTemplate: '{"username": "master"}'
         GenerateStringKey: password
         PasswordLength: !Ref PasswordsLength
-        ExcludeCharacters: "'/@\"\\%"
+        # XXX ExcludeCharacters: "'/@\"\\%!#$&()*+,-.:;<=>?[]^_`{}|~"
+        ExcludePunctuation: true
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-secret-${Project}-${Env}
@@ -853,7 +854,7 @@ Resources:
           PASSWORD_LENGTH: !Ref PasswordsLength
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200813-0952/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200815-0749/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-rotation-lambda-${Project}-${Env}
@@ -936,7 +937,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200813-0952/LambdaFunctions/rotation_trigger/rotation_trigger.zip
+        S3Key: DevOps/ACM-TMP-20200815-0749/LambdaFunctions/rotation_trigger/rotation_trigger.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-trigger-lambda-${Project}-${Env}
@@ -1109,7 +1110,7 @@ Resources:
         SubnetIds: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200813-0952/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
+        S3Key: DevOps/ACM-TMP-20200815-0749/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-create-database-lambda-${Project}-${Env}
@@ -1131,7 +1132,7 @@ Resources:
   Pki:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200813-0952/CloudFormation/pki.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200815-0749/CloudFormation/pki.yml
       TimeoutInMinutes: 15
       Parameters:
         Env: !Ref Env
@@ -1514,7 +1515,7 @@ Resources:
     # Make sure the user is created after the database
     DependsOn: AlfrescoDatabase
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200813-0952/CloudFormation/mariadb-user-secret.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200815-0749/CloudFormation/mariadb-user-secret.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
@@ -1914,30 +1915,31 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  AlfrescoRepositoryService:
-    Type: AWS::ECS::Service
-    DependsOn:
-      - AlfrescoListenerHttps
-      - AlfrescoEfsMountTargetA
-      - AlfrescoEfsMountTargetB
-    Properties:
-      Cluster: !Ref EcsCluster
-      TaskDefinition: !Ref AlfrescoRepositoryTaskDefinition
-      LaunchType: FARGATE
-      DesiredCount: 1  # NB: Alfresco CE doesn't support clustering
-      HealthCheckGracePeriodSeconds: 300
-      PlatformVersion: 1.4.0
-      LoadBalancers:
-        - ContainerName: nginx-acs-repository
-          ContainerPort: 8443
-          TargetGroupArn: !Ref AlfrescoRepositoryTargetGroup
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
-          SecurityGroups: 
-            - !GetAtt AlfrescoRepositoryTaskSecurityGroup.GroupId
-            - !GetAtt MariadbAllowedSecurityGroup.GroupId
-          Subnets: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
+#XXX
+#  AlfrescoRepositoryService:
+#    Type: AWS::ECS::Service
+#    DependsOn:
+#      - AlfrescoListenerHttps
+#      - AlfrescoEfsMountTargetA
+#      - AlfrescoEfsMountTargetB
+#    Properties:
+#      Cluster: !Ref EcsCluster
+#      TaskDefinition: !Ref AlfrescoRepositoryTaskDefinition
+#      LaunchType: FARGATE
+#      DesiredCount: 1  # NB: Alfresco CE doesn't support clustering
+#      HealthCheckGracePeriodSeconds: 300
+#      PlatformVersion: 1.4.0
+#      LoadBalancers:
+#        - ContainerName: nginx-acs-repository
+#          ContainerPort: 8443
+#          TargetGroupArn: !Ref AlfrescoRepositoryTargetGroup
+#      NetworkConfiguration:
+#        AwsvpcConfiguration:
+#          AssignPublicIp: DISABLED
+#          SecurityGroups:
+#            - !GetAtt AlfrescoRepositoryTaskSecurityGroup.GroupId
+#            - !GetAtt MariadbAllowedSecurityGroup.GroupId
+#          Subnets: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
 
   # Route53
 

@@ -62,9 +62,9 @@ Parameters:
   PasswordLength:
     Type: Number
     Description: How long passwords should be
-    Default: 20
-    MinValue: 15
-    MaxValue: 80
+    Default: 40
+    MinValue: 12
+    MaxValue: 40
 
   MasterSecretRotationCron:
     Type: String
@@ -492,7 +492,8 @@ Resources:
         SecretStringTemplate: !Sub '{"username": "admin1", "groups": "admin"}'
         GenerateStringKey: password
         PasswordLength: !Ref PasswordLength
-        ExcludePunctuation: true  # AmazonMQ is quite picky
+        # XXX ExcludeCharacters: "'/@\"\\%!#$&()*+,-.:;<=>?[]^_`{}|~"
+        ExcludePunctuation: true
       Tags:
         - Key: Name
           Value: !Sub amazonmq-master-secret-${Project}-${Env}
@@ -510,7 +511,7 @@ Resources:
   MasterSecretConfig:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200813-0952/CloudFormation/amqsecretcfg.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200815-0749/CloudFormation/amqsecretcfg.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
@@ -548,7 +549,8 @@ Resources:
         SecretStringTemplate: '{"username": "alfresco1", "groups": ["alfresco"]}'
         GenerateStringKey: password
         PasswordLength: !Ref PasswordLength
-        ExcludePunctuation: true  # AmazonMQ is quite picky
+        # XXX ExcludeCharacters: "'/@\"\\%!#$&()*+,-.:;<=>?[]^_`{}|~"
+        ExcludePunctuation: true
       Tags:
         - Key: Name
           Value: !Sub amazonmq-alfresco-user-${Project}-${Env}
@@ -566,7 +568,7 @@ Resources:
   AlfrescoUserSecretConfig:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200813-0952/CloudFormation/amqsecretcfg.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200815-0749/CloudFormation/amqsecretcfg.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
