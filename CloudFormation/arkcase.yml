@@ -442,82 +442,6 @@ Resources:
       SubnetId: !Ref PrivateSubnetB
       RouteTableId: !Ref PrivateRouteTable
 
-  ###############################################
-  # Replacement for AWS::SecretsManager::Secret #
-  ###############################################
-
-  SecretResourceLambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      Policies:
-        - PolicyName: SecretResourceLambdaPolicy
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - secretsmanager:DescribeSecret
-                  - secretsmanager:CreateSecret
-                  - secretsmanager:UpdateSecret
-                  - secretsmanager:DeleteSecret
-                  - secretsmanager:TagResource
-                  - secretsmanager:UntagResource
-                Resource: !Sub arn:aws:secretsmanager:*:*:secret:*
-
-              - Effect: Allow
-                Action: secretsmanager:GetRandomPassword
-                Resource: "*"
-
-      Tags:
-        - Key: Name
-          Value: !Sub secret-resource-lambda-execution-role-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: global
-        - Key: Component
-          Value: iam
-        - Key: ManagedBy
-          Value: CloudFormation
-
-  SecretResourceLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      Description: >
-        Backend for CloudFormation custom resources to create, update or delete
-        a secret
-      Runtime: python3.6
-      Role: !GetAtt SecretResourceLambdaExecutionRole.Arn
-      Handler: secret_resource.handler
-      Timeout: 60
-      Code:
-        S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200818-1235/LambdaFunctions/secret_resource/secret_resource.zip
-      Tags:
-        - Key: Name
-          Value: !Sub secret-resource-lambda-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: global
-        - Key: Component
-          Value: lambda
-        - Key: ManagedBy
-          Value: CloudFormation
-
   ###############################
   # Route53 private hosted zone #
   ###############################
@@ -604,7 +528,7 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200818-1235/LambdaFunctions/maintenance_windows/maintenance_windows.zip
+        S3Key: DevOps/ACM-TMP-20200819-0539/LambdaFunctions/maintenance_windows/maintenance_windows.zip
       Tags:
         - Key: Name
           Value: !Sub maintenance-windows-lambda-${Project}-${Env}
@@ -629,7 +553,7 @@ Resources:
       # the stack is updated. The reason is that CloudFormation doesn't call
       # the Lambda function during an update unless there is a change in the
       # input parameters.
-      RandomToken: ACM-TMP-20200818-1235
+      RandomToken: ACM-TMP-20200819-0539
 
   ######################################
   # Microsoft Active Directory Service #
@@ -655,12 +579,11 @@ Resources:
   Amazonmq:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200818-1235/CloudFormation/amazonmq.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200819-0539/CloudFormation/amazonmq.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
         Project: !Ref Project
-        SecretResourceLambdaArn: !GetAtt SecretResourceLambda.Arn
         VpcId: !Ref Vpc
         SubnetIdA: !Ref PrivateSubnetA
         SubnetIdB: !Ref PrivateSubnetB
@@ -742,7 +665,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200818-1235/LambdaFunctions/task_definition_resource/task_definition_resource.zip
+        S3Key: DevOps/ACM-TMP-20200819-0539/LambdaFunctions/task_definition_resource/task_definition_resource.zip
       Tags:
         - Key: Name
           Value: !Sub task-definition-resource-lambda-${Project}-${Env}
@@ -834,15 +757,13 @@ Resources:
   # MariaDB Master Secret
 
   MariadbMasterSecret:
-    Type: Custom::Secret
+    Type: AWS::SecretsManager::Secret
     Properties:
-      ServiceToken: !GetAtt SecretResourceLambda.Arn
       Description: Master secret
       GenerateSecretString:
         SecretStringTemplate: '{"username": "master"}'
         GenerateStringKey: password
         PasswordLength: !Ref PasswordsLength
-        # XXX ExcludeCharacters: "'/@\"\\%!#$&()*+,-.:;<=>?[]^_`{}|~"
         ExcludePunctuation: true
       Tags:
         - Key: Name
@@ -932,7 +853,7 @@ Resources:
           PASSWORD_LENGTH: !Ref PasswordsLength
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200818-1235/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200819-0539/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-rotation-lambda-${Project}-${Env}
@@ -1015,7 +936,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200818-1235/LambdaFunctions/rotation_trigger/rotation_trigger.zip
+        S3Key: DevOps/ACM-TMP-20200819-0539/LambdaFunctions/rotation_trigger/rotation_trigger.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-trigger-lambda-${Project}-${Env}
@@ -1188,7 +1109,7 @@ Resources:
         SubnetIds: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200818-1235/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
+        S3Key: DevOps/ACM-TMP-20200819-0539/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-create-database-lambda-${Project}-${Env}
@@ -1210,7 +1131,7 @@ Resources:
   Pki:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200818-1235/CloudFormation/pki.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200819-0539/CloudFormation/pki.yml
       TimeoutInMinutes: 15
       Parameters:
         Env: !Ref Env
@@ -1593,12 +1514,11 @@ Resources:
     # Make sure the user is created after the database
     DependsOn: AlfrescoDatabase
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200818-1235/CloudFormation/mariadb-user-secret.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200819-0539/CloudFormation/mariadb-user-secret.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
         Project: !Ref Project
-        SecretResourceLambdaArn: !GetAtt SecretResourceLambda.Arn
         SubnetIds: !Join [ ",", [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ] ]
         RotationLambdaSecurityGroupId: !GetAtt MariadbLambdaSecurityGroup.GroupId
         RdsInstanceId: !Ref MariadbInstance

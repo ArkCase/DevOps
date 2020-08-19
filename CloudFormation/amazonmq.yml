@@ -32,13 +32,6 @@ Parameters:
       Up to 30 alpha-numeric characters; can use underscores,
       dots and dashes
 
-  SecretResourceLambdaArn:
-    Type: String
-    Description: >
-      ARN of the Lambda function which is the backend for the `Secret` custom
-      resource
-    MinLength: 1
-
   VpcId:
     Type: AWS::EC2::VPC::Id
     Description: The VPC where the AmazonMQ broker will live
@@ -125,7 +118,6 @@ Metadata:
         Parameters:
           - Env
           - Project
-          - SecretResourceLambdaArn
 
       - Label: { default: Network configuration }
         Parameters:
@@ -492,16 +484,14 @@ Resources:
   #################
 
   MasterSecret:
-    Type: Custom::Secret
+    Type: AWS::SecretsManager::Secret
     Properties:
-      ServiceToken: !Ref SecretResourceLambdaArn
       Description: Master credentials to connect to the AmazonMQ broker
       GenerateSecretString:
         # NB: The `groups` field must be present and be a comma-separated list
         SecretStringTemplate: !Sub '{"username": "admin1", "groups": "admin"}'
         GenerateStringKey: password
         PasswordLength: !Ref PasswordLength
-        # XXX ExcludeCharacters: "'/@\"\\%!#$&()*+,-.:;<=>?[]^_`{}|~"
         ExcludePunctuation: true
       Tags:
         - Key: Name
@@ -520,7 +510,7 @@ Resources:
   MasterSecretConfig:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200818-1235/CloudFormation/amqsecretcfg.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200819-0539/CloudFormation/amqsecretcfg.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
@@ -549,9 +539,8 @@ Resources:
   ########################
 
   AlfrescoUserSecret:
-    Type: Custom::Secret
+    Type: AWS::SecretsManager::Secret
     Properties:
-      ServiceToken: !Ref SecretResourceLambdaArn
       Description: >
         Credentials to allow Alfresco to connect to the AmazonMQ broker
       GenerateSecretString:
@@ -559,7 +548,6 @@ Resources:
         SecretStringTemplate: '{"username": "alfresco1", "groups": ["alfresco"]}'
         GenerateStringKey: password
         PasswordLength: !Ref PasswordLength
-        # XXX ExcludeCharacters: "'/@\"\\%!#$&()*+,-.:;<=>?[]^_`{}|~"
         ExcludePunctuation: true
       Tags:
         - Key: Name
@@ -578,7 +566,7 @@ Resources:
   AlfrescoUserSecretConfig:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200818-1235/CloudFormation/amqsecretcfg.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200819-0539/CloudFormation/amqsecretcfg.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
