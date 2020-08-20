@@ -7,8 +7,10 @@ ARG MARIADB_JDBC_VERSION=2.2.5
 
 USER root
 
-RUN yum -y install \
+RUN yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm \
+    && yum -y install \
         curl \
+        jq \
         python3 \
         python3-pip \
         wget \
@@ -17,8 +19,12 @@ RUN yum -y install \
     && wget https://downloads.mariadb.com/Connectors/java/connector-java-${MARIADB_JDBC_VERSION}/mariadb-java-client-${MARIADB_JDBC_VERSION}.jar \
     && chmod 644 mariadb-java-client-${MARIADB_JDBC_VERSION}.jar
 
-COPY startup.sh /usr/local/tomcat/bin/startup.sh
-RUN chown root.Alfresco /usr/local/tomcat/bin/startup.sh \
-    && chmod 755 /usr/local/tomcat/bin/startup.sh
+RUN wget https://dev.mysql.com/get/mysql80-community-release-el7-3.noarch.rpm \
+    && rpm -ivh mysql80-community-release-el7-3.noarch.rpm \
+    && yum -y install mysql
+
+COPY ark-startup.sh /usr/local/tomcat/bin/ark-startup.sh
+
+CMD ["/usr/local/tomcat/bin/ark-startup.sh"]
 
 # XXX USER alfresco
