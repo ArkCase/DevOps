@@ -19,9 +19,10 @@ RUN yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.n
     && wget https://downloads.mariadb.com/Connectors/java/connector-java-${MARIADB_JDBC_VERSION}/mariadb-java-client-${MARIADB_JDBC_VERSION}.jar \
     && chmod 644 mariadb-java-client-${MARIADB_JDBC_VERSION}.jar
 
-RUN wget https://dev.mysql.com/get/mysql80-community-release-el7-3.noarch.rpm \
-    && rpm -ivh mysql80-community-release-el7-3.noarch.rpm \
-    && yum -y install mysql
+# XXX
+#RUN wget https://dev.mysql.com/get/mysql80-community-release-el7-3.noarch.rpm \
+#    && rpm -ivh mysql80-community-release-el7-3.noarch.rpm \
+#    && yum -y install mysql
 
 COPY ark-startup.sh /usr/local/tomcat/bin/ark-startup.sh
 

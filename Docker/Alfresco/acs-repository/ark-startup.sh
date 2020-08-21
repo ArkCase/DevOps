@@ -2,6 +2,12 @@
 
 set -eu -o pipefail
 
+echo "Installing RDS certificate"
+
+cd /etc/pki/ca-trust/source/anchors
+wget https://s3.amazonaws.com/rds-downloads/rds-ca-2019-root.pem
+update-ca-trust extract
+
 echo "Customizing environment for ArkCase"
 
 [ -v JAVA_OPTS ] || JAVA_OPTS=
@@ -15,15 +21,13 @@ if [ -v ARK_DB_SECRET_ARN ]; then
     dbname=$(echo "$secret" | jq -r .dbname)
     username=$(echo "$secret" | jq -r .username)
     password=$(echo "$secret" | jq -r .password)
-    JAVA_OPTS="$JAVA_OPTS -Ddb.url=\"jdbc:mariadb://$host:$port/$dbname?autoReconnect=true&useUnicode=true&characterEncoding=UTF-8\""
+    JAVA_OPTS="$JAVA_OPTS -Ddb.url=\"jdbc:mariadb://$host:$port/$dbname?autoReconnect=true&useUnicode=true&characterEncoding=UTF-8&useSSL=true\""
     JAVA_OPTS="$JAVA_OPTS -Ddb.username=$username -Ddb.password=$password"
     echo "MariaDB host: $host"
     echo "MariaDB port: $port"
     echo "MariaDB dbname: $dbname"
     echo "MariaDB username: $username"
-    echo "XXX mariadb password: $password"
     echo 'Added `-Ddb.url`, `-Ddb.username` and `-Ddb.password` to `JAVA_OPTS`' > /dev/stdout
-    echo 'show databases;' | mysql -h $host -u $username -p$password  # XXX
 fi
 
 # Fetch the ActiveMQ credentials and stuck them in JAVA_OPTS
