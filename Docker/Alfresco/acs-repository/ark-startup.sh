@@ -21,7 +21,7 @@ if [ -v ARK_DB_SECRET_ARN ]; then
     dbname=$(echo "$secret" | jq -r .dbname)
     username=$(echo "$secret" | jq -r .username)
     password=$(echo "$secret" | jq -r .password)
-    JAVA_OPTS="$JAVA_OPTS -Ddb.url=\"jdbc:mariadb://$host:$port/$dbname?autoReconnect=true&useUnicode=true&characterEncoding=UTF-8&useSSL=true\""
+    JAVA_OPTS="$JAVA_OPTS -Ddb.url=\"jdbc:mariadb://$host:$port/$dbname?autoReconnect=true&useUnicode=true&characterEncoding=UTF-8&useSSL=true&requireSsl=true&enabledSslProtocolSuites=TLSv1.2&trustServerCertificate=false&serverSslCert=/etc/pki/ca-trust/source/anchors/rds-ca-2019-root.pem\""
     JAVA_OPTS="$JAVA_OPTS -Ddb.username=$username -Ddb.password=$password"
     echo "MariaDB host: $host"
     echo "MariaDB port: $port"
