@@ -10,7 +10,7 @@ hostname = response.content.decode('utf-8')
 
 app = Flask(__name__)
 
-users_file = "/app/data/test-backend-users.txt"
+users_file = "/app/data/test-backend-users.json"
 
 
 def get_users():
@@ -49,7 +49,6 @@ def delete_user(username):
             del users[i]
             break
     save_users(users)
-            
 
 
 @app.route("/", defaults={'path': ""})
