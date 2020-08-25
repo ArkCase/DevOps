@@ -10,7 +10,7 @@ hostname = response.content.decode('utf-8')
 
 app = Flask(__name__)
 
-users_file = "/app/data/test-backend-users.json"
+users_file = "/app/data/users.json"
 
 
 def get_users():
