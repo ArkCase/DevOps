@@ -34,9 +34,6 @@ services:
     environment:
       JAVA_OPTS: >
         -Ddb.driver=org.mariadb.jdbc.Driver
-        -Ddb.username=alfresco
-        -Ddb.password=hei4aeY9
-        -Ddb.url="jdbc:mariadb://mariadb:3306/alfresco?autoReconnect=true&useUnicode=true&characterEncoding=UTF-8"
         -Dindex.subsystem.name=noindex
         -Dshare.host=${domain_name}
         -Dshare.port=9443
@@ -69,6 +66,9 @@ services:
         -Dreplication.enabled=false
         -Dtransferservice.receiver.enabled=false
         -Dsystem.thumbnail.generate=false
+      DC_DB_USERNAME: alfresco
+      DC_DB_PASSWORD: hei4aeY9
+      DC_DB_URL: jdbc:mariadb://mariadb:3306/alfresco?autoReconnect=true&useUnicode=true&characterEncoding=UTF-8
 
   nginx-acs-repository:
     image: ${account_id}.dkr.ecr.${region}.amazonaws.com/nginx-acs-repository:${nginx_acs_repository_tag}
