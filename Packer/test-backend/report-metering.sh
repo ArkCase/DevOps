@@ -11,7 +11,7 @@ if [ -e "$users_file" ]; then
 fi
 echo "Number of users: $nusers"
 
-product_code=$(curl -f http://169.254.169.254/latest/meta-data/product-codes)
+product_code=$(cat /app/aws-marketplace-product-code)
 timestamp=$(date -u +'%Y-%m-%dT%H:%M:%S')
 dimension=UserCount
 

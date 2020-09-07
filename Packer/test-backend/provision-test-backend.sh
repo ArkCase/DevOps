@@ -42,6 +42,7 @@ sudo chown app.app /app/data
 
 # Install the metering scripts
 
+move aws-marketplace-product-code /app
 move report-metering.sh /app
 move setup-metering.sh /app
 move setup-metering.service /etc/systemd/system
