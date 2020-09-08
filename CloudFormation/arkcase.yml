@@ -530,7 +530,7 @@ Resources:
       Timeout: 5
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200821-1506/LambdaFunctions/maintenance_windows/maintenance_windows.zip
+        S3Key: DevOps/ACM-TMP-20200908-0817/LambdaFunctions/maintenance_windows/maintenance_windows.zip
       Tags:
         - Key: Name
           Value: !Sub maintenance-windows-lambda-${Project}-${Env}
@@ -555,7 +555,7 @@ Resources:
       # the stack is updated. The reason is that CloudFormation doesn't call
       # the Lambda function during an update unless there is a change in the
       # input parameters.
-      RandomToken: ACM-TMP-20200821-1506
+      RandomToken: ACM-TMP-20200908-0817
 
   ######################################
   # Microsoft Active Directory Service #
@@ -581,7 +581,7 @@ Resources:
   Amazonmq:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200821-1506/CloudFormation/amazonmq.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200908-0817/CloudFormation/amazonmq.yml
       TimeoutInMinutes: 30
       Parameters:
         Env: !Ref Env
@@ -667,7 +667,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200821-1506/LambdaFunctions/task_definition_resource/task_definition_resource.zip
+        S3Key: DevOps/ACM-TMP-20200908-0817/LambdaFunctions/task_definition_resource/task_definition_resource.zip
       Tags:
         - Key: Name
           Value: !Sub task-definition-resource-lambda-${Project}-${Env}
@@ -855,7 +855,7 @@ Resources:
           PASSWORD_LENGTH: !Ref PasswordsLength
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200821-1506/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
+        S3Key: DevOps/ACM-TMP-20200908-0817/LambdaFunctions/mariadb_master_rotation/mariadb_master_rotation.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-rotation-lambda-${Project}-${Env}
@@ -938,7 +938,7 @@ Resources:
       Timeout: 30
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200821-1506/LambdaFunctions/rotation_trigger/rotation_trigger.zip
+        S3Key: DevOps/ACM-TMP-20200908-0817/LambdaFunctions/rotation_trigger/rotation_trigger.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-trigger-lambda-${Project}-${Env}
@@ -1111,7 +1111,7 @@ Resources:
         SubnetIds: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
       Code:
         S3Bucket: !Sub arkcase-public-${AWS::Region}
-        S3Key: DevOps/ACM-TMP-20200821-1506/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
+        S3Key: DevOps/ACM-TMP-20200908-0817/LambdaFunctions/mariadb_create_database/mariadb_create_database.zip
       Tags:
         - Key: Name
           Value: !Sub mariadb-create-database-lambda-${Project}-${Env}
@@ -1133,7 +1133,7 @@ Resources:
   Pki:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200821-1506/CloudFormation/pki.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200908-0817/CloudFormation/pki.yml
       TimeoutInMinutes: 15
       Parameters:
         Env: !Ref Env
@@ -1516,7 +1516,7 @@ Resources:
     # Make sure the user is created after the database
     DependsOn: AlfrescoDatabase
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200821-1506/CloudFormation/mariadb-user-secret.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200908-0817/CloudFormation/mariadb-user-secret.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
@@ -1783,7 +1783,7 @@ Resources:
             fileSystemId: !Ref AlfrescoEfs
       containerDefinitions:
         - name: acs-repository
-          image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/acs-repository:debug17
+          image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/acs-repository:debug25
           healthCheck:
             command: [ CMD-SHELL, "curl -f http://localhost:8080/alfresco/" ]
             interval: 10
@@ -1793,6 +1793,9 @@ Resources:
           portMappings:
             - containerPort: 8080
               protocol: tcp
+          mountPoints:
+            - sourceVolume: alfresco-efs
+              containerPath: /usr/local/tomcat/alf_data
           environment:
             - name: ARK_DB_SECRET_ARN
               value: !GetAtt AlfrescoDatabaseUser.Outputs.UserSecretArn
@@ -1803,6 +1806,7 @@ Resources:
             - name: JAVA_OPTS
               # TODO: Add -Dshare.host=xyz etc. when Alfresco Share is ready
               value: !Sub >
+                -Ddir.root=/usr/local/tomcat/alf_data
                 -Ddb.driver=org.mariadb.jdbc.Driver
                 -Dindex.subsystem.name=noindex
                 -Dalfresco.host=acs-repository.${Project}.lan
@@ -1833,6 +1837,7 @@ Resources:
                 -Dreplication.enabled=false
                 -Dtransferservice.receiver.enabled=false
                 -Dsystem.thumbnail.generate=false
+
           logConfiguration:
             logDriver: awslogs
             options:
