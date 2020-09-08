@@ -33,6 +33,7 @@ services:
       - alfdata-volume:/usr/local/tomcat/alf_data
     environment:
       JAVA_OPTS: >
+        -Ddir.root=/usr/local/tomcat/alf_data
         -Ddb.driver=org.mariadb.jdbc.Driver
         -Dindex.subsystem.name=noindex
         -Dshare.host=${domain_name}
