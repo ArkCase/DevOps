@@ -30,7 +30,15 @@ if [ -v ARK_DB_SECRET_ARN ]; then
     echo "MariaDB dbname: $dbname"
     echo "MariaDB username: $username"
     echo 'Added `-Ddb.url`, `-Ddb.username` and `-Ddb.password` to `JAVA_OPTS`'
+else
+    echo "I am are being run locally using docker-compose"
+    JAVA_OPTS="$JAVA_OPTS -Ddb.url=\"$DC_DB_URL\" -Ddb.username=$DC_DB_USERNAME -Ddb.password=$DC_DB_PASSWORD"
+    echo "MariaDB URL: DC_DB_URL"
+    echo "MariaDB username: $DC_DB_USERNAME"
+    echo 'Added `-Ddb.url`, `-Ddb.username` and `-Ddb.password` to `JAVA_OPTS`'
+fi
 
+if [ -v ARK_ACTIVEMQ_SECRET_ARN ]; then
     echo "Fetching the ActiveMQ credentials and adding them to JAVA_OPTS"
     response=$(aws secretsmanager get-secret-value --secret-id "$ARK_ACTIVEMQ_SECRET_ARN")
     secret=$(echo "$response" | jq -r .SecretString)
@@ -39,13 +47,8 @@ if [ -v ARK_DB_SECRET_ARN ]; then
     JAVA_OPTS="$JAVA_OPTS -Dmessaging.broker.username=$username -Dmessaging.broker.password=$password"
     echo "ActiveMQ username: $username"
     echo 'Added `-Dmessaging.broker.username` and `-Dmessaging.broker.password` to `JAVA_OPTS`'
-
 else
-    echo "I am are being run locally using docker-compose; local ActiveMQ doesn't use authorization"
-    JAVA_OPTS="$JAVA_OPTS -Ddb.url=\"$DC_DB_URL\" -Ddb.username=$DC_DB_USERNAME -Ddb.password=$DC_DB_PASSWORD"
-    echo "MariaDB URL: DC_DB_URL"
-    echo "MariaDB username: $DC_DB_USERNAME"
-    echo 'Added `-Ddb.url`, `-Ddb.username` and `-Ddb.password` to `JAVA_OPTS`'
+    echo "ARK_ACTIVEMQ_SECRET_ARN not defined => Don't set up ActiveMQ credentials for Alfresco"
 fi
 
 export JAVA_OPTS
