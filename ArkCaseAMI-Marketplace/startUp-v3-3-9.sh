@@ -18,6 +18,7 @@ if [ ! -e /var/lib/admin-password-changed ]; then
     ldap_bind_password=$(grep ldap.synchronization.java.naming.security.credentials "$alfresco_prop" | sed 's/^[^=]*=//')
 
     echo "Set password of admin user to: \"A$instance_id\""
+    sleep 30  # Wait for Samba to be up and running
     password=$(echo -n \"A$instance_id\" | iconv -f utf8 -t utf16le | base64 -w 0)
     tmpfile=$(mktemp /tmp/XXXXXX.ldif)
     echo "dn: ${arkcase_admin_user}" > "$tmpfile"
@@ -28,7 +29,6 @@ if [ ! -e /var/lib/admin-password-changed ]; then
     rm "$tmpfile"
 
     echo "Enable the admin user"
-    sleep 30  # Wait for Samba to be up and running
     tmpfile=$(mktemp /tmp/XXXXXX.ldif)
     echo "dn: ${arkcase_admin_user}" > "$tmpfile"
     echo "changetype: modify" >> "$tmpfile"
