@@ -17,16 +17,6 @@ if [ ! -e /var/lib/admin-password-changed ]; then
     ldap_bind_user=$(grep ldap.synchronization.java.naming.security.principal "$alfresco_prop" | sed 's/^[^=]*=//')
     ldap_bind_password=$(grep ldap.synchronization.java.naming.security.credentials "$alfresco_prop" | sed 's/^[^=]*=//')
 
-    echo "Enable the admin user"
-    sleep 30  # Wait for Samba to be up and running
-    tmpfile=$(mktemp /tmp/XXXXXX.ldif)
-    echo "dn: ${arkcase_admin_user}" > "$tmpfile"
-    echo "changetype: modify" >> "$tmpfile"
-    echo "replace: userAccountControl" >> "$tmpfile"
-    echo "userAccountControl: 512" >> "$tmpfile"
-    LDAPTLS_REQCERT=never ldapmodify -H "$ldap_url" -D "$ldap_bind_user" -w "$ldap_bind_password" -x -f "$tmpfile"
-    rm "$tmpfile"
-
     echo "Set password of admin user to: \"A$instance_id\""
     password=$(echo -n \"A$instance_id\" | iconv -f utf8 -t utf16le | base64 -w 0)
     tmpfile=$(mktemp /tmp/XXXXXX.ldif)
@@ -34,6 +24,16 @@ if [ ! -e /var/lib/admin-password-changed ]; then
     echo "changetype: modify" >> "$tmpfile"
     echo "replace: unicodePwd" >> "$tmpfile"
     echo "unicodePwd:: ${password}" >> "$tmpfile"
+    LDAPTLS_REQCERT=never ldapmodify -H "$ldap_url" -D "$ldap_bind_user" -w "$ldap_bind_password" -x -f "$tmpfile"
+    rm "$tmpfile"
+
+    echo "Enable the admin user"
+    sleep 30  # Wait for Samba to be up and running
+    tmpfile=$(mktemp /tmp/XXXXXX.ldif)
+    echo "dn: ${arkcase_admin_user}" > "$tmpfile"
+    echo "changetype: modify" >> "$tmpfile"
+    echo "replace: userAccountControl" >> "$tmpfile"
+    echo "userAccountControl: 512" >> "$tmpfile"
     LDAPTLS_REQCERT=never ldapmodify -H "$ldap_url" -D "$ldap_bind_user" -w "$ldap_bind_password" -x -f "$tmpfile"
     rm "$tmpfile"
 
