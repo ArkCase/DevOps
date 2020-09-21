@@ -360,14 +360,18 @@ Resources:
                   <map>
                     <authorizationMap>
                       <authorizationEntries>
-                        <authorizationEntry queue="alfresco.&gt;" admin="admin" read="admin,alfresco"
-                            write="admin,alfresco"/>
-                        <authorizationEntry topic="alfresco.Advisory.&gt;" admin="admin" read="admin,alfresco"
-                            write="admin,alfresco"/>
+                        <authorizationEntry topic="ActiveMQ.Advisory.&gt;" admin="alfresco1"
+                            read="alfresco1" write="alfresco1"/>
+                        <authorizationEntry queue="alfresco.&gt;" admin="alfresco"
+                            read="alfresco" write="alfresco"/>
+                        <authorizationEntry topic="alfresco.Advisory.&gt;" admin="alfresco"
+                            read="alfresco" write="alfresco"/>
                       </authorizationEntries>
+                      <!-- Fabrice: There is no group `admin`, so commenting this out for now
                       <tempDestinationAuthorizationEntry>
                         <tempDestinationAuthorizationEntry admin="admin" read="admin" write="admin"/>
                       </tempDestinationAuthorizationEntry>
+                      -->
                     </authorizationMap>
                   </map>
                 </authorizationPlugin>
@@ -527,7 +531,7 @@ Resources:
   MasterSecretConfig:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200908-0817/CloudFormation/amqsecretcfg.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200914-0828/CloudFormation/amqsecretcfg.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
@@ -583,7 +587,7 @@ Resources:
   AlfrescoUserSecretConfig:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200908-0817/CloudFormation/amqsecretcfg.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200914-0828/CloudFormation/amqsecretcfg.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
