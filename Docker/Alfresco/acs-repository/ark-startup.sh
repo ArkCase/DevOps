@@ -31,7 +31,7 @@ if [ -v ARK_DB_SECRET_ARN ]; then
     echo "MariaDB username: $username"
     echo 'Added `-Ddb.url`, `-Ddb.username` and `-Ddb.password` to `JAVA_OPTS`'
 else
-    echo "I am are being run locally using docker-compose"
+    echo "I am being run locally using docker-compose"
     JAVA_OPTS="$JAVA_OPTS -Ddb.url=\"$DC_DB_URL\" -Ddb.username=$DC_DB_USERNAME -Ddb.password=$DC_DB_PASSWORD"
     echo "MariaDB URL: DC_DB_URL"
     echo "MariaDB username: $DC_DB_USERNAME"
