@@ -216,6 +216,11 @@ Resources:
           FromPort: 61619
           ToPort: 61619
           SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
+        - Description: Allow traffic to the web console
+          IpProtocol: tcp
+          FromPort: 8162
+          ToPort: 8162
+          SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
       Tags:
         - Key: Name
           Value: !Sub amazonmq-broker-security-group-${Project}-${Env}
@@ -360,18 +365,20 @@ Resources:
                   <map>
                     <authorizationMap>
                       <authorizationEntries>
-                        <authorizationEntry topic="ActiveMQ.Advisory.&gt;" admin="alfresco1"
-                            read="alfresco1" write="alfresco1"/>
-                        <authorizationEntry queue="alfresco.&gt;" admin="alfresco"
-                            read="alfresco" write="alfresco"/>
-                        <authorizationEntry topic="alfresco.Advisory.&gt;" admin="alfresco"
-                            read="alfresco" write="alfresco"/>
+                        <authorizationEntry topic="ActiveMQ.Advisory.&gt;" admin="admin,alfresco"
+                            read="admin,alfresco" write="admin,alfresco"/>
+                        <authorizationEntry queue="alfresco.&gt;" admin="admin,alfresco"
+                            read="admin,alfresco" write="admin,alfresco"/>
+                        <authorizationEntry topic="alfresco.Advisory.&gt;" admin="admin,alfresco"
+                            read="admin,alfresco" write="admin,alfresco"/>
+                        <authorizationEntry queue="acs-repo-rendition-events" admin="admin,alfresco"
+                            read="admin,alfresco" write="admin,alfresco"/>
+                        <authorizationEntry queue="acs-repo-transform-request" admin="admin,alfresco"
+                            read="admin,alfresco" write="admin,alfresco"/>
                       </authorizationEntries>
-                      <!-- Fabrice: There is no group `admin`, so commenting this out for now
                       <tempDestinationAuthorizationEntry>
                         <tempDestinationAuthorizationEntry admin="admin" read="admin" write="admin"/>
                       </tempDestinationAuthorizationEntry>
-                      -->
                     </authorizationMap>
                   </map>
                 </authorizationPlugin>
@@ -475,6 +482,7 @@ Resources:
         - Username: !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:username}}"
           Password: !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:password}}"
           Groups: !Split [ ",", !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:groups}}" ]
+          ConsoleAccess: true
         - Username: !Sub "{{resolve:secretsmanager:${AlfrescoUserSecret}:SecretString:username}}"
           Password: !Sub "{{resolve:secretsmanager:${AlfrescoUserSecret}:SecretString:password}}"
           Groups: !Split [ ",", !Sub "{{resolve:secretsmanager:${AlfrescoUserSecret}:SecretString:groups}}" ]
@@ -483,7 +491,7 @@ Resources:
         TimeOfDay: !Ref MaintenanceTimeOfDay
         TimeZone: UTC
       Logs:
-        Audit: false
+        Audit: true
         General: true
       AutoMinorVersionUpgrade: true
       Tags:
@@ -531,7 +539,7 @@ Resources:
   MasterSecretConfig:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200914-0828/CloudFormation/amqsecretcfg.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200925-0830/CloudFormation/amqsecretcfg.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
@@ -587,7 +595,7 @@ Resources:
   AlfrescoUserSecretConfig:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200914-0828/CloudFormation/amqsecretcfg.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200925-0830/CloudFormation/amqsecretcfg.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
@@ -616,6 +624,10 @@ Outputs:
     Description: >
       ID of the security group allowed to connect to the AmazonMQ broker
     Value: !GetAtt AllowedSecurityGroup.GroupId
+
+  MasterSecretArn:
+    Description: ARN of the master credential secret for AmazonMQ
+    Value: !Ref MasterSecret
 
   AlfrescoUserSecretArn:
     Description: ARN of the credential secret to be used by Alfresco
