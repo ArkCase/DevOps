@@ -481,11 +481,11 @@ Resources:
       Users:
         - Username: !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:username}}"
           Password: !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:password}}"
-          Groups: !Split [ ",", !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:groups}}" ]
+          Groups: [ !Sub "{{resolve:secretsmanager:${MasterSecret}:SecretString:group}}" ]
           ConsoleAccess: true
         - Username: !Sub "{{resolve:secretsmanager:${AlfrescoUserSecret}:SecretString:username}}"
           Password: !Sub "{{resolve:secretsmanager:${AlfrescoUserSecret}:SecretString:password}}"
-          Groups: !Split [ ",", !Sub "{{resolve:secretsmanager:${AlfrescoUserSecret}:SecretString:groups}}" ]
+          Groups: [ !Sub "{{resolve:secretsmanager:${AlfrescoUserSecret}:SecretString:group}}" ]
       MaintenanceWindowStartTime:
         DayOfWeek: !Ref MaintenanceDayOfWeek
         TimeOfDay: !Ref MaintenanceTimeOfDay
@@ -517,8 +517,9 @@ Resources:
     Properties:
       Description: Master credentials to connect to the AmazonMQ broker
       GenerateSecretString:
-        # NB: The `groups` field must be present and be a comma-separated list
-        SecretStringTemplate: !Sub '{"username": "admin1", "groups": "admin"}'
+        # NB: The `group` field must be present (one and only group can be
+        #     specified)
+        SecretStringTemplate: !Sub '{"username": "admin1", "group": "admin"}'
         GenerateStringKey: password
         PasswordLength: !Ref PasswordLength
         ExcludePunctuation: true
@@ -539,7 +540,7 @@ Resources:
   MasterSecretConfig:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200925-0830/CloudFormation/amqsecretcfg.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200925-1738/CloudFormation/amqsecretcfg.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
@@ -573,8 +574,9 @@ Resources:
       Description: >
         Credentials to allow Alfresco to connect to the AmazonMQ broker
       GenerateSecretString:
-        # NB: The `groups` field must be present and be a comma-separated list
-        SecretStringTemplate: '{"username": "alfresco1", "groups": ["alfresco"]}'
+        # NB: The `group` field must be present (one and only group can be
+        #     specified)
+        SecretStringTemplate: '{"username": "alfresco1", "group": "alfresco"}'
         GenerateStringKey: password
         PasswordLength: !Ref PasswordLength
         ExcludePunctuation: true
@@ -595,7 +597,7 @@ Resources:
   AlfrescoUserSecretConfig:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200925-0830/CloudFormation/amqsecretcfg.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200925-1738/CloudFormation/amqsecretcfg.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
