@@ -365,11 +365,11 @@ Resources:
                   <map>
                     <authorizationMap>
                       <authorizationEntries>
-                        <authorizationEntry topic="ActiveMQ.Advisory.&gt;" admin="admin,alfresco"
+                        <authorizationEntry topic="ActiveMQ.Advisory.>" admin="admin,alfresco"
                             read="admin,alfresco" write="admin,alfresco"/>
-                        <authorizationEntry queue="alfresco.&gt;" admin="admin,alfresco"
+                        <authorizationEntry queue="alfresco.>" admin="admin,alfresco"
                             read="admin,alfresco" write="admin,alfresco"/>
-                        <authorizationEntry topic="alfresco.Advisory.&gt;" admin="admin,alfresco"
+                        <authorizationEntry topic="alfresco.Advisory.>" admin="admin,alfresco"
                             read="admin,alfresco" write="admin,alfresco"/>
                         <authorizationEntry queue="acs-repo-rendition-events" admin="admin,alfresco"
                             read="admin,alfresco" write="admin,alfresco"/>
@@ -540,7 +540,7 @@ Resources:
   MasterSecretConfig:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200928-0822/CloudFormation/amqsecretcfg.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200928-1418/CloudFormation/amqsecretcfg.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
@@ -597,7 +597,7 @@ Resources:
   AlfrescoUserSecretConfig:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200928-0822/CloudFormation/amqsecretcfg.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20200928-1418/CloudFormation/amqsecretcfg.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
