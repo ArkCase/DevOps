@@ -2,14 +2,6 @@
 
 set -eu -o pipefail
 
-echo "Installing RDS certificate"
-
-cd /etc/pki/ca-trust/source/anchors
-wget https://s3.amazonaws.com/rds-downloads/rds-ca-2019-root.pem
-update-ca-trust extract
-
-echo "Customizing environment for ArkCase"
-
 [ -v JAVA_OPTS ] || JAVA_OPTS=
 
 if [ -v ARK_DB_SECRET_ARN ]; then
