@@ -1,4 +1,4 @@
-FROM alfresco/alfresco-content-repository-community:latest
+FROM alfresco/alfresco-governance-repository-community:V3.4-latest
 
 # NB: Alfresco CE 2018-06 does not work with higher versions of
 #     MariaDB JDBC; specifically, it does not work with 2.4.2.
@@ -26,5 +26,6 @@ COPY ark-startup.sh /usr/local/tomcat/bin/ark-startup.sh
 CMD ["/usr/local/tomcat/bin/ark-startup.sh"]
 
 # Fabrice 20200930: For some reason, running catalina as user `alfresco` fails:
-#                   `/` works, but not `/alfresco/`. I can't figure out why...
+#                   `https://HOST/` works, but not `https://HOST/alfresco/`. I
+#                   can't figure out why...
 # USER alfresco
