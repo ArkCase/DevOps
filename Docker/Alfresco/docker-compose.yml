@@ -85,9 +85,10 @@ services:
       - 8443:8443
 
   acs-share:
-    # XXX image: alfresco/alfresco-governance-share-community:V3.3.1.x-latest
-    image: alfresco/alfresco-share:6.2.2
+    image: ${account_id}.dkr.ecr.${region}.amazonaws.com/acs-share:${acs_share_tag}
     init: true
+    build:
+      context: ./acs-share
     environment:
       REPO_HOST: nginx-acs-repository
       REPO_PORT: 8443
