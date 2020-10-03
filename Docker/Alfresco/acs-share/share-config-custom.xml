@@ -79,13 +79,13 @@
             Override and set this property with a regexp that if you have placed Share behind a proxy that
             does not rewrite the Referer header.
          -->
-         <referer>https://nginx-acs-share:9443/.*</referer>
+         <referer>http://nginx-acs-share:9180/.*</referer>
 
          <!--
             Override and set this property with a regexp that if you have placed Share behind a proxy that
             does not rewrite the Origin header.
          -->
-         <origin>https://nginx-acs-share:9443/</origin>
+         <origin>http://nginx-acs-share:9180/</origin>
       </properties>
 
       <!--
