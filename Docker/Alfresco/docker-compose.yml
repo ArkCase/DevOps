@@ -32,6 +32,11 @@ services:
     volumes:
       - alfdata-volume:/usr/local/tomcat/alf_data
     environment:
+      # TODO: try this instead of disable CSRF:
+      # -Dhttp.proxyHost=${domain_name}
+      # -Dhttp.proxyPort=9180
+      # -Dhttps.proxyHost=${domain_name}
+      # -Dhttps.proxyPort=9443
       JAVA_OPTS: >
         -Ddir.root=/usr/local/tomcat/alf_data
         -Ddb.driver=org.mariadb.jdbc.Driver
@@ -95,7 +100,7 @@ services:
       JAVA_OPTS: >
         -Xms500m
         -Xmx500m
-        -Dalfresco.host=${domain_name}
+        -Dalfresco.host=nginx-acs-repository
         -Dalfresco.port=8443
         -Dalfresco.protocol=https
         -Dalfresco.context=alfresco

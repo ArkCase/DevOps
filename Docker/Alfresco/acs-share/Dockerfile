@@ -22,5 +22,6 @@ RUN yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.n
     && update-ca-trust extract
 
 COPY ark-startup.sh /usr/local/tomcat/bin/ark-startup.sh
+COPY share-config-custom.xml /usr/local/tomcat/shared/classes/alfresco/web-extension/share-config-custom.xml
 
 CMD ["/usr/local/tomcat/bin/ark-startup.sh"]
