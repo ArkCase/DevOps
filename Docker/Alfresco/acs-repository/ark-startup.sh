@@ -16,7 +16,7 @@ if [ -v ARK_DB_SECRET_ARN ]; then
     username=$(echo "$secret" | jq -r .username)
     password=$(echo "$secret" | jq -r .password)
     JAVA_OPTS="$JAVA_OPTS -Ddb.url=\"jdbc:mariadb://$host:$port/$dbname?autoReconnect=true&useUnicode=true&characterEncoding=UTF-8&useSSL=true&requireSsl=true&enabledSslProtocolSuites=TLSv1.2&trustServerCertificate=false&serverSslCert=/etc/pki/ca-trust/source/anchors/rds-ca-2019-root.pem\""
-    JAVA_OPTS="$JAVA_OPTS -Ddb.username=$username -Ddb.password=$password"
+    JAVA_OPTS="$JAVA_OPTS -Ddb.username='$username' -Ddb.password='$password'"
     echo "MariaDB host: $host"
     echo "MariaDB port: $port"
     echo "MariaDB dbname: $dbname"
@@ -24,8 +24,8 @@ if [ -v ARK_DB_SECRET_ARN ]; then
     echo 'Added `-Ddb.url`, `-Ddb.username` and `-Ddb.password` to `JAVA_OPTS`'
 else
     echo "I am being run locally using docker-compose"
-    JAVA_OPTS="$JAVA_OPTS -Ddb.url=\"$DC_DB_URL\" -Ddb.username=$DC_DB_USERNAME -Ddb.password=$DC_DB_PASSWORD"
-    echo "MariaDB URL: DC_DB_URL"
+    JAVA_OPTS="$JAVA_OPTS -Ddb.url='$DC_DB_URL' -Ddb.username='$DC_DB_USERNAME' -Ddb.password='$DC_DB_PASSWORD'"
+    echo "MariaDB URL: $DC_DB_URL"
     echo "MariaDB username: $DC_DB_USERNAME"
     echo 'Added `-Ddb.url`, `-Ddb.username` and `-Ddb.password` to `JAVA_OPTS`'
 fi
@@ -36,7 +36,7 @@ if [ -v ARK_ACTIVEMQ_SECRET_ARN ]; then
     secret=$(echo "$response" | jq -r .SecretString)
     username=$(echo "$secret" | jq -r .username)
     password=$(echo "$secret" | jq -r .password)
-    JAVA_OPTS="$JAVA_OPTS -Dmessaging.broker.username=$username -Dmessaging.broker.password=$password"
+    JAVA_OPTS="$JAVA_OPTS -Dmessaging.broker.username='$username' -Dmessaging.broker.password='$password'"
     echo "ActiveMQ username: $username"
     echo 'Added `-Dmessaging.broker.username` and `-Dmessaging.broker.password` to `JAVA_OPTS`'
 else

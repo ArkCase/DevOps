@@ -134,21 +134,24 @@ services:
       REPO_HOST: nginx-acs-repository
 #XXX      REPO_PORT: 8443
       REPO_PORT: 8180
+      REPO_PROTO: http
+      CSRF_FILTER_REFERER: http://nginx-acs-share:9180/.*
+      CSRF_FILTER_ORIGIN: http://nginx-acs-share:9180/
+      JAVA_OPTS: >
+        -Xms500m
+        -Xmx500m
+        -Dalfresco.context=alfresco
 #XXX
 #      JAVA_OPTS: >
 #        -Xms500m
 #        -Xmx500m
 #        -Dalfresco.host=nginx-acs-repository
-#        -Dalfresco.port=8443
-#        -Dalfresco.protocol=https
+#        -Dalfresco.port=8180
+#        -Dalfresco.protocol=http
 #        -Dalfresco.context=alfresco
-      JAVA_OPTS: >
-        -Xms500m
-        -Xmx500m
-        -Dalfresco.host=nginx-acs-repository
-        -Dalfresco.port=8180
-        -Dalfresco.protocol=http
-        -Dalfresco.context=alfresco
+      DC_DB_USERNAME: alfresco
+      DC_DB_PASSWORD: hei4aeY9
+      DC_DB_URL: jdbc:mariadb://mariadb:3306/alfresco?autoReconnect=true&useUnicode=true&characterEncoding=UTF-8
 
   nginx-acs-share:
     image: ${account_id}.dkr.ecr.${region}.amazonaws.com/nginx-acs-share:${nginx_acs_share_tag}

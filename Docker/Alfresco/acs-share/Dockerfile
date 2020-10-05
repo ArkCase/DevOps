@@ -23,5 +23,6 @@ RUN yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.n
 
 COPY ark-startup.sh /usr/local/tomcat/bin/ark-startup.sh
 COPY share-config-custom.xml /usr/local/tomcat/shared/classes/alfresco/web-extension/share-config-custom.xml
+COPY substituter.sh /usr/local/tomcat/shared/classes/alfresco/substituter.sh
 
 CMD ["/usr/local/tomcat/bin/ark-startup.sh"]
