@@ -37,12 +37,12 @@ services:
         -Ddb.driver=org.mariadb.jdbc.Driver
         -Dindex.subsystem.name=noindex
         -Dshare.host=${domain_name}
-        -Dshare.port=9180
-        -Dshare.protocol=http
+        -Dshare.port=9443
+        -Dshare.protocol=https
         -Dalfresco.host=${domain_name}
-        -Dalfresco.port=8180
-        -Dalfresco.protocol=http
-        -Daos.baseUrlOverwrite=http://${domain_name}:8180/alfresco/aos
+        -Dalfresco.port=8443
+        -Dalfresco.protocol=https
+        -Daos.baseUrlOverwrite=https://${domain_name}:8443/alfresco/aos
         -Dmessaging.broker.url="failover:(nio://activemq:61616)?timeout=3000&jms.useCompression=true"
         -Ddeployment.method=DOCKER_COMPOSE
         -Dhttp.proxyHost=${domain_name}
@@ -85,7 +85,7 @@ services:
       ACM_NGINX_ACS_REPO_PORT: 8080
     ports:
       - 8180:8180
-#XXX      - 8443:8443
+      - 8443:8443
 
   acs-share:
     image: ${account_id}.dkr.ecr.${region}.amazonaws.com/acs-share:${acs_share_tag}
@@ -94,23 +94,14 @@ services:
       context: ./acs-share
     environment:
       REPO_HOST: nginx-acs-repository
-#XXX      REPO_PORT: 8443
-      REPO_PORT: 8180
-      REPO_PROTO: http
-      CSRF_FILTER_REFERER: http://nginx-acs-share:9180/.*
-      CSRF_FILTER_ORIGIN: http://nginx-acs-share:9180/
+      REPO_PORT: 8443
+      REPO_PROTO: https
+      CSRF_FILTER_REFERER: https://nginx-acs-share:9443/.*
+      CSRF_FILTER_ORIGIN: https://nginx-acs-share:9443/
       JAVA_OPTS: >
         -Xms500m
         -Xmx500m
         -Dalfresco.context=alfresco
-#XXX
-#      JAVA_OPTS: >
-#        -Xms500m
-#        -Xmx500m
-#        -Dalfresco.host=nginx-acs-repository
-#        -Dalfresco.port=8180
-#        -Dalfresco.protocol=http
-#        -Dalfresco.context=alfresco
       DC_DB_USERNAME: alfresco
       DC_DB_PASSWORD: hei4aeY9
       DC_DB_URL: jdbc:mariadb://mariadb:3306/alfresco?autoReconnect=true&useUnicode=true&characterEncoding=UTF-8
@@ -126,7 +117,7 @@ services:
       ACM_NGINX_ACS_SHARE_PORT: 8080
     ports:
       - 9180:9180
-#XXX      - 9443:9443
+      - 9443:9443
 
 volumes:
   mariadb-volume:
