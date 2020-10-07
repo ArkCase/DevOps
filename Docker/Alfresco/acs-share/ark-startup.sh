@@ -5,7 +5,9 @@ set -eu -o pipefail
 [ -v JAVA_OPTS ] || JAVA_OPTS=
 
 # Add Alfresco Repository connection details
-JAVA_OPTS="$JAVA_OPTS -Dalfresco.host='$REPO_HOST' -Dalfresco.port='$REPO_PORT' -Dalfresco.protocol='$REPO_PROTO'"
+tmp="-Dalfresco.host='$REPO_HOST' -Dalfresco.port='$REPO_PORT' -Dalfresco.protocol='$REPO_PROTO'"
+echo "Adding to JAVA_OPTS: $tmp"
+JAVA_OPTS="$JAVA_OPTS $tmp"
 
 if [ -v ARK_DB_SECRET_ARN ]; then
     echo "I am being run on ECS"
@@ -47,4 +49,4 @@ else
 fi
 
 export JAVA_OPTS
-exec /usr/local/tomcat/bin/catalina.sh run -security
+exec /usr/local/tomcat/shared/classes/alfresco/substituter.sh "catalina.sh run"

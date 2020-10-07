@@ -26,3 +26,8 @@ COPY share-config-custom.xml /usr/local/tomcat/shared/classes/alfresco/web-exten
 COPY substituter.sh /usr/local/tomcat/shared/classes/alfresco/substituter.sh
 
 CMD ["/usr/local/tomcat/bin/ark-startup.sh"]
+
+# The original image has an entrypoint pointing to `substituter.sh` which
+# totally ignores any CMD. So we reset the entrypoint here and call
+# `substituter.sh` from `ark-startup.sh`.
+ENTRYPOINT []
