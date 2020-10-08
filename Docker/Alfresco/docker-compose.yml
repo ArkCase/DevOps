@@ -37,16 +37,16 @@ services:
         -Ddb.driver=org.mariadb.jdbc.Driver
         -Dindex.subsystem.name=noindex
         -Dshare.host=${domain_name}
-        -Dshare.port=9443
-        -Dshare.protocol=https
+        -Dshare.port=9180
+        -Dshare.protocol=http
         -Dalfresco.host=${domain_name}
-        -Dalfresco.port=8443
-        -Dalfresco.protocol=https
-        -Daos.baseUrlOverwrite=https://${domain_name}:8443/alfresco/aos
+        -Dalfresco.port=10080
+        -Dalfresco.protocol=http
+        -Daos.baseUrlOverwrite=http://${domain_name}:10080/alfresco/aos
         -Dmessaging.broker.url="failover:(nio://activemq:61616)?timeout=3000&jms.useCompression=true"
         -Ddeployment.method=DOCKER_COMPOSE
         -Dhttp.proxyHost=${domain_name}
-        -Dhttp.proxyPort=9180
+        -Dhttp.proxyPort=10080
         -Dhttps.proxyHost=${domain_name}
         -Dhttps.proxyPort=9443
         -Djodconverter.enabled=false
@@ -85,7 +85,6 @@ services:
       ACM_NGINX_ACS_REPO_PORT: 8080
     ports:
       - 8180:8180
-      - 8443:8443
 
   acs-share:
     image: ${account_id}.dkr.ecr.${region}.amazonaws.com/acs-share:${acs_share_tag}
@@ -93,14 +92,17 @@ services:
     build:
       context: ./acs-share
     environment:
-      REPO_HOST: nginx-acs-repository
-      REPO_PORT: 8443
-      REPO_PROTO: https
-      CSRF_FILTER_REFERER: https://nginx-acs-share:9443/.*
-      CSRF_FILTER_ORIGIN: https://nginx-acs-share:9443/
+      REPO_HOST: ark-haproxy
+      REPO_PORT: 10180
+      REPO_PROTO: http
+      CSRF_FILTER_REFERER: http://ark-haproxy:10180/.*
+      CSRF_FILTER_ORIGIN: http://ark-haproxy:10180/
       JAVA_OPTS: >
         -Xms500m
         -Xmx500m
+        -Dshare.host=${domain_name}
+        -Dshare.port=10180
+        -Dshare.protocol=http
         -Dalfresco.context=alfresco
       DC_DB_USERNAME: alfresco
       DC_DB_PASSWORD: hei4aeY9
@@ -117,7 +119,20 @@ services:
       ACM_NGINX_ACS_SHARE_PORT: 8080
     ports:
       - 9180:9180
-      - 9443:9443
+
+  ark-haproxy:
+    image: ${account_id}.dkr.ecr.${region}.amazonaws.com/ark-haproxy:${ark_haproxy_tag}
+    init: true
+    build:
+      context: ./ark-haproxy
+    environment:
+      ACM_HAPROXY_DOMAIN_NAME: localhost
+      ACM_HAPROXY_ACS_REPO_HOST: nginx-acs-repository
+      ACM_HAPROXY_ACS_REPO_PORT: 8180
+      ACM_HAPROXY_ACS_SHARE_HOST: nginx-acs-share
+      ACM_HAPROXY_ACS_SHARE_PORT: 9180
+    ports:
+      - 10080:10080
 
 volumes:
   mariadb-volume:

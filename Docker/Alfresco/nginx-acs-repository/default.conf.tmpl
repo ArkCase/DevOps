@@ -1,13 +1,13 @@
 server {
   listen *:8180 default_server;
-  return 301 https://$host:8443$request_uri;
-}
-
-server {
-  listen *:8443 default_server ssl;
-  ssl_protocols TLSv1.2 TLSv1.3;
-  ssl_certificate /etc/certs/cert.pem;
-  ssl_certificate_key /etc/keys/key.pem;
+#  return 301 https://$host:8443$request_uri;
+#}
+#
+#server {
+#  listen *:8443 default_server ssl;
+#  ssl_protocols TLSv1.2 TLSv1.3;
+#  ssl_certificate /etc/certs/cert.pem;
+#  ssl_certificate_key /etc/keys/key.pem;
 
   client_max_body_size 0;
 
