@@ -1,0 +1,16 @@
+global
+  maxconn 500
+  log stdout local0 info
+
+defaults
+  mode http
+  timeout connect 5s
+  timeout client 30s
+  timeout server 60s
+
+frontend http
+  bind *:10080
+  default_backend alfresco
+
+backend alfresco
+  server repo ${ACM_HAPROXY_ACS_REPO_HOST}:${ACM_HAPROXY_ACS_REPO_PORT} maxconn 500

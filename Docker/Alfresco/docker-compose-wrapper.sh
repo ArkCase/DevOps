@@ -5,8 +5,9 @@ export account_id=300674751221
 export region=us-west-1
 export acs_repository_tag=dev1
 export acs_share_tag=dev1
-export nginx_acs_repository_tag=4
-export nginx_acs_share_tag=1
+export nginx_acs_repository_tag=dev1
+export nginx_acs_share_tag=dev1
+export ark_haproxy_tag=dev1
 
 usage() {
     echo "Usage: $0 [-h] [-d NAM] [-i ACC] [-l REG] [-r TAG] [-R TAG] [-S TAG] [--] OPTS"
@@ -18,6 +19,7 @@ usage() {
     echo "  -r TAG  Tag to use for the acs-repository Docker image (default: $acs_repository_tag)"
     echo "  -R TAG  Tag to use for the nginx-acs-repository Docker image (default: $nginx_acs_repository_tag)"
     echo "  -S TAG  Tag to use for the nginx-acs-share Docker image (default: $nginx_acs_share_tag)"
+    echo "  -H TAG  Tag to use for the ark-haproxy Docker image (default: $ark_haproxy_tag)"
     echo "  --      Stop parsing options; necessary only if you have pre-command options"
     echo "  OPTS    Docker-compose options"
     echo
@@ -59,6 +61,11 @@ while [ $finished_parsing == no ]; do
         -S)
             shift
             nginx_acs_share_tag="$1"
+            shift
+            ;;
+        -H)
+            shift
+            ark_haproxy_tag="$1"
             shift
             ;;
         --)
