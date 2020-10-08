@@ -1,6 +1,4 @@
-FROM 300674751221.dkr.ecr.us-west-1.amazonaws.com/nginx-tls:5
-
-RUN apk add bash
+FROM 300674751221.dkr.ecr.us-west-1.amazonaws.com/nginx-tls:6
 
 COPY default.conf.tmpl .
 COPY start_nginx.sh .
