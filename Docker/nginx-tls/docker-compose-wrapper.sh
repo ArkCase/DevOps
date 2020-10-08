@@ -3,7 +3,7 @@
 export account_id=300674751221
 export region=us-west-1
 export test_backend_tag=2
-export nginx_tls_tag=5
+export nginx_tls_tag=6
 
 usage() {
     echo "Usage: $0 [-h] [-i ACC] [-r REG] [-b TAG] [-n TAG] -- OPTS"
