@@ -46,6 +46,26 @@
       "destination": "/tmp/test-backend.service"
     },
     {
+      "type": "file",
+      "source": "setup-metering.sh",
+      "destination": "/tmp/setup-metering.sh"
+    },
+    {
+      "type": "file",
+      "source": "setup-metering.service",
+      "destination": "/tmp/setup-metering.service"
+    },
+    {
+      "type": "file",
+      "source": "aws-marketplace-product-code",
+      "destination": "/tmp/aws-marketplace-product-code"
+    },
+    {
+      "type": "file",
+      "source": "report-metering.sh",
+      "destination": "/tmp/report-metering.sh"
+    },
+    {
       "type": "shell",
       "script": "provision-test-backend.sh"
     }
