@@ -9,11 +9,9 @@ defaults
   timeout server 60s
 
 frontend http
-  bind *:10080
+  bind *:${ACM_HAPROXY_HTTP_PORT}
   default_backend alfresco
 
 backend alfresco
   server repo ${ACM_HAPROXY_ACS_REPO_HOST}:${ACM_HAPROXY_ACS_REPO_PORT} maxconn 500
-  # TODO/NEXT: Configure HAProxy to change the
-  #            `Location: http://localhost:8180/alfresco/` to
-  #            `Location: http://localhost:10080/alfresco/`
+  http-response replace-value Location ^http://(.*):${ACM_HAPROXY_ACS_REPO_PORT}(.*)$ http://${ACM_HAPROXY_DOMAIN_NAME}:${ACM_HAPROXY_HTTP_PORT}\2

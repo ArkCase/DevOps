@@ -127,6 +127,7 @@ services:
       context: ./ark-haproxy
     environment:
       ACM_HAPROXY_DOMAIN_NAME: localhost
+      ACM_HAPROXY_HTTP_PORT: 10080
       ACM_HAPROXY_ACS_REPO_HOST: nginx-acs-repository
       ACM_HAPROXY_ACS_REPO_PORT: 8180
       ACM_HAPROXY_ACS_SHARE_HOST: nginx-acs-share
