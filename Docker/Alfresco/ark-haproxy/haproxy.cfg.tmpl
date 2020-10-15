@@ -10,8 +10,20 @@ defaults
 
 frontend http
   bind *:${ACM_HAPROXY_HTTP_PORT}
+  acl acl_repo path_beg /alfresco
+  acl acl_share path_beg /share
+  use_backend alfresco_repo if acl_repo
+  use_backend alfresco_share if acl_share
   default_backend alfresco
 
 backend alfresco
+  server alfresco ${ACM_HAPROXY_ACS_REPO_HOST}:${ACM_HAPROXY_ACS_REPO_PORT} maxconn 500
+  http-response replace-value Location ^http://(.*):${ACM_HAPROXY_ACS_REPO_PORT}(.*)$ http://${ACM_HAPROXY_DOMAIN_NAME}:${ACM_HAPROXY_HTTP_PORT}\2
+
+backend alfresco_repo
   server repo ${ACM_HAPROXY_ACS_REPO_HOST}:${ACM_HAPROXY_ACS_REPO_PORT} maxconn 500
   http-response replace-value Location ^http://(.*):${ACM_HAPROXY_ACS_REPO_PORT}(.*)$ http://${ACM_HAPROXY_DOMAIN_NAME}:${ACM_HAPROXY_HTTP_PORT}\2
+
+backend alfresco_share
+  server share ${ACM_HAPROXY_ACS_SHARE_HOST}:${ACM_HAPROXY_ACS_SHARE_PORT} maxconn 500
+  http-response replace-value Location ^http://(.*):${ACM_HAPROXY_ACS_SHARE_PORT}(.*)$ http://${ACM_HAPROXY_DOMAIN_NAME}:${ACM_HAPROXY_HTTP_PORT}\2

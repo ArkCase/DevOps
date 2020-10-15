@@ -37,7 +37,7 @@ services:
         -Ddb.driver=org.mariadb.jdbc.Driver
         -Dindex.subsystem.name=noindex
         -Dshare.host=${domain_name}
-        -Dshare.port=9180
+        -Dshare.port=10080
         -Dshare.protocol=http
         -Dalfresco.host=${domain_name}
         -Dalfresco.port=10080
@@ -48,7 +48,7 @@ services:
         -Dhttp.proxyHost=${domain_name}
         -Dhttp.proxyPort=10080
         -Dhttps.proxyHost=${domain_name}
-        -Dhttps.proxyPort=9443
+        -Dhttps.proxyPort=10443
         -Djodconverter.enabled=false
         -Djodconverter.officeHome=null
         -Xms1500m
@@ -93,15 +93,15 @@ services:
       context: ./acs-share
     environment:
       REPO_HOST: ark-haproxy
-      REPO_PORT: 10180
+      REPO_PORT: 10080
       REPO_PROTO: http
-      CSRF_FILTER_REFERER: http://ark-haproxy:10180/.*
-      CSRF_FILTER_ORIGIN: http://ark-haproxy:10180/
+      CSRF_FILTER_REFERER: http://ark-haproxy:10080/.*
+      CSRF_FILTER_ORIGIN: http://ark-haproxy:10080/
       JAVA_OPTS: >
         -Xms500m
         -Xmx500m
         -Dshare.host=${domain_name}
-        -Dshare.port=10180
+        -Dshare.port=10080
         -Dshare.protocol=http
         -Dalfresco.context=alfresco
       DC_DB_USERNAME: alfresco
