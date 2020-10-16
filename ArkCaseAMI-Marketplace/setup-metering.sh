@@ -23,4 +23,8 @@ echo "SHELL=/bin/bash" > "$cronfile"
 echo "PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin" >> "$cronfile"
 echo "$minute * * * *  root  /usr/local/bin/report-metering.sh" >> "$cronfile"
 
-systemctl restart cron
+if systemctl list-units | grep cron.service > /dev/null 2>&1; then
+    systemctl restart cron
+else
+    systemctl restart crond
+fi
