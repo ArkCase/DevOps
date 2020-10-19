@@ -15,7 +15,7 @@
       "type": "amazon-ebs",
       "region": "{{ user `aws_region` }}",
       "source_ami": "{{ user `base_ami` }}",
-      "instance_type": "t3.micro",
+      "instance_type": "t3.xlarge",
       "ssh_username": "centos",
 
       "ami_name": "ArkCase-FOIA-{{ user `version` }} [{{ user `timestamp` }}]",
