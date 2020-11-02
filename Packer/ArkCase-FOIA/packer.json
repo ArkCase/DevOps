@@ -2,7 +2,6 @@
   "description": "Packer template to build an ArkCase FOIA AMI ready to be published on AWS Marketplace",
 
   "variables": {
-    "aws_region": "us-east-1",
     "base_ami": "ami-05afa634116a37d03",
     "timestamp": "",
     "project": "arkcase-foia",
@@ -13,7 +12,7 @@
   "builders": [
     {
       "type": "amazon-ebs",
-      "region": "{{ user `aws_region` }}",
+      "region": "us-east-1",
       "source_ami": "{{ user `base_ami` }}",
       "instance_type": "t3.xlarge",
       "ssh_username": "centos",
