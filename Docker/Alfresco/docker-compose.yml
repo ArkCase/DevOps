@@ -95,8 +95,8 @@ services:
       REPO_HOST: ark-haproxy
       REPO_PORT: 10080
       REPO_PROTO: http
-      CSRF_FILTER_REFERER: http://ark-haproxy:10080/.*
-      CSRF_FILTER_ORIGIN: http://ark-haproxy:10080/
+      CSRF_FILTER_REFERER: http://${domain_name}:10080/.*
+      CSRF_FILTER_ORIGIN: http://${domain_name}:10080
       JAVA_OPTS: >
         -Xms500m
         -Xmx500m
