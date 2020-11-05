@@ -3,6 +3,7 @@
 
   "variables": {
     "base_ami": "ami-05afa634116a37d03",
+    "disk_size_gb": "100",
     "timestamp": "",
     "project": "arkcase-foia",
     "version": "x.y",
@@ -15,9 +16,16 @@
       "region": "us-east-1",
       "source_ami": "{{ user `base_ami` }}",
       "instance_type": "t3.xlarge",
+      "ami_block_device_mappings": [{
+        "device_name": "/dev/sda1",
+        "volume_size": "{{ user `disk_size_gb` }}",
+        "volume_type": "gp2",
+        "delete_on_termination": true,
+        "encrypted": false
+      }],
       "ssh_username": "centos",
 
-      "ami_name": "ArkCase-FOIA-{{ user `version` }} [{{ user `timestamp` }}]",
+      "ami_name": "ArkCase FOIA {{ user `version` }} [{{ user `timestamp` }}]",
       "ami_description": "ArkCase FOIA version {{ user `version` }}",
       "tags": {
         "Project": "{{ user `project` }}",
@@ -28,6 +36,16 @@
   ],
 
   "provisioners": [
+    {
+      "type": "file",
+      "source": "startup.sh",
+      "destination": "/tmp/startup.sh"
+    },
+    {
+      "type": "file",
+      "source": "startup.service",
+      "destination": "/tmp/startup.service"
+    },
     {
       "type": "file",
       "source": "aws-marketplace-product-code",
@@ -47,6 +65,11 @@
       "type": "file",
       "source": "report-metering.sh",
       "destination": "/tmp/report-metering.sh"
+    },
+    {
+      "type": "file",
+      "source": "facts.yml",
+      "destination": "/tmp/facts.yml"
     },
     {
       "type": "shell",
