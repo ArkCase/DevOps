@@ -14,10 +14,10 @@ if [ ! -e /var/lib/admin-password-changed ]; then
     pentaho_prop="${rootdir}/app/pentaho/pentaho-server/pentaho-solutions/system/applicationContext-security-ldap.properties"
     arkcase_admin_user=$(grep ^adminUser "$pentaho_prop" | sed 's/^adminUser=//')
 
-    alfresco_prop="${rootdir}/app/alfresco/shared/classes/alfresco-global.properties"
-    ldap_url=$(grep ldap.authentication.java.naming.provider.url "$alfresco_prop" | sed 's/^[^=]*=//')
-    ldap_bind_user=$(grep ldap.synchronization.java.naming.security.principal "$alfresco_prop" | sed 's/^[^=]*=//')
-    ldap_bind_password=$(grep ldap.synchronization.java.naming.security.credentials "$alfresco_prop" | sed 's/^[^=]*=//')
+    ldap_prop="${rootdir}/app/alfresco/shared/classes/alfresco/extension/subsystems/Authentication/ldap-ad/ldap2/ldap-ad.properties"
+    ldap_url=$(grep ldap.authentication.java.naming.provider.url "$ldap_prop" | sed 's/^[^=]*=//')
+    ldap_bind_user=$(grep ldap.synchronization.java.naming.security.principal "$ldap_prop" | sed 's/^[^=]*=//')
+    ldap_bind_password=$(grep ldap.synchronization.java.naming.security.credentials "$ldap_prop" | sed 's/^[^=]*=//')
 
     echo "Set password of admin user to: \"A$instance_id\""
     sleep 30  # Wait for Samba to be up and running
