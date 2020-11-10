@@ -38,6 +38,9 @@ rm -rf arkcase-ce
 
 # Post-installation steps
 
+# Wait 10' for services to start
+sleep 600
+
 ## Disable services and firewall
 sudo systemctl stop pentaho solr snowbound alfresco config-server arkcase firewalld
 sudo systemctl disable pentaho solr snowbound alfresco config-server arkcase firewalld
