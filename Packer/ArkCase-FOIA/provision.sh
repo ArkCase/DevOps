@@ -30,16 +30,17 @@ function move()
 git clone https://github.com/ArkCase/arkcase-ce.git
 cd arkcase-ce/vagrant/provisioning
 move facts.yml .
-git checkout develop
+# XXX git checkout develop
+git checkout fabrice-packer
 echo 'localhost ansible_connection=local' > inventory.ini
-ansible-playbook -i inventory.ini -e @facts.yml arkcase-ce-foia-AWS.yml
+ansible-playbook -i inventory.ini -e @facts.yml arkcase-ee-foia-AWS.yml
 cd
 rm -rf arkcase-ce
 
 # Post-installation steps
 
-# Wait 10' for services to start
-sleep 600
+## Wait 15' for services to start
+sleep 900
 
 ## Disable services and firewall
 sudo systemctl stop pentaho solr snowbound alfresco config-server arkcase firewalld
@@ -59,8 +60,7 @@ move setup-metering.sh /usr/local/bin
 move setup-metering.service /etc/systemd/system
 
 sudo systemctl daemon-reload
-# TODO: Enable metering reports when building the AMI is fully automated
-#sudo systemctl enable setup-metering.service
+sudo systemctl enable setup-metering.service
 
 # Secure the AMI
 
