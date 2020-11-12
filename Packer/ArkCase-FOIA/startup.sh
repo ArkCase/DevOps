@@ -78,9 +78,10 @@ sed -i "19s/$PublicDNS/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.ark
 sed -i "22s/$PublicDNS/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
 sed -i "58s/$PublicDNS/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
 sed -i "60s/$PublicDNS/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "64s/$PublicDNS/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "101s/$PublicDNS/arkcase-ce.local/g"   "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "62s/$PublicDNS/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "66s/$PublicDNS/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
 sed -i "103s/$PublicDNS/arkcase-ce.local/g"   "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "105s/$PublicDNS/arkcase-ce.local/g"   "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
 
 # Start services now
 
@@ -90,3 +91,4 @@ systemctl start snowbound
 systemctl start alfresco
 systemctl start config-server
 systemctl start arkcase
+systemctl start haproxy
