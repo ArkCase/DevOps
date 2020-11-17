@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eux -o pipefail
+set -eu -o pipefail
 umask 022
 
 # Install dependencies #
@@ -39,8 +39,25 @@ rm -rf arkcase-ce
 
 # Post-installation steps
 
-## Wait 15' for services to start
-sleep 900
+## Wait for ArkCase to fully start
+timeout_min=60  # Timeout: 1h
+timer_min=0
+echo "Wait for ArkCase to fully start..."
+while true; do
+    sleep 60  # Wait for 1'
+    if sudo grep 'org.apache.catalina.startup.Catalina.start Server startup in \[.*\] milliseconds' /opt/app/arkcase/log/arkcase/catalina.out > /dev/null 2>&1; then
+        break
+    else
+        timer_min=$[ $timer_min + 1 ]
+        if [ "$timer_min" -gt "$timeout_min" ]; then
+            echo "ERROR: ArkCase didn't start within $timeout_min minutes"
+            exit 1
+        fi
+        echo -n .
+    fi
+done
+echo
+echo "ArkCase fully started"
 
 ## Disable services and firewall
 sudo systemctl stop pentaho solr snowbound alfresco config-server arkcase firewalld
