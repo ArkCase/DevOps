@@ -59,29 +59,29 @@ ref "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-se
 
 # Modify config files
 
-PublicDNS="$(curl -s http://169.254.169.254/latest/meta-data/public-hostname)"
+DnsName="$(curl -sf http://169.254.169.254/latest/meta-data/public-hostname || curl -sf http://169.254.169.254/latest/meta-data/local-hostname)"
 pentaho_url1="PENTAHO_SERVER_URL:\ \"https://acm-arkcase\""
-pentaho_url2="PENTAHO_SERVER_URL:\ \"https://$PublicDNS\""
+pentaho_url2="PENTAHO_SERVER_URL:\ \"https://$DnsName\""
 
 echo "127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4" > /etc/hosts
 echo "::1         localhost6 localhost6.localdomain6" >> /etc/hosts
-echo "127.0.0.1   $PublicDNS" >> /etc/hosts
+echo "127.0.0.1   $DnsName" >> /etc/hosts
 echo "127.0.0.1   arkcase-ce.local" >> /etc/hosts
 
-sed -i "s/arkcase-ce.local/$PublicDNS/g"      "${rootdir}/app/alfresco/shared/classes/alfresco/web-extension/share-config-custom.xml"
-sed -i "s/$PublicDNS:7070/arkcase-ce.local/g" "${rootdir}/app/alfresco/shared/classes/alfresco/web-extension/share-config-custom.xml"
-sed -i "s~$pentaho_url1~$pentaho_url2~g"      "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase.yaml"
-sed -i "s/arkcase-ce.local/$PublicDNS/g"      "${rootdir}/app/pentaho/pentaho-server/tomcat/conf/server.xml"
-sed -i "s/arkcase-ce.local/$PublicDNS/g"      "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "3s/$PublicDNS/arkcase-ce.local/g"     "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "19s/$PublicDNS/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "22s/$PublicDNS/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "58s/$PublicDNS/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "60s/$PublicDNS/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "62s/$PublicDNS/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "66s/$PublicDNS/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "103s/$PublicDNS/arkcase-ce.local/g"   "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "105s/$PublicDNS/arkcase-ce.local/g"   "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "s/arkcase-ce.local/$DnsName/g"      "${rootdir}/app/alfresco/shared/classes/alfresco/web-extension/share-config-custom.xml"
+sed -i "s/$DnsName:7070/arkcase-ce.local/g" "${rootdir}/app/alfresco/shared/classes/alfresco/web-extension/share-config-custom.xml"
+sed -i "s~$pentaho_url1~$pentaho_url2~g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase.yaml"
+sed -i "s/arkcase-ce.local/$DnsName/g"      "${rootdir}/app/pentaho/pentaho-server/tomcat/conf/server.xml"
+sed -i "s/arkcase-ce.local/$DnsName/g"      "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "3s/$DnsName/arkcase-ce.local/g"     "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "19s/$DnsName/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "22s/$DnsName/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "58s/$DnsName/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "60s/$DnsName/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "62s/$DnsName/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "66s/$DnsName/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "103s/$DnsName/arkcase-ce.local/g"   "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "105s/$DnsName/arkcase-ce.local/g"   "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
 
 # Start services now
 
