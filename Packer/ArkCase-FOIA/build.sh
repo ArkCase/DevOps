@@ -36,9 +36,9 @@ else
     no_color_opt="-color=false"
 fi
 
-timestamp=$(date '+%Y%m%d-%H%M')
+timestamp=$(date -u '+%Y%m%d-%H%M')
 
 packer build $no_color_opt \
     -var region="$aws_region" \
     -var timestamp="$timestamp" \
-    packer.json
+    packer.json | tee packer-build.log
