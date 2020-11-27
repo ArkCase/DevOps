@@ -2,11 +2,11 @@
 
 set -eu -o pipefail
 
-echo "Creating an X.509 self-signed certificate for $ACM_NGINX_DOMAIN_NAME"
+echo "Creating an X.509 self-signed certificate"
 mkdir /etc/certs /etc/keys
 chmod 755 /etc/certs
 chmod 700 /etc/keys
-openssl req -x509 -nodes -days 9000 -newkey rsa:2048 -keyout /etc/keys/key.pem -out /etc/certs/cert.pem -subj "/CN=$ACM_NGINX_DOMAIN_NAME"
+openssl req -x509 -nodes -days 9000 -newkey rsa:2048 -keyout /etc/keys/key.pem -out /etc/certs/cert.pem -subj "/CN=proxy"
 chmod 700 /etc/keys/key.pem
 
 cd /app

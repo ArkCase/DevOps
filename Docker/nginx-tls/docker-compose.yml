@@ -18,7 +18,6 @@ services:
     build:
       context: nginx-tls
     environment:
-      ACM_NGINX_DOMAIN_NAME: test-backend.arkcase.lan  # Only used in the certificate
       ACM_NGINX_UPSTREAM_HOST: test-backend
       ACM_NGINX_UPSTREAM_PORT: 8080
     ports:
