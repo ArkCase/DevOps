@@ -27,12 +27,15 @@ frontend main
 
 backend alfresco
   server alfresco ${ACM_HAPROXY_ACS_REPO_HOST}:${ACM_HAPROXY_ACS_REPO_HTTPS_PORT} maxconn 500 ssl verify none
-  http-response replace-value Location ^https://(.*):${ACM_HAPROXY_ACS_REPO_HTTPS_PORT}(.*)$ https://${ACM_HAPROXY_DOMAIN_NAME}:9443\2
+  http-response replace-value Location ^https?://(.*):${ACM_HAPROXY_ACS_REPO_HTTPS_PORT}(.*)$ https://${ACM_HAPROXY_DOMAIN_NAME}:9443\2
+  http-response replace-value Location ^https?://(.*):9443(.*)$ https://${ACM_HAPROXY_DOMAIN_NAME}:9443\2
 
 backend alfresco_repo
   server repo ${ACM_HAPROXY_ACS_REPO_HOST}:${ACM_HAPROXY_ACS_REPO_HTTPS_PORT} maxconn 500 ssl verify none
-  http-response replace-value Location ^https://(.*):${ACM_HAPROXY_ACS_REPO_HTTPS_PORT}(.*)$ https://${ACM_HAPROXY_DOMAIN_NAME}:9443\2
+  http-response replace-value Location ^https?://(.*):${ACM_HAPROXY_ACS_REPO_HTTPS_PORT}(.*)$ https://${ACM_HAPROXY_DOMAIN_NAME}:9443\2
+  http-response replace-value Location ^https?://(.*):9443(.*)$ https://${ACM_HAPROXY_DOMAIN_NAME}:9443\2
 
 backend alfresco_share
   server share ${ACM_HAPROXY_ACS_SHARE_HOST}:${ACM_HAPROXY_ACS_SHARE_HTTPS_PORT} maxconn 500 ssl verify none
-  http-response replace-value Location ^https://(.*):${ACM_HAPROXY_ACS_SHARE_HTTPS_PORT}(.*)$ https://${ACM_HAPROXY_DOMAIN_NAME}:9443\2
+  http-response replace-value Location ^https?://(.*):${ACM_HAPROXY_ACS_SHARE_HTTPS_PORT}(.*)$ https://${ACM_HAPROXY_DOMAIN_NAME}:9443\2
+  http-response replace-value Location ^https?://(.*):9443(.*)$ https://${ACM_HAPROXY_DOMAIN_NAME}:9443\2
