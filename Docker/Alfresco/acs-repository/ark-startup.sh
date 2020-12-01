@@ -2,6 +2,27 @@
 
 set -eu -o pipefail
 
+if [ -d /etc/minipki ]; then
+    echo "Installing mini PKI"
+    keytool -import -keystore /usr/java/openjdk-11.0.7+10/lib/security/cacerts \
+            -file /etc/minipki/ca.crt -alias localalfrescoca -storetype jks \
+            -storepass changeit -noprompt -trustcacerts
+    case "$(keytool -list \
+            -keystore /usr/java/openjdk-11.0.7+10/lib/security/cacerts \
+            -storepass changeit 2> /dev/null | grep fresco)" in
+        *localalfrescoca*)
+            echo "Local Alfresco root CA certificate successfully added"
+            ;;
+        *)
+            echo "ERROR: keytool succeeded, but Local Alfresco root CA certificate is absent"
+            ;;
+    esac
+else
+    echo "Install internal PKI"
+    echo "TODO - NOT YET IMPLEMENTED"
+    exit 1
+fi
+
 [ -v JAVA_OPTS ] || JAVA_OPTS=
 
 if [ -v ARK_DB_SECRET_ARN ]; then

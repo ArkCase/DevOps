@@ -14,4 +14,4 @@ COPY haproxy.cfg.tmpl .
 
 CMD [ "/app/start_haproxy.sh" ]
 
-EXPOSE 10080
+EXPOSE 9080 9443
