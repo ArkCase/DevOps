@@ -16,21 +16,21 @@ it is integrated with ArkCase (including SSL).
 Block diagram
 =============
 
-                                      +-------+             +------+
-                             HTTPS    |       |    HTTP     |      |
-                         +-- 5443 --> | NGINX | -- 8080 --> | Repo |
-                         |            |       |             |      |
-                         |            +-------+             +------+
-       HTTP      +---------+
-    -- 10080 --> |         |
-                 | HAProxy |
-    -- 10443 --> |         |
-       HTTPS     +---------+
-                         |            +-------+             +-------+
-                         |   HTTPS    |       |    HTTP     |       |
-                         +-- 6443 --> | NGINX | -- 8080 --> | Share |
-                                      |       |             |       |
-                                      +-------+             +-------+
+                                     +-------+             +------+
+                            HTTPS    |       |    HTTP     |      |
+                        +-- 5443 --> | NGINX | -- 8080 --> | Repo |
+                        |            |       |             |      |
+                        |            +-------+             +------+
+       HTTP     +---------+
+    -- 9080 --> |         |
+                | HAProxy |
+    -- 9443 --> |         |
+       HTTPS    +---------+
+                        |            +-------+             +-------+
+                        |   HTTPS    |       |    HTTP     |       |
+                        +-- 6443 --> | NGINX | -- 8080 --> | Share |
+                                     |       |             |       |
+                                     +-------+             +-------+
 
 Note: The NGINX containers are actually side-car proxies. They must
       run on the same host as the Repository (resp. Share) container,
