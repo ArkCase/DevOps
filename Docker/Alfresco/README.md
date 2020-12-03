@@ -10,8 +10,21 @@ Alfresco reference docker-compose file
 This is a reference docker-compose file to deploy Alfresco in the way
 it is integrated with ArkCase (including SSL).
 
-    $ domain_name=$(curl -sSL http://169.254.169.254/latest/meta-data/public-hostname)
-    $ ./docker-compose-wrapper.sh -d $domain_name up --build
+In order to run it, you will need to edit your `/etc/hosts` file and
+point the `ark-haproxy` name to your own computer. You can edit the
+file as root, or run the following:
+
+    $ echo "127.1.2.3 ark-haproxy" | sudo tee -a /etc/hosts
+
+To start everything, run the following (you will need to have
+docker-ce and docker-compose installed on your machine):
+
+    $ ./docker-compose-wrapper.sh up --build
+
+Wait until the logs show that Repository has started, and then point
+your browser to:
+
+    http://ark-haproxy:9080/alfreso
 
 Block diagram
 =============

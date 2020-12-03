@@ -6,7 +6,6 @@ s=$(realpath "$0")
 here=$(dirname "$s")
 cd "$here"
 
-export domain_name=localhost
 export account_id=300674751221
 export region=us-west-1
 export acs_repository_tag=dev2
@@ -18,8 +17,6 @@ export ark_haproxy_tag=dev2
 usage() {
     echo "Usage: $0 [-h] [-d NAM] [-i ACC] [-l REG] [-r TAG] [-R TAG] [-S TAG] [--] OPTS"
     echo "  -h      Print this usage message"
-    echo "  -d NAM  DNS name pointing to the Alfresco service (default: $domain_name)"
-    echo "            More precisely, it's the name pointing to the NGINX side-car proxy"
     echo "  -i ACC  AWS account id (default: $account_id)"
     echo "  -l REG  AWS region (default: $region)"
     echo "  -r TAG  Tag to use for the acs-repository Docker image (default: $acs_repository_tag)"
@@ -38,11 +35,6 @@ while [ $finished_parsing == no ]; do
         -h)
             usage
             exit 0
-            ;;
-        -d)
-            shift
-            domain_name="$1"
-            shift
             ;;
         -i)
             shift
