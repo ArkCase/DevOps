@@ -31,24 +31,23 @@ services:
       context: ./acs-repository
     volumes:
       - alfdata-volume:/usr/local/tomcat/alf_data
-      - ./easyrsa/pki:/etc/minipki:ro
     environment:
       JAVA_OPTS: >
         -Ddir.root=/usr/local/tomcat/alf_data
         -Ddb.driver=org.mariadb.jdbc.Driver
         -Dindex.subsystem.name=noindex
-        -Dshare.host=ark-haproxy
+        -Dshare.host=${domain_name}
         -Dshare.port=9443
         -Dshare.protocol=https
-        -Dalfresco.host=ark-haproxy
+        -Dalfresco.host=${domain_name}
         -Dalfresco.port=9443
         -Dalfresco.protocol=https
-        -Daos.baseUrlOverwrite=https://ark-haproxy:9443/alfresco/aos
+        -Daos.baseUrlOverwrite=https://${domain_name}:9443/alfresco/aos
         -Dmessaging.broker.url="failover:(nio://activemq:61616)?timeout=3000&jms.useCompression=true"
         -Ddeployment.method=DOCKER_COMPOSE
-        -Dhttp.proxyHost=ark-haproxy
+        -Dhttp.proxyHost=${domain_name}
         -Dhttp.proxyPort=9080
-        -Dhttps.proxyHost=ark-haproxy
+        -Dhttps.proxyHost=${domain_name}
         -Dhttps.proxyPort=9443
         -Djodconverter.enabled=false
         -Djodconverter.officeHome=null
@@ -77,78 +76,47 @@ services:
     depends_on:
       - mariadb
 
-  nginx-acs-repository:
-    image: ${account_id}.dkr.ecr.${region}.amazonaws.com/nginx-acs-repository:${nginx_acs_repository_tag}
-    init: true
-    build:
-      context: ./nginx-acs-repository
-    environment:
-      ACM_NGINX_ACS_REPO_HOST: acs-repository
-      ACM_NGINX_ACS_REPO_PORT: 8080
-    depends_on:
-      - acs-repository
-    ports:
-      - 5443:5443
-
   acs-share:
     image: ${account_id}.dkr.ecr.${region}.amazonaws.com/acs-share:${acs_share_tag}
     init: true
     build:
       context: ./acs-share
-    volumes:
-      - ./easyrsa/pki:/etc/minipki:ro
     environment:
-      REPO_HOST: ark-haproxy
-      REPO_PORT: 9443
-      REPO_PROTO: https
-      CSRF_FILTER_REFERER: https://ark-haproxy:9443/.*
-      CSRF_FILTER_ORIGIN: https://ark-haproxy:9443
+      REPO_HOST: acs-repository
+      REPO_PORT: 8080
+      REPO_PROTO: http
+      CSRF_FILTER_REFERER: https://${domain_name}:9443/.*
+      CSRF_FILTER_ORIGIN: https://${domain_name}:9443
       JAVA_OPTS: >
         -Xms500m
         -Xmx500m
-        -Dshare.host=ark-haproxy
+        -Dshare.host=${domain_name}
         -Dshare.port=9443
         -Dshare.protocol=https
+        -Dalfresco.host=${domain_name}
+        -Dalfresco.port=9443
+        -Dalfresco.protocol=https
         -Dalfresco.context=alfresco
-        -Dhttp.proxyHost=ark-haproxy
-        -Dhttp.proxyPort=9080
-        -Dhttps.proxyHost=ark-haproxy
-        -Dhttps.proxyPort=9443
       DC_DB_USERNAME: alfresco
       DC_DB_PASSWORD: hei4aeY9
       DC_DB_URL: jdbc:mariadb://mariadb:3306/alfresco?autoReconnect=true&useUnicode=true&characterEncoding=UTF-8
     depends_on:
       - mariadb
 
-  nginx-acs-share:
-    image: ${account_id}.dkr.ecr.${region}.amazonaws.com/nginx-acs-share:${nginx_acs_share_tag}
+  nginx-proxy:
+    image: ${account_id}.dkr.ecr.${region}.amazonaws.com/nginx-acs-repository:${nginx_proxy_tag}
     init: true
     build:
-      context: ./nginx-acs-share
+      context: ./nginx-proxy
     environment:
+      ACM_NGINX_DOMAIN_NAME: ${domain_name}
+      ACM_NGINX_ACS_REPO_HOST: acs-repository
+      ACM_NGINX_ACS_REPO_PORT: 8080
       ACM_NGINX_ACS_SHARE_HOST: acs-share
       ACM_NGINX_ACS_SHARE_PORT: 8080
     depends_on:
+      - acs-repository
       - acs-share
-    ports:
-      - 6443:6443
-
-  ark-haproxy:
-    image: ${account_id}.dkr.ecr.${region}.amazonaws.com/ark-haproxy:${ark_haproxy_tag}
-    init: true
-    build:
-      context: ./ark-haproxy
-    volumes:
-      - ./easyrsa/pki:/etc/minipki:ro
-    environment:
-      ACM_HAPROXY_DOMAIN_NAME: ark-haproxy
-      ACM_HAPROXY_ACS_REPO_HOST: nginx-acs-repository
-      ACM_HAPROXY_ACS_REPO_HTTPS_PORT: 5443
-      ACM_HAPROXY_ACS_SHARE_HOST: nginx-acs-share
-      ACM_HAPROXY_ACS_SHARE_HTTPS_PORT: 6443
-    depends_on:
-      - nginx-acs-repository
-      - nginx-acs-share
     ports:
       - 9080:9080
       - 9443:9443

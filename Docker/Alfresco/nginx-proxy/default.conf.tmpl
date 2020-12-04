@@ -1,10 +1,10 @@
-#server {
-#  listen *:5080 default_server;
-#  return 301 https://$host:5443$request_uri;
-#}
-#
 server {
-  listen *:5443 default_server ssl;
+  listen *:9080 default_server;
+  return 301 https://$host:9443$request_uri;
+}
+
+server {
+  listen *:9443 default_server ssl;
   ssl_protocols TLSv1.2 TLSv1.3;
   ssl_certificate /etc/certs/cert.pem;
   ssl_certificate_key /etc/keys/key.pem;
@@ -32,11 +32,18 @@ server {
     root /app/html;
   }
 
-  # Alfresco Repository
+  # Alfresco backends
   location / {
     proxy_pass http://${ACM_NGINX_ACS_REPO_HOST}:${ACM_NGINX_ACS_REPO_PORT};
   }
   location /alfresco/ {
     proxy_pass http://${ACM_NGINX_ACS_REPO_HOST}:${ACM_NGINX_ACS_REPO_PORT};
+  }
+  location /share/ {
+    proxy_pass http://${ACM_NGINX_ACS_SHARE_HOST}:${ACM_NGINX_ACS_SHARE_PORT};
+    # Mangle the returned `Location` header, because Share keeps on redirecting
+    # to http instead of https, despite being configured otherwise... So NGINX
+    # forces http redirects sent by Share into https redirects.
+    proxy_redirect ~*^http://${ACM_NGINX_DOMAIN_NAME}:9443(.*)$ https://${ACM_NGINX_DOMAIN_NAME}:9443$1;
   }
 }
