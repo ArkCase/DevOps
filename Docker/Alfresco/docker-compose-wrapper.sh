@@ -11,7 +11,7 @@ export account_id=300674751221
 export region=us-west-1
 export acs_repository_tag=dev2
 export acs_share_tag=dev2
-export nginx_proxy_tag=dev2
+export nginx_acs_tag=dev2
 
 usage() {
     echo "Usage: $0 [-h] [-d DOM] [-i ACC] [-l REG] [-r TAG] [-s TAG] [-p TAG] [--] OPTS"
@@ -21,7 +21,7 @@ usage() {
     echo "  -l REG  AWS region (default: $region)"
     echo "  -r TAG  Tag to use for the acs-repository Docker image (default: $acs_repository_tag)"
     echo "  -s TAG  Tag to use for the acs-share Docker image (default: $acs_share_tag)"
-    echo "  -p TAG  Tag to use for the nginx-proxy Docker image (default: $nginx_proxy_tag)"
+    echo "  -p TAG  Tag to use for the nginx-acs Docker image (default: $nginx_acs_tag)"
     echo "  --      Stop parsing options; necessary only if you have pre-command options"
     echo "  OPTS    Docker-compose options"
     echo

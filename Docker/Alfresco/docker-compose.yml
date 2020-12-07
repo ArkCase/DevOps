@@ -93,9 +93,6 @@ services:
         -Dshare.host=${domain_name}
         -Dshare.port=9443
         -Dshare.protocol=https
-        -Dalfresco.host=${domain_name}
-        -Dalfresco.port=9443
-        -Dalfresco.protocol=https
         -Dalfresco.context=alfresco
       DC_DB_USERNAME: alfresco
       DC_DB_PASSWORD: hei4aeY9
@@ -103,11 +100,11 @@ services:
     depends_on:
       - mariadb
 
-  nginx-proxy:
-    image: ${account_id}.dkr.ecr.${region}.amazonaws.com/nginx-acs-repository:${nginx_proxy_tag}
+  nginx-acs:
+    image: ${account_id}.dkr.ecr.${region}.amazonaws.com/nginx-acs:${nginx_acs_tag}
     init: true
     build:
-      context: ./nginx-proxy
+      context: ./nginx-acs
     environment:
       ACM_NGINX_DOMAIN_NAME: ${domain_name}
       ACM_NGINX_ACS_REPO_HOST: acs-repository
