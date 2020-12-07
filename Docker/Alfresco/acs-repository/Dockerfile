@@ -25,6 +25,8 @@ COPY ark-startup.sh /usr/local/tomcat/bin/ark-startup.sh
 
 CMD ["/usr/local/tomcat/bin/ark-startup.sh"]
 
+EXPOSE 8081
+
 # Fabrice 20200930: For some reason, running catalina as user `alfresco` fails:
 #                   `https://HOST/` works, but not `https://HOST/alfresco/`. I
 #                   can't figure out why...

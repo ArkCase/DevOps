@@ -83,7 +83,7 @@ services:
       context: ./acs-share
     environment:
       REPO_HOST: acs-repository
-      REPO_PORT: 8080
+      REPO_PORT: 8081
       REPO_PROTO: http
       CSRF_FILTER_REFERER: https://${domain_name}:9443/.*
       CSRF_FILTER_ORIGIN: https://${domain_name}:9443
@@ -111,7 +111,7 @@ services:
     environment:
       ACM_NGINX_DOMAIN_NAME: ${domain_name}
       ACM_NGINX_ACS_REPO_HOST: acs-repository
-      ACM_NGINX_ACS_REPO_PORT: 8080
+      ACM_NGINX_ACS_REPO_PORT: 8081
       ACM_NGINX_ACS_SHARE_HOST: acs-share
       ACM_NGINX_ACS_SHARE_PORT: 8080
     depends_on:
