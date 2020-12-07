@@ -31,3 +31,5 @@ CMD ["/usr/local/tomcat/bin/ark-startup.sh"]
 # totally ignores any CMD. So we reset the entrypoint here and call
 # `substituter.sh` from `ark-startup.sh`.
 ENTRYPOINT []
+
+EXPOSE 8082
