@@ -540,7 +540,7 @@ Resources:
   MasterSecretConfig:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20201001-0805/CloudFormation/amqsecretcfg.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20201208-1437/CloudFormation/amqsecretcfg.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env
@@ -597,7 +597,7 @@ Resources:
   AlfrescoUserSecretConfig:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20201001-0805/CloudFormation/amqsecretcfg.yml
+      TemplateURL: https://arkcase-public-us-east-1.s3.amazonaws.com/DevOps/ACM-TMP-20201208-1437/CloudFormation/amqsecretcfg.yml
       TimeoutInMinutes: 5
       Parameters:
         Env: !Ref Env

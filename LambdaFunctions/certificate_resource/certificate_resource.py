@@ -110,12 +110,14 @@ def handler(event, context):
           }
         }
 
-    The ARNs of the private key and certificate SSM parameters will be returned
-    and made available through `Fn::GetAtt`, along with the IAM server
-    certificate name:
+    The ARNs and names of the private key and certificate SSM parameters will
+    be returned and made available through `Fn::GetAtt`, along with the IAM
+    server certificate name:
 
         !GetAtt Certificate.KeyParameterArn
         !GetAtt Certificate.CertParameterArn
+        !GetAtt Certificate.KeyParameterName
+        !GetAtt Certificate.CertParameterName
         !GetAtt Certificate.IamCertName
 
     """
@@ -313,6 +315,8 @@ def build_response(
         'Data': {
             'KeyParameterArn': key_parameter_arn,
             'CertParameterArn': cert_parameter_arn,
+            'KeyParameterName': key_parameter_name,
+            'CertParameterName': cert_parameter_name,
             'IamCertArn': iam_cert_arn
         }
     }
