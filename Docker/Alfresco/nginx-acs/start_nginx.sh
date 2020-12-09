@@ -16,6 +16,9 @@ if [ -v ARK_KEY_PARAMETER_NAME ]; then
             | jq -r .Parameter.Value >> /etc/certs/cert.pem
     aws ssm get-parameter --name "${ARK_KEY_PARAMETER_NAME}" --with-decryption \
             | jq -r .Parameter.Value > /etc/keys/key.pem
+
+    echo "XXX DEBUG"
+    curl "${ECS_CONTAINER_METADATA_URI}"
 else
     echo "Creating an X.509 self-signed certificate"
     openssl req -x509 -nodes -days 9000 -newkey rsa:2048 -keyout /etc/keys/key.pem -out /etc/certs/cert.pem -subj "/CN=proxy"
