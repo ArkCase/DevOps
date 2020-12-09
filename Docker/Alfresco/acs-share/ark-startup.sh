@@ -8,6 +8,9 @@ sed -i 's/port="8080"/port="8082"/g' /usr/local/tomcat/conf/server.xml
 # Remove AJP port
 sed -i 's|^.*Connector.*port="8009".*$||' /usr/local/tomcat/conf/server.xml
 
+# Remove shutdown port
+sed -i 's/port="8005"/port="-1"/g' /usr/local/tomcat/conf/server.xml
+
 [ -v JAVA_OPTS ] || JAVA_OPTS=
 
 if [ -v ARK_DB_SECRET_ARN ]; then
