@@ -5,6 +5,9 @@ set -eu -o pipefail
 # Configue Share to listen on port 8082 instead of 8080
 sed -i 's/port="8080"/port="8082"/g' /usr/local/tomcat/conf/server.xml
 
+# Remove AJP port
+sed -i 's|^.*Connector.*port="8009".*$||' /usr/local/tomcat/conf/server.xml
+
 [ -v JAVA_OPTS ] || JAVA_OPTS=
 
 if [ -v ARK_DB_SECRET_ARN ]; then

@@ -5,6 +5,9 @@ set -eu -o pipefail
 # Configue Repository to listen on port 8081 instead of 8080
 sed -i 's/port="8080"/port="8081"/g' /usr/local/tomcat/conf/server.xml
 
+# Remove AJP port
+sed -i 's|^.*Connector.*port="8009".*$||' /usr/local/tomcat/conf/server.xml
+
 [ -v JAVA_OPTS ] || JAVA_OPTS=
 
 if [ -v ARK_DB_SECRET_ARN ]; then

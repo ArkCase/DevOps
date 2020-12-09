@@ -9,8 +9,8 @@ cd "$here"
 export domain_name=localhost
 export account_id=300674751221
 export region=us-west-1
-export acs_repository_tag=dev2
-export acs_share_tag=dev2
+export acs_repository_tag=dev3
+export acs_share_tag=dev3
 export nginx_acs_tag=dev5
 
 usage() {
