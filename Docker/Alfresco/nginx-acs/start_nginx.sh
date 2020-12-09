@@ -7,18 +7,14 @@ chown root:root /etc/certs /etc/keys
 chmod 755 /etc/certs
 chmod 700 /etc/keys
 
-if [ -v ARK_KEY_PARAMETER_NAME ]; then
+if [ -v ACM_NGINX_KEY ]; then
     echo "I am being run on ECS"
-    echo "Fetching the TLS private key and certificate"
-    aws ssm get-parameter --name "${ARK_CERT_PARAMETER_NAME}" --with-decryption \
-            | jq -r .Parameter.Value > /etc/certs/cert.pem
-    aws ssm get-parameter --name "${ARK_INTERMEDIATE_CERT_PARAMETER_NAME}" --with-decryption \
-            | jq -r .Parameter.Value >> /etc/certs/cert.pem
-    aws ssm get-parameter --name "${ARK_KEY_PARAMETER_NAME}" --with-decryption \
-            | jq -r .Parameter.Value > /etc/keys/key.pem
+    echo "$ACM_NGINX_KEY" > /etc/keys/key.pem
+    echo "$ACM_NGINX_CERT" > /etc/certs/cert.pem
+    echo "$ACM_NGINX_INTERMEDIATE_CA_CERT" >> /etc/certs/cert.pem
 
-    echo "XXX DEBUG"
-    curl "${ECS_CONTAINER_METADATA_URI}"
+    echo "XXX DEBUG: curl $ECS_CONTAINER_METADATA_URI"
+    curl "$ECS_CONTAINER_METADATA_URI"
 else
     echo "Creating an X.509 self-signed certificate"
     openssl req -x509 -nodes -days 9000 -newkey rsa:2048 -keyout /etc/keys/key.pem -out /etc/certs/cert.pem -subj "/CN=proxy"
