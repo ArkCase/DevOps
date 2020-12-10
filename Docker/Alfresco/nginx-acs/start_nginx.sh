@@ -13,8 +13,31 @@ if [ -v ACM_NGINX_KEY ]; then
     echo "$ACM_NGINX_CERT" > /etc/certs/cert.pem
     echo "$ACM_NGINX_INTERMEDIATE_CA_CERT" >> /etc/certs/cert.pem
 
-    echo "XXX DEBUG: curl $ECS_CONTAINER_METADATA_URI"
-    curl "$ECS_CONTAINER_METADATA_URI"
+    myip=$(curl -sSLf "$ECS_CONTAINER_METADATA_URI" | jq -r ".Networks[0].IPv4Addresses[0]")
+    echo "Adding a Route53 A record $ACM_NGINX_DOMAIN_NAME -> $myip"
+
+    template='{
+      "Changes": [
+        {
+          "Action": "UPSERT",
+          "ResourceRecordSet": {
+            "Name": $name,
+            "Type": "A",
+            "ResourceRecords": [
+              {
+                "Value": $ipaddr
+              }
+            ],
+            "TTL": 60
+          }
+        }
+      ]
+    }'
+    rrchange=$(jq -n --arg name "$ACM_NGINX_DOMAIN_NAME" --arg ipaddr "$myip" "$template")
+
+    aws route53 change-resource-record-sets \
+            --hosted-zone-id "$ACM_NGINX_ROUTE53_ZONE_ID" \
+            --change-batch "$rrchange"
 else
     echo "Creating an X.509 self-signed certificate"
     openssl req -x509 -nodes -days 9000 -newkey rsa:2048 -keyout /etc/keys/key.pem -out /etc/certs/cert.pem -subj "/CN=proxy"

@@ -11,7 +11,7 @@ export account_id=300674751221
 export region=us-west-1
 export acs_repository_tag=dev4
 export acs_share_tag=dev4
-export nginx_acs_tag=dev5
+export nginx_acs_tag=dev9
 
 usage() {
     echo "Usage: $0 [-h] [-d DOM] [-i ACC] [-l REG] [-r TAG] [-s TAG] [-p TAG] [--] OPTS"
