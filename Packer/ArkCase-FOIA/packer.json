@@ -16,13 +16,6 @@
       "region": "us-east-1",
       "source_ami": "{{ user `base_ami` }}",
       "instance_type": "t3.xlarge",
-      "ami_block_device_mappings": [{
-        "device_name": "/dev/sda1",
-        "volume_size": "{{ user `disk_size_gb` }}",
-        "volume_type": "gp2",
-        "delete_on_termination": true,
-        "encrypted": false
-      }],
       "ssh_username": "centos",
 
       "ami_name": "ArkCase FOIA {{ user `version` }} [{{ user `timestamp` }}]",
