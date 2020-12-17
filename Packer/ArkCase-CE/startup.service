@@ -1,0 +1,14 @@
+[Unit]
+Description=ArkCase StartUp Script
+After=network.target
+Requires=samba.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/local/bin/startup.sh
+TimeoutStartSec=0
+
+[Install]
+WantedBy=default.target

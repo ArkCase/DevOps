@@ -14,10 +14,10 @@ if [ ! -e /var/lib/admin-password-changed ]; then
     pentaho_prop="${rootdir}/app/pentaho/pentaho-server/pentaho-solutions/system/applicationContext-security-ldap.properties"
     arkcase_admin_user=$(grep ^adminUser "$pentaho_prop" | sed 's/^adminUser=//')
 
-    alfresco_prop="${rootdir}/app/alfresco/shared/classes/alfresco-global.properties"
-    ldap_url=$(grep ldap.authentication.java.naming.provider.url "$alfresco_prop" | sed 's/^[^=]*=//')
-    ldap_bind_user=$(grep ldap.synchronization.java.naming.security.principal "$alfresco_prop" | sed 's/^[^=]*=//')
-    ldap_bind_password=$(grep ldap.synchronization.java.naming.security.credentials "$alfresco_prop" | sed 's/^[^=]*=//')
+    ldap_prop="${rootdir}/app/alfresco/shared/classes/alfresco/extension/subsystems/Authentication/ldap-ad/ldap1/ldap-ad.properties"
+    ldap_url=$(grep ldap.authentication.java.naming.provider.url "$ldap_prop" | sed 's/^[^=]*=//')
+    ldap_bind_user=$(grep ldap.synchronization.java.naming.security.principal "$ldap_prop" | sed 's/^[^=]*=//')
+    ldap_bind_password=$(grep ldap.synchronization.java.naming.security.credentials "$ldap_prop" | sed 's/^[^=]*=//')
 
     echo "Set password of admin user to: \"A$instance_id\""
     sleep 30  # Wait for Samba to be up and running
@@ -59,28 +59,29 @@ ref "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-se
 
 # Modify config files
 
-PublicDNS="$(curl -s http://169.254.169.254/latest/meta-data/public-hostname)"
+DnsName="$(curl -sf http://169.254.169.254/latest/meta-data/public-hostname || curl -sf http://169.254.169.254/latest/meta-data/local-hostname)"
 pentaho_url1="PENTAHO_SERVER_URL:\ \"https://acm-arkcase\""
-pentaho_url2="PENTAHO_SERVER_URL:\ \"https://$PublicDNS\""
+pentaho_url2="PENTAHO_SERVER_URL:\ \"https://$DnsName\""
 
 echo "127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4" > /etc/hosts
 echo "::1         localhost6 localhost6.localdomain6" >> /etc/hosts
-echo "127.0.0.1   $PublicDNS" >> /etc/hosts
+echo "127.0.0.1   $DnsName" >> /etc/hosts
 echo "127.0.0.1   arkcase-ce.local" >> /etc/hosts
 
-sed -i "s/arkcase-ce.local/$PublicDNS/g"      "${rootdir}/app/alfresco/shared/classes/alfresco/web-extension/share-config-custom.xml"
-sed -i "s/$PublicDNS:7070/arkcase-ce.local/g" "${rootdir}/app/alfresco/shared/classes/alfresco/web-extension/share-config-custom.xml"
-sed -i "s~$pentaho_url1~$pentaho_url2~g"      "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase.yaml"
-sed -i "s/arkcase-ce.local/$PublicDNS/g"      "${rootdir}/app/pentaho/pentaho-server/tomcat/conf/server.xml"
-sed -i "s/arkcase-ce.local/$PublicDNS/g"      "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "3s/$PublicDNS/arkcase-ce.local/g"     "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "19s/$PublicDNS/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "22s/$PublicDNS/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "58s/$PublicDNS/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "60s/$PublicDNS/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "64s/$PublicDNS/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "101s/$PublicDNS/arkcase-ce.local/g"   "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
-sed -i "103s/$PublicDNS/arkcase-ce.local/g"   "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "s/arkcase-ce.local/$DnsName/g"      "${rootdir}/app/alfresco/shared/classes/alfresco/web-extension/share-config-custom.xml"
+sed -i "s/$DnsName:7070/arkcase-ce.local/g" "${rootdir}/app/alfresco/shared/classes/alfresco/web-extension/share-config-custom.xml"
+sed -i "s~$pentaho_url1~$pentaho_url2~g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase.yaml"
+sed -i "s/arkcase-ce.local/$DnsName/g"      "${rootdir}/app/pentaho/pentaho-server/tomcat/conf/server.xml"
+sed -i "s/arkcase-ce.local/$DnsName/g"      "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "3s/$DnsName/arkcase-ce.local/g"     "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "19s/$DnsName/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "22s/$DnsName/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "58s/$DnsName/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "60s/$DnsName/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "62s/$DnsName/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "66s/$DnsName/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "103s/$DnsName/arkcase-ce.local/g"   "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "105s/$DnsName/arkcase-ce.local/g"   "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
 
 # Start services now
 
@@ -90,3 +91,4 @@ systemctl start snowbound
 systemctl start alfresco
 systemctl start config-server
 systemctl start arkcase
+systemctl start haproxy

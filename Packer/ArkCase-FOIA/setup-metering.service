@@ -1,0 +1,10 @@
+[Unit]
+Description=Setup metering reporting
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/setup-metering.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
