@@ -2,7 +2,7 @@
   "description": "Packer template to build an ArkCase FOIA AMI ready to be published on AWS Marketplace",
 
   "variables": {
-    "base_ami": "ami-05afa634116a37d03",
+    "base_ami": "ami-06e5b34e5ddc9fad1",
     "disk_size_gb": "100",
     "timestamp": "",
     "project": "arkcase-foia",
