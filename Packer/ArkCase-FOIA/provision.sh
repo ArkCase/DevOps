@@ -30,8 +30,7 @@ function move()
 git clone https://github.com/ArkCase/arkcase-ce.git
 cd arkcase-ce/vagrant/provisioning
 move facts.yml .
-# XXX git checkout develop
-git checkout fabrice-packer
+git checkout develop
 echo 'localhost ansible_connection=local' > inventory.ini
 ansible-playbook -i inventory.ini -e @facts.yml arkcase-ee-foia-AWS.yml
 cd
