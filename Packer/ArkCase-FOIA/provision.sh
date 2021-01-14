@@ -82,3 +82,4 @@ sudo systemctl enable setup-metering.service
 
 rm -f ~/.ssh/authorized_keys
 sudo rm -f /root/.ssh/authorized_keys
+sudo rm -f /home/loc.svcmgmt/.ssh/authorized_keys

@@ -42,6 +42,10 @@ if [ ! -e /var/lib/admin-password-changed ]; then
     touch /var/lib/admin-password-changed
 fi
 
+# Re-enable the solr user by using the instance ID as the password
+
+echo "solr:$instance_id" | chpasswd
+
 # Create references of config files that we will modify later in this script
 
 function ref()
