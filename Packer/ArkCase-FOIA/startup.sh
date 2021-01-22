@@ -4,13 +4,13 @@ set -eu -o pipefail
 
 rootdir=/opt/app/arkcase
 
+sleep 10  # Sometimes, the metadata is not available immediately at boot...
+instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+
 # Restore ArkCase admin user if this is the first time this EC2 instances is
 # booted up
 
 if [ ! -e /var/lib/admin-password-changed ]; then
-    sleep 10  # Sometimes, the metadata is not available immediately at boot...
-    instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-
     pentaho_prop="${rootdir}/app/pentaho/pentaho-server/pentaho-solutions/system/applicationContext-security-ldap.properties"
     arkcase_admin_user=$(grep ^adminUser "$pentaho_prop" | sed 's/^adminUser=//')
 
@@ -21,7 +21,8 @@ if [ ! -e /var/lib/admin-password-changed ]; then
 
     echo "Set password of admin user to: \"A$instance_id\""
     sleep 30  # Wait for Samba to be up and running
-    password=$(echo -n \"A$instance_id\" | iconv -f utf8 -t utf16le | base64 -w 0)
+    clear_password="A$instance_id"
+    password=$(echo -n \"$clear_password\" | iconv -f utf8 -t utf16le | base64 -w 0)
     tmpfile=$(mktemp /tmp/XXXXXX.ldif)
     echo "dn: ${arkcase_admin_user}" > "$tmpfile"
     echo "changetype: modify" >> "$tmpfile"
@@ -38,6 +39,9 @@ if [ ! -e /var/lib/admin-password-changed ]; then
     echo "userAccountControl: 512" >> "$tmpfile"
     LDAPTLS_REQCERT=never ldapmodify -H "$ldap_url" -D "$ldap_bind_user" -w "$ldap_bind_password" -x -f "$tmpfile"
     rm "$tmpfile"
+
+    # Update the password in the portal configuration
+    sed -i "19s/@rKc@3e/$clear_password/g" "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-portal-server.yaml"
 
     touch /var/lib/admin-password-changed
 fi
@@ -86,6 +90,11 @@ sed -i "62s/$DnsName/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkca
 sed -i "66s/$DnsName/arkcase-ce.local/g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
 sed -i "103s/$DnsName/arkcase-ce.local/g"   "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
 sed -i "105s/$DnsName/arkcase-ce.local/g"   "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "10s/arkcase-ce.local/$DnsName/g"      "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-portal-server.yaml"
+sed -i "11s/arkcase-ce.local/$DnsName/g"      "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-portal-server.yaml"
+sed -i "13s/arkcase-ce.local/$DnsName/g"      "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-portal-server.yaml"
+
+rm -f "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-portal-runtime.yaml"
 
 # Start services now
 
