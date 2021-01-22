@@ -102,9 +102,9 @@ Parameters:
     Type: Number
     Description: >
       How long passwords should be for various AWS services
-    Default: 20
+    Default: 40
     MinValue: 12
-    MaxValue: 80
+    MaxValue: 40
 
   MariadbRdsInstanceClass:
     Type: String
@@ -113,12 +113,14 @@ Parameters:
       official AWS documentation here:
       https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.DBInstanceClass.html
     Default: db.t3.small
-    AllowedValues: [ db.m5.24xlarge, db.m5.16xlarge, db.m5.12xlarge, db.m5.8xlarge, db.m5.4xlarge, db.m5.4xlarge, db.m5.2xlarge, db.m5.xlarge, db.m5.large,
+    AllowedValues: [ db.m5.24xlarge, db.m5.16xlarge, db.m5.12xlarge, db.m5.8xlarge, db.m5.4xlarge, db.m5.4xlarge,
+                     db.m5.2xlarge, db.m5.xlarge, db.m5.large,
                      db.m4.16xlarge, db.m4.10xlarge, db.m4.4xlarge, db.m4.2xlarge, db.m4.xlarge, db.m4.large,
                      db.z1d.12xlarge, db.z1d.6xlarge, db.z1d.3xlarge, db.z1d.2xlarge, db.z1d.xlarge, db.z1d.large,
                      db.x1e.32xlarge, db.x1e.16xlarge, db.x1e.8xlarge, db.x1e.4xlarge, db.x1e.2xlarge, db.x1e.xlarge,
                      db.x1.32xlarge, db.x1.16xlarge,
-                     db.r5.24xlarge, db.r5.16xlarge, db.r5.12xlarge, db.r5.8xlarge, db.r5.4xlarge, db.r5.2xlarge, db.r5.xlarge, db.r5.large,
+                     db.r5.24xlarge, db.r5.16xlarge, db.r5.12xlarge, db.r5.8xlarge, db.r5.4xlarge, db.r5.2xlarge,
+                     db.r5.xlarge, db.r5.large,
                      db.r4.16xlarge, db.r4.8xlarge, db.r4.4xlarge, db.r4.2xlarge, db.r4.xlarge, db.r4.large,
                      db.t3.2xlarge, db.t3.xlarge, db.t3.large, db.t3.medium, db.t3.small, db.t3.micro,
                      db.t2.2xlarge, db.t2.xlarge, db.t2.large, db.t2.medium, db.t2.small, db.t2.micro ]
@@ -559,6 +561,7 @@ Resources:
   # Microsoft Active Directory Service #
   ######################################
 
+  # NB: AWS::DirectoryService::MicrosoftAD doesn't support Tags :-(
   DirectoryService:
     Type: AWS::DirectoryService::MicrosoftAD
     Properties:
@@ -570,7 +573,6 @@ Resources:
           - !Ref PrivateSubnetA
           - !Ref PrivateSubnetB
         VpcId: !Ref Vpc
-      # AWS::DirectoryService::MicrosoftAD doesn't support Tags :-(
 
   ############
   # AmazonMQ #
@@ -604,6 +606,79 @@ Resources:
           Value: amazonmq
         - Key: Component
           Value: cfn
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ###########################################################
+  # Task definition custom resource with EFS specifications #
+  ###########################################################
+
+  TaskDefinitionResourceLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: TaskDefinitionResourceLambaPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - ecs:RegisterTaskDefinition
+                  - ecs:DeregisterTaskDefinition
+                Resource: "*"
+                Effect: Allow
+
+              - Action:
+                  - iam:GetRole
+                  - iam:PassRole
+                Resource: "*"
+                Effect: Allow
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Tags:
+        - Key: Name
+          Value: !Sub task-definition-resource-lambda-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: global
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  TaskDefinitionResourceLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: >
+        CloudFormation custom resource backend to create a task definition that
+        also supports EFS mounts
+      Runtime: python3.6
+      Role: !GetAtt TaskDefinitionResourceLambdaExecutionRole.Arn
+      Handler: task_definition_resource.handler
+      Timeout: 30
+      Code:
+        S3Bucket: !Sub arkcase-public-${AWS::Region}
+        S3Key: DevOps/ACM-TMP-20201210-0907/LambdaFunctions/task_definition_resource/task_definition_resource.zip
+      Tags:
+        - Key: Name
+          Value: !Sub task-definition-resource-lambda-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: global
+        - Key: Component
+          Value: lambda
         - Key: ManagedBy
           Value: CloudFormation
 
@@ -688,10 +763,10 @@ Resources:
     Properties:
       Description: Master secret
       GenerateSecretString:
-        SecretStringTemplate: !Sub '{"username": "master"}'
+        SecretStringTemplate: '{"username": "master"}'
         GenerateStringKey: password
         PasswordLength: !Ref PasswordsLength
-        ExcludeCharacters: "'/@\"\\%"
+        ExcludePunctuation: true
       Tags:
         - Key: Name
           Value: !Sub mariadb-master-secret-${Project}-${Env}
@@ -1183,7 +1258,7 @@ Resources:
         - Type: redirect
           RedirectConfig:
             Host: '#{host}'
-            Path: '/#{path}'
+            Path: '/#{path}'  # yamllint disable-line rule:quoted-strings
             Query: '#{query}'
             Port: 443
             Protocol: HTTPS
@@ -1337,7 +1412,7 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  TestBackendSecurityGroup:
+  TestBackendTaskSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Security group for the test-backend task
@@ -1374,6 +1449,7 @@ Resources:
       Cluster: !Ref EcsCluster
       TaskDefinition: !Ref TestBackendTaskDefinition
       LaunchType: FARGATE
+      PlatformVersion: 1.4.0
       DesiredCount: 2
       HealthCheckGracePeriodSeconds: 20
       LoadBalancers:
@@ -1383,12 +1459,27 @@ Resources:
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: DISABLED
-          SecurityGroups: [ !GetAtt TestBackendSecurityGroup.GroupId ]
+          SecurityGroups: [ !GetAtt TestBackendTaskSecurityGroup.GroupId ]
           Subnets: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
+
+  # Route53
+
+  TestBackendDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Sub test-backend.${Project}.lan
+      Type: A
+      HostedZoneId: !Ref PrivateHostedZone
+      AliasTarget:
+        DNSName: !GetAtt TestBackendLoadBalancer.DNSName
+        EvaluateTargetHealth: false
+        HostedZoneId: !GetAtt TestBackendLoadBalancer.CanonicalHostedZoneID
 
   ############
   # Alfresco #
   ############
+
+  # Database
 
   AlfrescoDatabase:
     Type: Custom::MariadbDatabase
@@ -1452,16 +1543,530 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  TestBackendDnsRecord:
-    Type: AWS::Route53::RecordSet
+  # Load balancer
+
+  # NB: As of writing, I can't manage to get Share to connect to Repository
+  #     over TLS. Consequently, I decided to run both Repository and Share in
+  #     the same ECS task. The traffic between them can then be left
+  #     unencrypted because it won't leave the host the ECS task is running on.
+  #
+  #     Consequently, we don't need a load balancer because there is only one
+  #     ECS task. The code is commented out, ready to be brought back in when
+  #     we manage to get Share to connect to Repository using HTTPS, and/or we
+  #     can run Alfresco in cluster mode.
+
+  # AlfrescoLoadBalancerSecurityGroup:
+  #   Type: AWS::EC2::SecurityGroup
+  #   Properties:
+  #     GroupDescription: Security group for the Alfresco load balancer
+  #     VpcId: !Ref Vpc
+  #     SecurityGroupIngress:
+  #       - Description: http
+  #         IpProtocol: tcp
+  #         FromPort: 80
+  #         ToPort: 80
+  #         CidrIp: !Ref VpcCidr
+  #       - Description: https
+  #         IpProtocol: tcp
+  #         FromPort: 443
+  #         ToPort: 443
+  #         CidrIp: !Ref VpcCidr
+  #     Tags:
+  #       - Key: Name
+  #         Value: !Sub alfresco-load-balancer-security-group-${Project}-${Env}
+  #       - Key: Env
+  #         Value: !Ref Env
+  #       - Key: Project
+  #         Value: !Ref Project
+  #       - Key: Service
+  #         Value: alfresco
+  #       - Key: Component
+  #         Value: vpc
+  #       - Key: ManagedBy
+  #         Value: CloudFormation
+
+  # AlfrescoLoadBalancer:
+  #   Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+  #   Properties:
+  #     Type: application
+  #     Scheme: internal
+  #     SecurityGroups: [ !GetAtt AlfrescoLoadBalancerSecurityGroup.GroupId ]
+  #     Subnets: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
+  #     Tags:
+  #       - Key: Name
+  #         Value: !Sub alfresco-load-balancer-${Project}-${Env}
+  #       - Key: Env
+  #         Value: !Ref Env
+  #       - Key: Project
+  #         Value: !Ref Project
+  #       - Key: Service
+  #         Value: alfresco
+  #       - Key: Component
+  #         Value: lb
+  #       - Key: ManagedBy
+  #         Value: CloudFormation
+
+  # AlfrescoRepositoryTargetGroup:
+  #   Type: AWS::ElasticLoadBalancingV2::TargetGroup
+  #   Properties:
+  #     Port: 443
+  #     Protocol: HTTPS
+  #     VpcId: !Ref Vpc
+  #     TargetType: ip
+  #     HealthCheckEnabled: true
+  #     HealthCheckIntervalSeconds: 10
+  #     HealthCheckProtocol: HTTPS
+  #     HealthCheckPath: /alfresco/
+  #     HealthCheckTimeoutSeconds: 5
+  #     HealthyThresholdCount: 2
+  #     UnhealthyThresholdCount: 2
+
+  # AlfrescoListenerHttp:
+  #   Type: AWS::ElasticLoadBalancingV2::Listener
+  #   Properties:
+  #     LoadBalancerArn: !Ref AlfrescoLoadBalancer
+  #     Port: 80
+  #     Protocol: HTTP
+  #     DefaultActions:
+  #       - Type: redirect
+  #         RedirectConfig:
+  #           Host: '#{host}'
+  #           Path: '/#{path}'  # yamllint disable-line rule:quoted-strings
+  #           Query: '#{query}'
+  #           Port: 443
+  #           Protocol: HTTPS
+  #           StatusCode: HTTP_302
+
+  # AlfrescoListenerHttps:
+  #   Type: AWS::ElasticLoadBalancingV2::Listener
+  #   Properties:
+  #     LoadBalancerArn: !Ref AlfrescoLoadBalancer
+  #     Port: 443
+  #     Protocol: HTTPS
+  #     DefaultActions:
+  #       - Type: forward
+  #         TargetGroupArn: !Ref AlfrescoRepositoryTargetGroup
+  #     Certificates:
+  #       - CertificateArn: !GetAtt Pki.Outputs.AlfrescoIamCertArn
+  #     SslPolicy: ELBSecurityPolicy-FS-1-2-Res-2019-08
+
+  # Route53 for Alfresco
+
+  # AlfrescoDnsRecord:
+  #   Type: AWS::Route53::RecordSet
+  #   Properties:
+  #     Name: !Sub alfresco.${Project}.lan
+  #     Type: A
+  #     HostedZoneId: !Ref PrivateHostedZone
+  #     AliasTarget:
+  #       DNSName: !GetAtt AlfrescoLoadBalancer.DNSName
+  #       EvaluateTargetHealth: false
+  #       HostedZoneId: !GetAtt AlfrescoLoadBalancer.CanonicalHostedZoneID
+
+  # EFS filesystem
+
+  AlfrescoEfsMountTargetSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
     Properties:
-      Name: !Sub test-backend.${Project}.lan
-      Type: A
-      HostedZoneId: !Ref PrivateHostedZone
-      AliasTarget:
-        DNSName: !GetAtt TestBackendLoadBalancer.DNSName
-        EvaluateTargetHealth: false
-        HostedZoneId: !GetAtt TestBackendLoadBalancer.CanonicalHostedZoneID
+      GroupDescription: Security group for the Alfresco EFS mount targets
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - Description: NFSv4 from this VPC
+          IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !GetAtt AlfrescoTaskSecurityGroup.GroupId
+      Tags:
+        - Key: Name
+          Value: !Sub alfresco-efs-security-group-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: alfresco
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  AlfrescoEfs:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      Encrypted: true
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub alfresco-efs-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: alfresco
+        - Key: Component
+          Value: efs
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  AlfrescoEfsMountTargetA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref AlfrescoEfs
+      SubnetId: !Ref PrivateSubnetA
+      SecurityGroups: [ !GetAtt AlfrescoEfsMountTargetSecurityGroup.GroupId ]
+
+  AlfrescoEfsMountTargetB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref AlfrescoEfs
+      SubnetId: !Ref PrivateSubnetB
+      SecurityGroups: [ !GetAtt AlfrescoEfsMountTargetSecurityGroup.GroupId ]
+
+  # ECS stuff for Alfresco
+
+  AlfrescoLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 365
+
+  AlfrescoTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: AlfrescoTaskExecutionPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action: ssm:GetParameters
+                Resource:
+                  - !GetAtt Pki.Outputs.AlfrescoKeyParameterArn
+                  - !GetAtt Pki.Outputs.AlfrescoCertParameterArn
+                  - !GetAtt Pki.Outputs.IntermediateCaCertParameterArn
+                Effect: Allow
+      Tags:
+        - Key: Name
+          Value: !Sub alfresco-task-execution-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: alfresco
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  AlfrescoTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AlfrescoTaskPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action: secretsmanager:GetSecretValue
+                Resource:
+                  - !GetAtt AlfrescoDatabaseUser.Outputs.UserSecretArn
+                  - !GetAtt Amazonmq.Outputs.AlfrescoUserSecretArn
+                Effect: Allow
+
+              - Action: route53:ChangeResourceRecordSets
+                Resource: !Sub arn:aws:route53:::hostedzone/${PrivateHostedZone}
+                Effect: Allow
+      Tags:
+        - Key: Name
+          Value: !Sub alfresco-task-role-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: alfresco
+        - Key: Component
+          Value: iam
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  AlfrescoTaskDefinition:
+    # NB: Containers in an `awsvpc` task can access each other on `localhost`
+    Type: Custom::TaskDefinition
+    Properties:
+      ServiceToken: !GetAtt TaskDefinitionResourceLambda.Arn
+      family: alfresco
+      cpu: 2048
+      memory: 8192
+      executionRoleArn: !GetAtt AlfrescoTaskExecutionRole.Arn
+      taskRoleArn: !GetAtt AlfrescoTaskRole.Arn
+      requiresCompatibilities: [ FARGATE ]
+      networkMode: awsvpc
+      volumes:
+        - name: alfresco-efs
+          efsVolumeConfiguration:
+            fileSystemId: !Ref AlfrescoEfs
+      containerDefinitions:
+        - name: acs-repository
+          image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/acs-repository:dev4
+          healthCheck:
+            command: [ CMD-SHELL, "curl -f http://localhost:8081/alfresco/" ]
+            interval: 10
+            retries: 2
+            startPeriod: 300  # 5 minutes; Alfresco is very slow to start but 300 seconds is the maximum allowed value
+            timeout: 3
+          # TODO XXX rm if ok to rm
+          # portMappings:
+          #   - containerPort: 8081
+          #     protocol: tcp
+          mountPoints:
+            - sourceVolume: alfresco-efs
+              containerPath: /usr/local/tomcat/alf_data
+          logConfiguration:
+            logDriver: awslogs
+            options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref AlfrescoLogGroup
+              awslogs-stream-prefix: repository
+          essential: true
+          linuxParameters:
+            initProcessEnabled: true
+          environment:
+            - name: ARK_DB_SECRET_ARN
+              value: !GetAtt AlfrescoDatabaseUser.Outputs.UserSecretArn
+
+            - name: ARK_ACTIVEMQ_SECRET_ARN
+              value: !GetAtt Amazonmq.Outputs.AlfrescoUserSecretArn
+
+            - name: JAVA_OPTS
+              value: !Sub >
+                -Ddir.root=/usr/local/tomcat/alf_data
+                -Ddb.driver=org.mariadb.jdbc.Driver
+                -Dindex.subsystem.name=noindex
+                -Dshare.host=alfresco.${Project}.lan
+                -Dshare.port=9443
+                -Dshare.protocol=https
+                -Dalfresco.host=alfresco.${Project}.lan
+                -Dalfresco.port=9443
+                -Dalfresco.protocol=https
+                -Daos.baseUrlOverwrite=https://alfresco.${Project}.lan:443/alfresco/aos
+                -Dmessaging.broker.connections.max=8
+                -Dmessaging.broker.url="failover:(${Amazonmq.Outputs.OpenwireEndpoints})"
+                -Dhttp.proxyHost=alfresco.${Project}.lan
+                -Dhttp.proxyPort=9080
+                -Dhttps.proxyHost=alfresco.${Project}.lan
+                -Dhttps.proxyPort=9443
+                -Djodconverter.enabled=false
+                -Djodconverter.officeHome=null
+                -Xms3500m
+                -Xmx3500m
+                -Dlocal.transform.service.enabled=false
+                -Dtransform.service.enabled=false
+                -Dlegacy.transform.service.enabled=false
+                -DsyncService.mode=OFF
+                -Dsync.mode=OFF
+                -Dsync.pullJob.enabled=false
+                -Dsync.pushJob.enabled=false
+                -Dsystem.usages.enabled=false
+                -Dsystem.usages.clearBatchSize=0
+                -Dactivities.feed.notifier.enabled=false
+                -Dactivities.feed.cleaner.enabled=false
+                -Dactivities.post.cleaner.enabled=false
+                -Dactivities.feed.generator.enabled=false
+                -Dactivities.post.lookup.enabled=false
+                -Dreplication.enabled=false
+                -Dtransferservice.receiver.enabled=false
+                -Dsystem.thumbnail.generate=false
+
+        - name: acs-share
+          image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/acs-share:dev4
+          healthCheck:
+            command: [ CMD-SHELL, "curl -f http://localhost:8082/share/" ]
+            interval: 10
+            retries: 2
+            startPeriod: 300  # 5 minutes; Alfresco is very slow to start but 300 seconds is the maximum allowed value
+            timeout: 3
+          # TODO XXX rm if ok to rm
+          # portMappings:
+          #   - containerPort: 8082
+          #     protocol: tcp
+          logConfiguration:
+            logDriver: awslogs
+            options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref AlfrescoLogGroup
+              awslogs-stream-prefix: share
+          essential: true
+          linuxParameters:
+            initProcessEnabled: true
+          environment:
+            - name: REPO_HOST
+              value: localhost
+
+            - name: REPO_PORT
+              value: 8081
+
+            - name: REPO_PROTO
+              value: http
+
+            - name: CSRF_FILTER_REFERER
+              value: !Sub https://alfresco.${Project}.lan:9443/.*
+
+            - name: CSRF_FILTER_ORIGIN
+              value: !Sub https://alfresco.${Project}.lan:9443
+
+            - name: ARK_DB_SECRET_ARN
+              value: !GetAtt AlfrescoDatabaseUser.Outputs.UserSecretArn
+
+            - name: ARK_ACTIVEMQ_SECRET_ARN
+              value: !GetAtt Amazonmq.Outputs.AlfrescoUserSecretArn
+
+            - name: JAVA_OPTS
+              value: !Sub >
+                -Xms3500m
+                -Xmx3500m
+                -Dshare.host=alfresco.${Project}.lan
+                -Dshare.port=9443
+                -Dshare.protocol=https
+                -Dalfresco.context=alfresco
+
+        - name: nginx-acs
+          image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/nginx-acs:dev9
+          healthCheck:
+            command: [ CMD-SHELL, "curl -kf https://localhost:9443/nginx-ecs-ping.html" ]
+            interval: 10
+            retries: 2
+            startPeriod: 5
+            timeout: 2
+          portMappings:
+            - containerPort: 9443
+              protocol: tcp
+          ulimits:
+            - name: nofile
+              softLimit: 15000
+              hardLimit: 15000
+          logConfiguration:
+            logDriver: awslogs
+            options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref AlfrescoLogGroup
+              awslogs-stream-prefix: nginx
+          essential: true
+          linuxParameters:
+            initProcessEnabled: true
+          environment:
+            - name: ACM_NGINX_DOMAIN_NAME
+              value: !Sub alfresco.${Project}.lan
+
+            - name: ACM_NGINX_ACS_REPO_HOST
+              value: localhost
+
+            - name: ACM_NGINX_ACS_REPO_PORT
+              value: 8081
+
+            - name: ACM_NGINX_ACS_SHARE_HOST
+              value: localhost
+
+            - name: ACM_NGINX_ACS_SHARE_PORT
+              value: 8082
+
+            - name: ACM_NGINX_ROUTE53_ZONE_ID
+              value: !Ref PrivateHostedZone
+
+          secrets:
+            - name: ACM_NGINX_KEY
+              valueFrom: !GetAtt Pki.Outputs.AlfrescoKeyParameterArn
+
+            - name: ACM_NGINX_CERT
+              valueFrom: !GetAtt Pki.Outputs.AlfrescoCertParameterArn
+
+            - name: ACM_NGINX_INTERMEDIATE_CA_CERT
+              valueFrom: !GetAtt Pki.Outputs.IntermediateCaCertParameterArn
+
+      tags:
+        - key: Name
+          value: !Sub alfresco-task-defintion-${Project}-${Env}
+        - key: Env
+          value: !Ref Env
+        - key: Project
+          value: !Ref Project
+        - key: Service
+          value: test-backend
+        - key: Component
+          value: ecs
+        - key: ManagedBy
+          value: CloudFormation
+
+  AlfrescoTaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for the Alfresco Repository task
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        # - Description: HTTPS from load balancer
+        #   IpProtocol: tcp
+        #   FromPort: 9443
+        #   ToPort: 9443
+        #   SourceSecurityGroupId: !GetAtt AlfrescoLoadBalancerSecurityGroup.GroupId
+        # TODO: restrict
+        - Description: HTTPS debug
+          IpProtocol: tcp
+          FromPort: 9443
+          ToPort: 9443
+          CidrIp: !Ref VpcCidr
+      Tags:
+        - Key: Name
+          Value: !Sub alfresco-task-security-group-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: alfresco
+        - Key: Component
+          Value: vpc
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  AlfrescoService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      # - AlfrescoListenerHttps
+      - AlfrescoEfsMountTargetA
+      - AlfrescoEfsMountTargetB
+    Properties:
+      Cluster: !Ref EcsCluster
+      TaskDefinition: !Ref AlfrescoTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 1  # NB: Alfresco CE doesn't support clustering
+      PlatformVersion: 1.4.0
+      # LoadBalancers:
+      #   - ContainerName: nginx-acs
+      #     ContainerPort: 9443
+      #     TargetGroupArn: !Ref AlfrescoTargetGroup
+      # HealthCheckGracePeriodSeconds: 300
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !GetAtt AlfrescoTaskSecurityGroup.GroupId
+            - !GetAtt MariadbAllowedSecurityGroup.GroupId
+            - !GetAtt Amazonmq.Outputs.AllowedSecurityGroupId
+          Subnets: [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
 
 Outputs:
   StartBlockTraffic:
@@ -1503,3 +2108,11 @@ Outputs:
   StartAllowTraffic:
     Description: End weekly maintenance window
     Value: !GetAtt MaintenanceWindows.StartAllowTraffic
+
+  TestBackendDns:
+    Description: DNS name of the test-backend service
+    Value: !Ref TestBackendDnsRecord
+
+#  AlfrescoDns:
+#    Description: DNS name of the Alfresco services
+#    Value: !Ref AlfrescoDnsRecord

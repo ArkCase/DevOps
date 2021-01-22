@@ -66,7 +66,8 @@ def create_secret(client, arn, version_id):
     secret = get_secret(client, arn, "AWSCURRENT")
     random_password = client.get_random_password(
             PasswordLength=int(os.environ['PASSWORD_LENGTH']),
-            ExcludeCharacters="/@\"'\\%")
+            ExcludePunctuation=True
+    )
     secret['password'] = random_password['RandomPassword']
 
     # Update the pending secret with the new value

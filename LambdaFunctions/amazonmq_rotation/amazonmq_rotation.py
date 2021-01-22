@@ -7,6 +7,7 @@
 import boto3
 import os
 import json
+import time
 
 
 def handler(event, context):
@@ -77,7 +78,7 @@ def set_secret(client, arn, version_id):
     # Get the pending secret
     pending_secret = get_secret(client, arn, "AWSPENDING", version_id)
     username = pending_secret['username']
-    groups = pending_secret['groups'].split(",")
+    group = pending_secret['group']
     password = pending_secret['password']
 
     # Check whether the user exist already
@@ -97,25 +98,39 @@ def set_secret(client, arn, version_id):
                 BrokerId=broker_id,
                 ConsoleAccess=False,
                 Username=username,
-                Groups=groups,
+                Groups=[group],
                 Password=password)
-        print(f"set_secret: Successfully changed the password of AmazonMQ user '{username}', groups: '{groups}'")
+        print(f"set_secret: Successfully changed the password of AmazonMQ user '{username}', group '{group}'")
     else:
         print(f"set_secret: Creating AmazonMQ user '{username}'...")
         mq_client.create_user(
                 BrokerId=broker_id,
                 ConsoleAccess=False,
                 Username=username,
-                Groups=groups,
+                Groups=[group],
                 Password=password)
-        print(f"set_secret: Successfully created AmazonMQ user '{username}', groups: '{groups}'")
-    print(f"set_secret: **IMPORTANT**: Changes will be effective after the next maintenance window")
+        print(f"set_secret: Successfully created AmazonMQ user '{username}', group '{group}'")
+
+    print(f"Rebooting broker {broker_id} to effect changes")
+    response = mq_client.describe_broker(BrokerId=broker_id)
+    state = response['BrokerState']
+    if state != "REBOOT_IN_PROGRESS":
+        mq_client.reboot_broker(BrokerId=broker_id)
+    rebooting = True
+    while rebooting:
+        time.sleep(10)
+        response = mq_client.describe_broker(BrokerId=broker_id)
+        state = response['BrokerState']
+        print(f"Broker state: {state}")
+        if state == "REBOOT_IN_PROGRESS":
+            print(f"Reboot in progress...")
+        else:
+            rebooting = false
+    print(f"Broker {broker_id} successfully rebooted")
 
 
 def test_secret(client, arn, version_id):
-    # We can't test the secret because the AmazonMQ broker needs to reboot for
-    # the changes to be effective, and we don't want to do that at random times,
-    # we wait for the next maintenance window.
+    # TODO
     pass
 
 
@@ -165,7 +180,7 @@ def get_secret(client, arn, stage, version_id=None):
     secret = json.loads(response['SecretString'])
 
     # Sanity checks
-    for field in ['username', 'groups', 'password']:
+    for field in ['username', 'group', 'password']:
         if field not in secret:
             raise KeyError(f"Invalid secret '{arn}': field '{field}' must be present")
 
