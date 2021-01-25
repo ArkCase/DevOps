@@ -7,12 +7,40 @@ by maintainers.
 Alfresco reference docker-compose file
 ======================================
 
-This is a reference docker-compose file to deploy Alfresco in the way
-it is integrated with ArkCase (except for SSL).
+This is a reference docker-compose file to deploy Alfresco in a
+similar way it is integrated with ArkCase (including SSL).
 
-You will need to set the `DNS_NAME` environment variable before
-running `docker-compose up`. If you run it on an EC2 instance, you can
-do this:
+To run it on your computer, just run the following:
 
-    $ DNS_NAME=$(curl -sSL http://169.254.169.254/latest/meta-data/public-hostname) docker-compose up
+    $ ./docker-compose-wrapper.sh up --build
 
+Wait until the logs show that Repository has started, and then point
+your browser to:
+
+    http://${domain_name}:9080/alfreso
+
+You will need to accept the warnings about the self-signed SSL
+certificates.
+
+Block diagram
+=============
+
+                                 +------+
+                        HTTP     |      |
+                    +-- 8080 --> | Repo |
+                    |            |      |
+                    |            +------+
+       HTTP     +-------+
+    -- 9080 --> |       |
+                | NIGNX |
+    -- 9443 --> |       |
+       HTTPS    +-------+
+                    |            +-------+
+                    |   HTTP     |       |
+                    +-- 8080 --> | Share |
+                                 |       |
+                                 +-------+
+
+Note: The NGINX container is a proxy. It must run on the same host as
+      both Repository and Share containers, as the traffic between
+      NGINX and the Repository (resp. Share) container is unencrypted.

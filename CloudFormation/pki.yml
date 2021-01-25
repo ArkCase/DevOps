@@ -318,6 +318,7 @@ Resources:
   RenewCertificatesStateMachineLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
+      LogGroupName: !Sub /aws/vendedlogs/states/${AWS::StackName}/RenewCertificatesStateMachineLogGroup
       RetentionInDays: 120
 
   RenewCertificatesStateMachineRole:
@@ -418,7 +419,8 @@ Resources:
         - Id: PostToSns
           Arn: !Ref AlertsSnsTopicArn
           InputTransformer:
-            InputTemplate: "{ \"msg\": \"Failed to renew certificates: the AWS Step Functions state machine failed\", \"event\": <EVENT> }"
+            InputTemplate: '{"msg":
+                "Failed to renew certificates: the AWS Step Functions state machine failed", "event": <EVENT>}'
             InputPathsMap:
               EVENT: $
 
@@ -704,6 +706,70 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
+  TestBackendCertificate:
+    Type: Custom::Certificate
+    DependsOn: IntermediateCaCertificate
+    Properties:
+      ServiceToken: !GetAtt CertificateResourceLambda.Arn
+      KeyType: RSA
+      KeySize: 2048
+      ValidityDays: 90
+      CountryName: US
+      StateOrProvinceName: VA
+      LocalityName: Vienna
+      OrganizationName: ArkCase
+      OrganizationalUnitName: Product Development
+      EmailAddress: info@arkcase.com
+      CommonName: test-backend.arkcase.internal
+      BasicConstraints:
+        CA: false
+      KeyUsage:
+        Critical: true
+        Usages: [ DigitalSignature, KeyEncipherment ]
+      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key-${AWS::StackName}
+      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert-${AWS::StackName}
+      KeyParameterName: !Sub /${AWS::StackName}/pki/private/test-backend-key-${AWS::StackName}
+      CertParameterName: !Sub /${AWS::StackName}/pki/certs/test-backend-cert-${AWS::StackName}
+      KeyTags:
+        - Key: Name
+          Value: !Sub test-backend-private-key-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      CertTags:
+        - Key: Name
+          Value: !Sub test-backend-certificate-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: ssm
+        - Key: ManagedBy
+          Value: CloudFormation
+      Tags:
+        - Key: Name
+          Value: !Sub test-backend-certificate-resource-${Project}-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Project
+          Value: !Ref Project
+        - Key: Service
+          Value: pki
+        - Key: Component
+          Value: admin
+        - Key: ManagedBy
+          Value: CloudFormation
+
   AlfrescoCertificate:
     Type: Custom::Certificate
     DependsOn: IntermediateCaCertificate
@@ -832,119 +898,77 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  TestBackendCertificate:
-    Type: Custom::Certificate
-    DependsOn: IntermediateCaCertificate
-    Properties:
-      ServiceToken: !GetAtt CertificateResourceLambda.Arn
-      KeyType: RSA
-      KeySize: 2048
-      ValidityDays: 90
-      CountryName: US
-      StateOrProvinceName: VA
-      LocalityName: Vienna
-      OrganizationName: ArkCase
-      OrganizationalUnitName: Product Development
-      EmailAddress: info@arkcase.com
-      CommonName: test-backend.arkcase.internal
-      BasicConstraints:
-        CA: false
-      KeyUsage:
-        Critical: true
-        Usages: [ DigitalSignature, KeyEncipherment ]
-      CaKeyParameterName: !Sub /${AWS::StackName}/pki/private/intermediate-ca-key-${AWS::StackName}
-      CaCertParameterName: !Sub /${AWS::StackName}/pki/certs/intermediate-ca-cert-${AWS::StackName}
-      KeyParameterName: !Sub /${AWS::StackName}/pki/private/test-backend-key-${AWS::StackName}
-      CertParameterName: !Sub /${AWS::StackName}/pki/certs/test-backend-cert-${AWS::StackName}
-      KeyTags:
-        - Key: Name
-          Value: !Sub test-backend-private-key-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: ssm
-        - Key: ManagedBy
-          Value: CloudFormation
-      CertTags:
-        - Key: Name
-          Value: !Sub test-backend-certificate-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: ssm
-        - Key: ManagedBy
-          Value: CloudFormation
-      Tags:
-        - Key: Name
-          Value: !Sub test-backend-certificate-resource-${Project}-${Env}
-        - Key: Env
-          Value: !Ref Env
-        - Key: Project
-          Value: !Ref Project
-        - Key: Service
-          Value: pki
-        - Key: Component
-          Value: admin
-        - Key: ManagedBy
-          Value: CloudFormation
-
 Outputs:
+  RootCaKeyParameterName:
+    Description: Name of the SSM parameter storing the root CA private key
+    Value: !GetAtt RootCaCertificate.KeyParameterName
   RootCaKeyParameterArn:
     Description: ARN of the SSM parameter storing the root CA private key
     Value: !GetAtt RootCaCertificate.KeyParameterArn
-
+  RootCaCertParameterName:
+    Description: Name of the SSM parameter storing the root CA certificate
+    Value: !GetAtt RootCaCertificate.CertParameterName
   RootCaCertParameterArn:
     Description: ARN of the SSM parameter storing the root CA certificate
     Value: !GetAtt RootCaCertificate.CertParameterArn
 
+  IntermediateCaKeyParameterName:
+    Description: Name of the SSM parameter storing the intermediate CA private key
+    Value: !GetAtt IntermediateCaCertificate.KeyParameterName
   IntermediateCaKeyParameterArn:
     Description: ARN of the SSM parameter storing the intermediate CA private key
     Value: !GetAtt IntermediateCaCertificate.KeyParameterArn
-
+  IntermediateCaCertParameterName:
+    Description: Name of the SSM parameter storing the intermediate CA certificate
+    Value: !GetAtt IntermediateCaCertificate.CertParameterName
   IntermediateCaCertParameterArn:
     Description: ARN of the SSM parameter storing the intermediate CA certificate
     Value: !GetAtt IntermediateCaCertificate.CertParameterArn
 
+  TestBackendKeyParameterName:
+    Description: Name of the SSM parameter storing the test-backend service private key
+    Value: !GetAtt TestBackendCertificate.KeyParameterName
+  TestBackendKeyParameterArn:
+    Description: ARN of the SSM parameter storing the test-backend service private key
+    Value: !GetAtt TestBackendCertificate.KeyParameterArn
+  TestBackendCertParameterName:
+    Description: Name of the SSM parameter storing the test-backend service certificate
+    Value: !GetAtt TestBackendCertificate.CertParameterName
+  TestBackendCertParameterArn:
+    Description: ARN of the SSM parameter storing the test-backend service certificate
+    Value: !GetAtt TestBackendCertificate.CertParameterArn
+  TestBackendIamCertArn:
+    Description: ARN of the IAM certificate for test-backend
+    Value: !GetAtt TestBackendCertificate.IamCertArn
+
+  AlfrescoKeyParameterName:
+    Description: Name of the SSM parameter storing the Alfresco service private key
+    Value: !GetAtt AlfrescoCertificate.KeyParameterName
   AlfrescoKeyParameterArn:
     Description: ARN of the SSM parameter storing the Alfresco service private key
     Value: !GetAtt AlfrescoCertificate.KeyParameterArn
-
+  AlfrescoCertParameterName:
+    Description: Name of the SSM parameter storing the Alfresco service certificate
+    Value: !GetAtt AlfrescoCertificate.CertParameterName
   AlfrescoCertParameterArn:
     Description: ARN of the SSM parameter storing the Alfresco service certificate
     Value: !GetAtt AlfrescoCertificate.CertParameterArn
-
   AlfrescoIamCertArn:
     Description: ARN of the IAM certificate for Alfresco
     Value: !GetAtt AlfrescoCertificate.IamCertArn
 
+  PentahoKeyParameterName:
+    Description: Name of the SSM parameter storing the Pentaho service private key
+    Value: !GetAtt PentahoCertificate.KeyParameterName
   PentahoKeyParameterArn:
     Description: ARN of the SSM parameter storing the Pentaho service private key
     Value: !GetAtt PentahoCertificate.KeyParameterArn
-
+  PentahoCertParameterName:
+    Description: Name of the SSM parameter storing the Pentaho service certificate
+    Value: !GetAtt PentahoCertificate.CertParameterName
   PentahoCertParameterArn:
     Description: ARN of the SSM parameter storing the Pentaho service certificate
     Value: !GetAtt PentahoCertificate.CertParameterArn
-
   PentahoIamCertArn:
     Description: ARN of the IAM certificate for Pentaho
     Value: !GetAtt PentahoCertificate.IamCertArn
-
-  TestBackendKeyParameterArn:
-    Description: ARN of the SSM parameter storing the test-backend service private key
-    Value: !GetAtt TestBackendCertificate.KeyParameterArn
-
-  TestBackendCertParameterArn:
-    Description: ARN of the SSM parameter storing the test-backend service certificate
-    Value: !GetAtt TestBackendCertificate.CertParameterArn
-
-  TestBackendIamCertArn:
-    Description: ARN of the IAM certificate for test-backend
-    Value: !GetAtt TestBackendCertificate.IamCertArn

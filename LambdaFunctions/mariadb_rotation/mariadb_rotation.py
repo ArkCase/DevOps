@@ -65,7 +65,8 @@ def create_secret(client, arn, version_id):
     secret['username'] = alternate_username(secret['username'])
     random_password = client.get_random_password(
             PasswordLength=int(os.environ['PASSWORD_LENGTH']),
-            ExcludeCharacters="/@\"'\\%")
+            ExcludePunctuation=True
+    )
     secret['password'] = random_password['RandomPassword']
 
     # Update the pending secret with the new value

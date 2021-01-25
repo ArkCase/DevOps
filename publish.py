@@ -23,11 +23,27 @@ ap.add_argument("-k", "--keep-temporary",
 ap.add_argument("-r", "--region",
     default=[], action="append",
     help="Publish to the given region(s) instead of the default ones; can be specified multiple times")
+ap.add_argument("-f", "--force",
+    default=False, action="store_true",
+    help="Force publishing, even if the host is not an Amazon Linux 2 machine")
 args = ap.parse_args()
 
 if 'AWS_PROFILE' not in os.environ and not 'AWS_DEFAULT_REGION' in os.environ:
     print(f"ERROR: You must set either the `AWS_PROFILE` or the `AWS_DEFAULT_REGION` environment variable")
     sys.exit(1)
+
+is_amazon_linux_2 = False
+if os.access("/etc/system-release", os.R_OK):
+    with open("/etc/system-release") as f:
+        content = f.read()
+        if content.startswith("Amazon Linux release 2"):
+            is_amazon_linux_2 = True
+if not is_amazon_linux_2:
+    if args.force:
+        print(f"WARNING: Not running on Amazon Linux 2, but force publishing anyway")
+    else:
+        print(f"ERROR: Not running on Amazon Linux 2, you must publish from an Amazon Linux 2 machine so the Lambda functions will work properly")
+        sys.exit(1)
 
 tag = args.TAG
 regex = re.compile(r"^\w+$")

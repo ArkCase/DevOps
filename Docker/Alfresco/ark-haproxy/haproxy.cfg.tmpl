@@ -1,0 +1,41 @@
+global
+  maxconn 500
+  log stdout local0 info
+
+defaults
+  mode http
+  timeout connect 5s
+  timeout client 30s
+  timeout server 60s
+
+frontend main
+  bind *:9080
+  bind *:9443 ssl crt /app/cert/bundle.pem
+
+  # Redirecting HTTP to HTTPS is a chore. The `http-request redirect` directive
+  # does not changes the port number, so we have to mangle the `Host` header so
+  # that the `Location` header in the response is the correct one.
+  http-request replace-header Host ^(.*?)(:[0-9]+)?$ \1:9443 if !{ ssl_fc }
+  http-request redirect scheme https code 301 if !{ ssl_fc }
+
+  http-request set-header X-Forwarded-Proto https if { ssl_fc }
+  acl acl_repo path_beg /alfresco
+  acl acl_share path_beg /share
+  use_backend alfresco_repo if acl_repo
+  use_backend alfresco_share if acl_share
+  default_backend alfresco
+
+backend alfresco
+  server alfresco ${ACM_HAPROXY_ACS_REPO_HOST}:${ACM_HAPROXY_ACS_REPO_HTTPS_PORT} maxconn 500 ssl verify none
+  http-response replace-value Location ^https?://(.*):${ACM_HAPROXY_ACS_REPO_HTTPS_PORT}(.*)$ https://${ACM_HAPROXY_DOMAIN_NAME}:9443\2
+  http-response replace-value Location ^https?://(.*):9443(.*)$ https://${ACM_HAPROXY_DOMAIN_NAME}:9443\2
+
+backend alfresco_repo
+  server repo ${ACM_HAPROXY_ACS_REPO_HOST}:${ACM_HAPROXY_ACS_REPO_HTTPS_PORT} maxconn 500 ssl verify none
+  http-response replace-value Location ^https?://(.*):${ACM_HAPROXY_ACS_REPO_HTTPS_PORT}(.*)$ https://${ACM_HAPROXY_DOMAIN_NAME}:9443\2
+  http-response replace-value Location ^https?://(.*):9443(.*)$ https://${ACM_HAPROXY_DOMAIN_NAME}:9443\2
+
+backend alfresco_share
+  server share ${ACM_HAPROXY_ACS_SHARE_HOST}:${ACM_HAPROXY_ACS_SHARE_HTTPS_PORT} maxconn 500 ssl verify none
+  http-response replace-value Location ^https?://(.*):${ACM_HAPROXY_ACS_SHARE_HTTPS_PORT}(.*)$ https://${ACM_HAPROXY_DOMAIN_NAME}:9443\2
+  http-response replace-value Location ^https?://(.*):9443(.*)$ https://${ACM_HAPROXY_DOMAIN_NAME}:9443\2
