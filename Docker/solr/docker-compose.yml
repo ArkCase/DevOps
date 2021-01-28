@@ -1,0 +1,56 @@
+version: "2.4"
+
+services:
+  solr:
+    image: ${account_id}.dkr.ecr.${region}.amazonaws.com/solr:${solr_tag}
+    init: true
+    build:
+      context: ./solr
+    volumes:
+      - alfdata-volume:/usr/local/tomcat/alf_data
+    environment:
+      JAVA_OPTS: >
+        -Ddir.root=/usr/local/tomcat/alf_data
+        -Ddb.driver=org.mariadb.jdbc.Driver
+        -Dindex.subsystem.name=noindex
+        -Dshare.host=${domain_name}
+        -Dshare.port=9443
+        -Dshare.protocol=https
+        -Dalfresco.host=${domain_name}
+        -Dalfresco.port=9443
+        -Dalfresco.protocol=https
+        -Daos.baseUrlOverwrite=https://${domain_name}:9443/alfresco/aos
+        -Dmessaging.broker.url="failover:(nio://activemq:61616)?timeout=3000&jms.useCompression=true"
+        -Ddeployment.method=DOCKER_COMPOSE
+        -Dhttp.proxyHost=${domain_name}
+        -Dhttp.proxyPort=9080
+        -Dhttps.proxyHost=${domain_name}
+        -Dhttps.proxyPort=9443
+        -Djodconverter.enabled=false
+        -Djodconverter.officeHome=null
+        -Xms1500m
+        -Xmx1500m
+        -Dlocal.transform.service.enabled=false
+        -Dtransform.service.enabled=false
+        -Dlegacy.transform.service.enabled=false
+        -DsyncService.mode=OFF
+        -Dsync.mode=OFF
+        -Dsync.pullJob.enabled=false
+        -Dsync.pushJob.enabled=false
+        -Dsystem.usages.enabled=false
+        -Dsystem.usages.clearBatchSize=0
+        -Dactivities.feed.notifier.enabled=false
+        -Dactivities.feed.cleaner.enabled=false
+        -Dactivities.post.cleaner.enabled=false
+        -Dactivities.feed.generator.enabled=false
+        -Dactivities.post.lookup.enabled=false
+        -Dreplication.enabled=false
+        -Dtransferservice.receiver.enabled=false
+        -Dsystem.thumbnail.generate=false
+      DC_DB_USERNAME: alfresco
+      DC_DB_PASSWORD: hei4aeY9
+      DC_DB_URL: jdbc:mariadb://mariadb:3306/alfresco?autoReconnect=true&useUnicode=true&characterEncoding=UTF-8
+
+volumes:
+  mariadb-volume:
+  alfdata-volume:
