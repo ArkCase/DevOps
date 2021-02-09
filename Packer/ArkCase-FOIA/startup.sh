@@ -52,18 +52,26 @@ echo "solr:$instance_id" | chpasswd
 
 # Create references of config files that we will modify later in this script
 
+origroot=/var/orig
+mkdir -p "$origroot"
+
 function ref()
 {
-    if [ ! -e "$1.orig" ]; then
-        cp "$1" "$1.orig"
+    filename=$(basename "$1")
+    reldir=$(dirname "$1" | sed -e "s|^$rootdir/||")
+    origpath="${origroot}/${reldir}/${filename}.orig"
+    if [ ! -e "$origpath" ]; then
+        mkdir -p "$origroot/$reldir"
+        cp "$1" "$origpath"
     fi
-    cp -f "$1.orig" "$1"
+    cp -f "$origpath" "$1"
 }
 
 ref "${rootdir}/app/alfresco/shared/classes/alfresco/web-extension/share-config-custom.xml"
 ref "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase.yaml"
 ref "${rootdir}/app/pentaho/pentaho-server/tomcat/conf/server.xml"
 ref "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+ref "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-portal-server.yaml"
 
 # Modify config files
 
