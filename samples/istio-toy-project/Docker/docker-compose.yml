@@ -1,0 +1,22 @@
+version: "3.7"
+
+services:
+  toymesh-backend:
+    image: ftarmedia/toymesh-backend:1
+    init: true
+    build:
+      context: backend
+    environment:
+      - HOSTNAME=bugs_bunny
+    ports:
+      - 8080:8080
+
+  toymesh-web:
+    image: ftarmedia/toymesh-web:1
+    init: true
+    build:
+      context: web
+    environment:
+      - BACKEND_URL=http://toymesh-backend:8080
+    ports:
+      - 8081:8081
