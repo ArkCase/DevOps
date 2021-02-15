@@ -8,6 +8,7 @@ spec:
   selector:
     matchLabels:
       microservice: web
+  replicas: 2
   template:
     metadata:
       labels:
@@ -20,3 +21,6 @@ spec:
           image: ftarmedia/toymesh-web:1
           ports:
             - containerPort: 8081
+          env:
+            - name: BACKEND_URL
+              value: http://backend-service:8100
