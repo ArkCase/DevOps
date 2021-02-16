@@ -1,0 +1,112 @@
+version: "3.7"
+
+services:
+  zoo1:
+    image: zookeeper:3.6
+    init: true
+    ports:
+      - 2181:2181
+      - 8081:8080
+      - 7001:7000
+    volumes:
+      - zoo1:/data
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_TICK_TIME: 2000
+      ZOO_INIT_LIMIT: 10
+      ZOO_SYNC_LIMIT: 5
+      ZOO_MAX_CLIENT_CNXNS: 50
+      ZOO_STANDALONE_ENABLED: "false"
+      ZOO_SERVERS: server.1=zoo1:2888:3888;2181 server.2=zoo2:2888:3888;2181 server.3=zoo3:2888:3888;2181
+      ZOO_4LW_COMMANDS_WHITELIST: mntr, conf, ruok
+      ZOO_CFG_EXTRA: "metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider metricsProvider.httpPort=7000 metricsProvider.exportJvmInfo=true"
+
+  zoo2:
+    image: zookeeper:3.6
+    init: true
+    ports:
+      - 2182:2181
+      - 8082:8080
+      - 7002:7000
+    volumes:
+      - zoo2:/data
+    environment:
+      ZOO_MY_ID: 2
+      ZOO_TICK_TIME: 2000
+      ZOO_INIT_LIMIT: 10
+      ZOO_SYNC_LIMIT: 5
+      ZOO_MAX_CLIENT_CNXNS: 50
+      ZOO_STANDALONE_ENABLED: "false"
+      ZOO_SERVERS: server.1=zoo1:2888:3888;2181 server.2=zoo2:2888:3888;2181 server.3=zoo3:2888:3888;2181
+      ZOO_4LW_COMMANDS_WHITELIST: mntr, conf, ruok
+      ZOO_CFG_EXTRA: "metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider metricsProvider.httpPort=7000 metricsProvider.exportJvmInfo=true"
+
+  zoo3:
+    image: zookeeper:3.6
+    init: true
+    ports:
+      - 2183:2181
+      - 8083:8080
+      - 7003:7000
+    volumes:
+      - zoo3:/data
+    environment:
+      ZOO_MY_ID: 3
+      ZOO_TICK_TIME: 2000
+      ZOO_INIT_LIMIT: 10
+      ZOO_SYNC_LIMIT: 5
+      ZOO_MAX_CLIENT_CNXNS: 50
+      ZOO_STANDALONE_ENABLED: "false"
+      ZOO_SERVERS: server.1=zoo1:2888:3888;2181 server.2=zoo2:2888:3888;2181 server.3=zoo3:2888:3888;2181
+      ZOO_4LW_COMMANDS_WHITELIST: mntr, conf, ruok
+      ZOO_CFG_EXTRA: "metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider metricsProvider.httpPort=7000 metricsProvider.exportJvmInfo=true"
+
+  solr1:
+    image: solr:8.7  # Latest LTS version
+    init: true
+    ports:
+      - 8981:8983
+    volumes:
+      - solr1:/var/solr
+    environment:
+      ZK_HOST: zoo1:2181,zoo2:2181,zoo3:2181
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+
+  solr2:
+    image: solr:8.7  # Latest LTS version
+    init: true
+    ports:
+      - 8982:8983
+    volumes:
+      - solr2:/var/solr
+    environment:
+      ZK_HOST: zoo1:2181,zoo2:2181,zoo3:2181
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+
+  solr3:
+    image: solr:8.7  # Latest LTS version
+    init: true
+    ports:
+      - 8983:8983
+    volumes:
+      - solr3:/var/solr
+    environment:
+      ZK_HOST: zoo1:2181,zoo2:2181,zoo3:2181
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+
+volumes:
+  zoo1:
+  zoo2:
+  zoo3:
+  solr1:
+  solr2:
+  solr3:
