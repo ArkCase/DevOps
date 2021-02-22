@@ -1,0 +1,72 @@
+{
+  "description": "Packer template to build an ArkCase FOIA AMI ready to be published on AWS Marketplace",
+
+  "variables": {
+    "base_ami": "ami-06e5b34e5ddc9fad1",
+    "disk_size_gb": "100",
+    "timestamp": "",
+    "project": "arkcase-foia",
+    "version": "2020.18.03",
+    "service": "arkcase-foia"
+  },
+
+  "builders": [
+    {
+      "type": "amazon-ebs",
+      "region": "us-east-1",
+      "source_ami": "{{ user `base_ami` }}",
+      "instance_type": "t3.xlarge",
+      "ssh_username": "centos",
+
+      "ami_name": "ArkCase FOIA {{ user `version` }} [{{ user `timestamp` }}]",
+      "ami_description": "ArkCase FOIA version {{ user `version` }}",
+      "tags": {
+        "Project": "{{ user `project` }}",
+        "Service": "{{ user `service` }}",
+        "Vendor": "Armedia, LLC"
+      }
+    }
+  ],
+
+  "provisioners": [
+    {
+      "type": "file",
+      "source": "startup.sh",
+      "destination": "/tmp/startup.sh"
+    },
+    {
+      "type": "file",
+      "source": "startup.service",
+      "destination": "/tmp/startup.service"
+    },
+    {
+      "type": "file",
+      "source": "aws-marketplace-product-code",
+      "destination": "/tmp/aws-marketplace-product-code"
+    },
+    {
+      "type": "file",
+      "source": "setup-metering.sh",
+      "destination": "/tmp/setup-metering.sh"
+    },
+    {
+      "type": "file",
+      "source": "setup-metering.service",
+      "destination": "/tmp/setup-metering.service"
+    },
+    {
+      "type": "file",
+      "source": "report-metering.sh",
+      "destination": "/tmp/report-metering.sh"
+    },
+    {
+      "type": "file",
+      "source": "facts.yml",
+      "destination": "/tmp/facts.yml"
+    },
+    {
+      "type": "shell",
+      "script": "provision.sh"
+    }
+  ]
+}
