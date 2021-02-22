@@ -31,20 +31,26 @@ def hello():
 
     headers = {}
     for header in tracing_headers:
-        headers[header] = request.headers.get(header)
-        if headers[header]:
-            print(f"Header: {header}: {headers[header]}", flush=True)
+        if header in request.headers:
+            value = request.headers[header]
+            headers[header] = value
+            print(f"Propagating tracing header: {header}: {value}", flush=True)
 
     try:
         print(f"Querying backend: {url}", flush=True)
         response = requests.get(url, headers=headers)
         print(f"Backend returned status: {response.status_code}", flush=True)
         if response.status_code != 200:
-            raise RuntimeError(f"Gateway error")
+            raise RuntimeError(f"Backend error")
         print(f"Backend returned message: {response.text}", flush=True)
         status_code = 200
-        msg = json.loads(response.text)['message']
-        data = {'backend': msg}
+        j = json.loads(response.text)
+        msg = j['message']
+        ts = j['timestamp_utc']
+        data = {
+            'backend': msg,
+            'timestamp_utc': ts
+        }
 
     except Exception as e:
         status_code = 503
@@ -54,4 +60,4 @@ def hello():
     return make_response(json.dumps(data), status_code)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8081)
+    app.run(host="0.0.0.0", port=8080)

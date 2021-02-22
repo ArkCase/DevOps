@@ -1,22 +1,32 @@
 version: "3.7"
 
 services:
-  toymesh-backend:
-    image: ftarmedia/toymesh-backend:1
+  timeserver:
+    image: ftarmedia/toymesh-timeserver:2
+    init: true
+    build:
+      context: timeserver
+    ports:
+      - 8082:8082
+
+  backend:
+    image: ftarmedia/toymesh-backend:2
     init: true
     build:
       context: backend
     environment:
-      - HOSTNAME=bugs_bunny
+      HOSTNAME: bugs_bunny
+      SIMULATE_ERROR_RATE: 0.25
+      TIMESERVER_URL: http://timeserver:8082
     ports:
-      - 8080:8080
+      - 8081:8081
 
-  toymesh-web:
-    image: ftarmedia/toymesh-web:1
+  web:
+    image: ftarmedia/toymesh-web:2
     init: true
     build:
       context: web
     environment:
-      - BACKEND_URL=http://toymesh-backend:8080
+      BACKEND_URL: http://backend:8081
     ports:
-      - 8081:8081
+      - 8080:8080
