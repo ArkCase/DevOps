@@ -62,12 +62,13 @@ metadata:
   labels:
     app: jaeger
 spec:
-  type: ClusterIP
+  type: NodePort
   ports:
     - name: http-query
       port: 80
       protocol: TCP
       targetPort: 16686
+      nodePort: 32002
   selector:
     app: jaeger
 ---
@@ -665,12 +666,13 @@ metadata:
     app.kubernetes.io/version: "7.2.1"
     app.kubernetes.io/managed-by: Helm
 spec:
-  type: ClusterIP
+  type: NodePort
   ports:
     - name: service
       port: 3000
       protocol: TCP
       targetPort: 3000
+      nodePort: 32003
 
   selector:
     app.kubernetes.io/name: grafana
@@ -2082,10 +2084,12 @@ metadata:
     kiali.io/api-spec: https://kiali.io/api
     kiali.io/api-type: rest
 spec:
+  type: NodePort
   ports:
   - name: http
     protocol: TCP
     port: 20001
+    nodePort: 32001
   - name: http-metrics
     protocol: TCP
     port: 9090
