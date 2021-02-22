@@ -11,6 +11,7 @@ hostname = os.environ['HOSTNAME']
 timeserver_url = os.environ['TIMESERVER_URL']
 if 'SIMULATE_ERROR_RATE' in os.environ:
     error_rate = float(os.environ['SIMULATE_ERROR_RATE'])
+    print(f"SIMULATE_ERROR_RATE: {error_rate}", flush=True)
 else:
     error_rate = None
 
@@ -59,7 +60,6 @@ def hello(path):
             raise RuntimeError(f"Timeserver error")
         print(f"Timeserver returned message: {response.text}", flush=True)
         ts = json.loads(response.text)['now_utc']
-        print(f"XXX ts={ts}")
         data['timestamp_utc'] = ts
         status_code = 200
 

@@ -10,7 +10,7 @@ services:
       - 8082:8082
 
   backend:
-    image: ftarmedia/toymesh-backend:2
+    image: ftarmedia/toymesh-backend:3
     init: true
     build:
       context: backend
