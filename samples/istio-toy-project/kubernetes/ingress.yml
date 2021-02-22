@@ -14,4 +14,4 @@ spec:
               service:
                 name: web-service
                 port:
-                  number: 8101
+                  number: 9080
