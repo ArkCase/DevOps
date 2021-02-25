@@ -30,9 +30,9 @@ function move()
 git clone https://github.com/ArkCase/arkcase-ce.git
 cd arkcase-ce/vagrant/provisioning
 move facts.yml .
-git checkout DSO-248
+git checkout develop
 echo 'localhost ansible_connection=local' > inventory.ini
-ansible-playbook -i inventory.ini -e @facts.yml arkcase-ee-foia-AWS.yml
+ansible-playbook -i inventory.ini -e @facts.yml arkcase-all.yml -t "marketplace, pki, alfresco-ce, pentaho-ee"
 cd
 rm -rf arkcase-ce
 
@@ -64,19 +64,20 @@ sudo systemctl disable pentaho solr snowbound alfresco config-server arkcase fir
 
 ## Setup ArkCase startup script
 move startup.sh /usr/local/bin
+sudo chmod 755 /usr/local/bin/startup.sh
 move startup.service /etc/systemd/system
 sudo systemctl daemon-reload
 sudo systemctl enable startup.service
 
 # Install the metering scripts
 
-#move aws-marketplace-product-code /
-#move report-metering.sh /usr/local/bin
-#move setup-metering.sh /usr/local/bin
-#move setup-metering.service /etc/systemd/system
+move aws-marketplace-product-code /
+move report-metering.sh /usr/local/bin
+move setup-metering.sh /usr/local/bin
+move setup-metering.service /etc/systemd/system
 
-#sudo systemctl daemon-reload
-#sudo systemctl enable setup-metering.service
+sudo systemctl daemon-reload
+sudo systemctl enable setup-metering.service
 
 # Secure the AMI
 
