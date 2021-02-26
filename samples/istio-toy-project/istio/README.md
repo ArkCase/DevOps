@@ -8,7 +8,6 @@ Create a minikube environment:
 
 Install Istio:
 
-    $ kubectl label namespace default istio-injection=enabled
     $ istioctl install --set profile=demo
     $ kubectl get pods -n istio-system
 
@@ -20,6 +19,7 @@ Install the tools:
 
 Install the toymesh app:
 
+    $ kubectl label namespace default istio-injection=enabled
     $ kubectl apply -f toy-app.yml
     $ kubectl apply -f gateway.yml
 
