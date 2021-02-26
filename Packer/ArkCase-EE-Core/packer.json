@@ -1,5 +1,5 @@
 {
-  "description": "Packer template to build an ArkCase FOIA AMI ready to be published on AWS Marketplace",
+  "description": "Packer template to build an ArkCase EE Core AMI ready to be published on AWS Marketplace",
 
   "variables": {
     "base_ami": "ami-06e5b34e5ddc9fad1",
