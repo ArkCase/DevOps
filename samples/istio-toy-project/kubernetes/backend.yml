@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  annotations:
+    comment: This is the deployment object for the backend pods
+spec:
+  selector:
+    matchLabels:
+      microservice: backend
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        microservice: backend
+      annotations:
+        comment: This is a pod which is part of the backend deployment
+    spec:
+      containers:
+        - name: backend
+          image: ftarmedia/toymesh-backend:2
+          ports:
+            - containerPort: 8081
+          env:
+            - name: TIMESERVER_URL
+              value: http://timeserver-service:9082
+            - name: SIMULATE_ERROR_RATE
+              value: "0.25"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  annotations:
+    comment: Service for the backend microservice
+spec:
+  selector:
+    microservice: backend
+  ports:
+    - port: 9081
+      targetPort: 8081
