@@ -12,10 +12,17 @@ spec:
       labels:
         app: mariadb
     spec:
+      volumes:
+        - name: mariadb-storage
+          persistentVolumeClaim:
+            claimName: mariadb-pvc
       containers:
         - name: mariadb
           image: arkcase/mariadb:10.4-ark1
           imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: mariadb-storage
+              mountPath: /var/lib/mysql
           ports:
             - containerPort: 3306
               protocol: TCP
