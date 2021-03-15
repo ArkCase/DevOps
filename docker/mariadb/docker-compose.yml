@@ -6,7 +6,8 @@ services:
     build:
       context: .
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      OLD_MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: pass
       MARIADB_DATABASE_0: db0
       MARIADB_USERNAME_0: user0
       MARIADB_PASSWORD_0: pass0
