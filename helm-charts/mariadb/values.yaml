@@ -1,8 +1,11 @@
 # `namespace` is the namespace where MariaDB should be deployed
 namespace: arkcase
 
-# `rootPassword` is the password of the MariaDB root user
+# `rootPassword` is the password for the MariaDB root user. If a password already exists, specify it as the `oldRootPassword` variable to ensure it gets changed to `rootPassword`.
 rootPassword: superpass
+
+# `oldRootPassword` is the existing password for the MariaDB root user
+# oldRootPassword: root
 
 # `dbconfig` is the list of databases, usernames and passwords
 # NB: `dbname` should be formed only of lowercase alphanumeric characters, or
@@ -19,7 +22,7 @@ dbconfig:
     password: pass3
 
 # `storageClass` is the name of the storage class to use for MariaDB's persistent volume
-storageClass: default
+storageClass: standard
 
 # `storageSizeGb` is the size of the storage for MariaDB's persistent volume, in GiB
 storageSizeGb: 2

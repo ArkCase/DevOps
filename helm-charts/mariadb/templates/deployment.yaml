@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mariadb.fullname" . }}-deployment
+  labels:
+    {{- include "mariadb.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "mariadb.fullname" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "mariadb.fullname" . }}
+        release: {{ .Release.Name }}
+        {{- include "mariadb.labels" . | nindent 8 }}
+    spec:
+      volumes:
+        - name: mariadb-storage
+          persistentVolumeClaim:
+            claimName: {{ include "mariadb.fullname" . }}-pvc
+        - name: init-scripts
+          configMap:
+            name: {{ include "mariadb.fullname" . }}-init-cm
+      containers:
+        - name: mariadb
+          image: "mariadb:{{ .Chart.AppVersion }}"
+          ports:
+            - containerPort: 3306
+              protocol: TCP
+          volumeMounts:
+            - name: mariadb-storage
+              mountPath: /var/lib/mysql
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "mysqladmin ping -u root \"-p$MYSQL_ROOT_PASSWORD\""]
+            initialDelaySeconds: 20
+            periodSeconds: 5
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "mysqladmin ping -u root \"-p$MYSQL_ROOT_PASSWORD\""]
+            initialDelaySeconds: 20
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mariadb.fullname" . }}-root-password-secret
+                  key: rootPassword
+            {{- if .Values.oldRootPassword }}
+            - name: OLD_MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mariadb.fullname" . }}-root-password-secret
+                  key: oldRootPassword
+            {{- end }}
+            {{- range $index, $cfg := .Values.dbconfig }}
+            - name: MARIADB_DATABASE_{{ $index }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mariadb.fullname" $ }}-{{ $index }}
+                  key: dbname
+            - name: MARIADB_USERNAME_{{ $index }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mariadb.fullname" $ }}-{{ $index }}
+                  key: username
+            - name: MARIADB_PASSWORD_{{ $index }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mariadb.fullname" $ }}-{{ $index }}
+                  key: password
+            {{- end }}
