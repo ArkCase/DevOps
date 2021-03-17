@@ -5,6 +5,8 @@ metadata:
   labels:
     {{- include "mariadb.labels" . | nindent 4 }}
 spec:
+  strategy:
+    type: Recreate  # Two MariaDB pods can't share the same volume on /var/lib/mysql
   selector:
     matchLabels:
       app: {{ include "mariadb.fullname" . }}
@@ -16,6 +18,7 @@ spec:
         release: {{ .Release.Name }}
         {{- include "mariadb.labels" . | nindent 8 }}
     spec:
+      serviceAccountName: {{ include "mariadb.fullname" . }}-sa
       volumes:
         - name: mariadb-storage
           persistentVolumeClaim:
@@ -53,6 +56,7 @@ spec:
                 secretKeyRef:
                   name: {{ include "mariadb.fullname" . }}-root-password-secret
                   key: rootPassword
+
             {{- if .Values.oldRootPassword }}
             - name: OLD_MYSQL_ROOT_PASSWORD
               valueFrom:
@@ -60,6 +64,7 @@ spec:
                   name: {{ include "mariadb.fullname" . }}-root-password-secret
                   key: oldRootPassword
             {{- end }}
+
             {{- range $index, $cfg := .Values.dbconfig }}
             - name: MARIADB_DATABASE_{{ $index }}
               valueFrom:
