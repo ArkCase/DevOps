@@ -31,7 +31,6 @@ spec:
           image: "mariadb:{{ .Chart.AppVersion }}"
           ports:
             - containerPort: 3306
-              protocol: TCP
           volumeMounts:
             - name: mariadb-storage
               mountPath: /var/lib/mysql
