@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "mariadb.fullname" . }}-test
+  labels:
+    {{- include "mariadb.labels" . | nindent 4 }}
+    mariadb-client: enabled
+  annotations:
+    helm.sh/hook: test
+spec:
+  containers:
+    - name: test-mariadb
+      image: "mariadb:{{ .Chart.AppVersion }}"
+      command: ["sh", "-c", "mysqladmin ping -h mariadb -u root \"-p$MARIADB_ROOT_PASSWORD\""]
+      env:
+        - name: MARIADB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "mariadb.fullname" . }}-root-password-secret
+              key: rootPassword
+  restartPolicy: Never
