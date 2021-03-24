@@ -60,5 +60,5 @@ rm "istioctl-${ISTIO_VERSION}-osx.tar.gz"
 
 echo
 echo
-echo "*** Installation complete ***"
+echo "*** Installation complete; please reboot your computer ***"
 myinstall istioctl
