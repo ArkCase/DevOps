@@ -9,6 +9,20 @@ tmp=$(realpath "$0")
 here=$(dirname "$tmp")
 cd "$here"
 
+function add_helm_repo()
+{
+    if ! helm repo list | grep -wq ^$1; then
+        helm repo add $1 $2
+    fi
+}
+
+echo
+echo
+echo "*** Adding helm repositories ***"
+add_helm_repo grafana https://grafana.github.io/helm-charts
+add_helm_repo prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+
 echo
 echo
 echo "*** Deleting old minikube ***"
