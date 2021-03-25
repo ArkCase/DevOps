@@ -53,12 +53,12 @@ sleep 10
 echo
 echo
 echo "*** Installing Loki ***"
-kubectl create namespace loki
-kubectl label namespace loki istio-injection=enabled
-helm -n loki install -f loki-values.yaml loki grafana/loki
+kubectl create namespace obs
+kubectl label namespace obs istio-injection=enabled
+helm -n obs install -f loki-values.yaml loki grafana/loki
 sleep 10  # Give some time to the controller to create pods
 while true; do
-    tmp=$(kubectl -n loki get pods | grep loki-0 | awk '{ print $2 }')
+    tmp=$(kubectl -n obs get pods | grep loki-0 | awk '{ print $2 }')
     have=$(echo "$tmp" | cut -d/ -f1)
     want=$(echo "$tmp" | cut -d/ -f2)
     if [ "$have" = "$want" ]; then
@@ -74,10 +74,10 @@ sleep 10
 echo
 echo
 echo "*** Installing Promtail ***"
-helm -n loki install -f promtail-values.yaml promtail grafana/promtail
+helm -n obs install -f promtail-values.yaml promtail grafana/promtail
 sleep 10  # Give some time to the controller to create pods
 while true; do
-    tmp=$(kubectl -n loki get pods | grep promtail | tail -1 | awk '{ print $2 }')
+    tmp=$(kubectl -n obs get pods | grep promtail | tail -1 | awk '{ print $2 }')
     have=$(echo "$tmp" | cut -d/ -f1)
     want=$(echo "$tmp" | cut -d/ -f2)
     if [ "$have" = "$want" ]; then
