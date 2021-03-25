@@ -43,7 +43,7 @@ while true; do
     if [ "$have" = "$want" ]; then
         break
     else
-        sleep 1
+        sleep 2
         echo -n .
     fi
 done
@@ -64,7 +64,7 @@ while true; do
     if [ "$have" = "$want" ]; then
         break
     else
-        sleep 1
+        sleep 2
         echo -n .
     fi
 done
@@ -83,7 +83,26 @@ while true; do
     if [ "$have" = "$want" ]; then
         break
     else
-        sleep 1
+        sleep 2
+        echo -n .
+    fi
+done
+echo
+sleep 10
+
+echo
+echo
+echo "*** Installing Grafana ***"
+helm -n obs install -f grafana-values.yaml grafana grafana/grafana
+sleep 10  # Give some time to the controller to create pods
+while true; do
+    tmp=$(kubectl -n obs get pods | grep grafana | tail -1 | awk '{ print $2 }')
+    have=$(echo "$tmp" | cut -d/ -f1)
+    want=$(echo "$tmp" | cut -d/ -f2)
+    if [ "$have" = "$want" ]; then
+        break
+    else
+        sleep 2
         echo -n .
     fi
 done

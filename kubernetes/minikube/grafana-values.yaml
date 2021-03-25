@@ -1,0 +1,30 @@
+# Values file for the Grafana helm chart located
+# [here](https://github.com/grafana/helm-charts/tree/main/charts/grafana).
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 10Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+adminUser: admin
+adminPassword: admin
+
+service:
+  type: NodePort
+  nodePort: 30000
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki:3100
+        jsonData:
+          maxLines: 1000
+
+# TODO: dashboards
