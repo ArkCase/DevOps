@@ -73,4 +73,23 @@ sleep 10
 
 echo
 echo
+echo "*** Installing Promtail ***"
+helm -n loki install -f promtail-values.yaml promtail grafana/promtail
+sleep 10  # Give some time to the controller to create pods
+while true; do
+    tmp=$(kubectl -n loki get pods | grep promtail | tail -1 | awk '{ print $2 }')
+    have=$(echo "$tmp" | cut -d/ -f1)
+    want=$(echo "$tmp" | cut -d/ -f2)
+    if [ "$have" = "$want" ]; then
+        break
+    else
+        sleep 1
+        echo -n .
+    fi
+done
+echo
+sleep 10
+
+echo
+echo
 echo "*** Minikube succesfully set up ***"
