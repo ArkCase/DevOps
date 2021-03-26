@@ -9,5 +9,9 @@ resources:
     cpu: 200m
     memory: 128Mi
 
+# The Promtail helm chart doesn't define an `app` label
+podLabels:
+  app: promtail
+
 config:
   lokiAddress: http://loki:3100/loki/api/v1/push
