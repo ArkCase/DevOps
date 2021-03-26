@@ -89,6 +89,7 @@ echo
 echo
 echo "*** Installing Promtail ***"
 helm install -f promtail-values.yaml promtail grafana/promtail
+kubectl apply -f promtail-network-policy.yaml
 sleep 10  # Give some time to the controller to create pods
 while true; do
     tmp=$(kubectl get pods | grep promtail | tail -1 | awk '{ print $2 }')
