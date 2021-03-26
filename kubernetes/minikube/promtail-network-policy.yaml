@@ -8,7 +8,8 @@ spec:
   podSelector:
     matchLabels:
       app: promtail
-  policyTypes: [Ingress]
+  policyTypes: [Ingress, Egress]
+
   ingress:
     - from:
         - podSelector:
@@ -16,3 +17,7 @@ spec:
               app: prometheus
       ports:
         - port: 3101
+
+  egress:
+    - ports:
+        - port: 8443  # Allow promtail to query the Kubernetes API
