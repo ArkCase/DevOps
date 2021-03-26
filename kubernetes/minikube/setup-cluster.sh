@@ -76,26 +76,26 @@ echo "*** Setting up cluster-wide stuff ***"
 # namespace.
 kubectl label namespace default istio-injection=enabled
 
-kubectl apply -f default-network-policy.yaml
+kubectl apply -f files/default-network-policy.yaml
 
 echo
 echo
 echo "*** Installing Calico ***"
-kubectl apply -f calico.yaml
+kubectl apply -f files/calico.yaml
 wait_for_pod calico-node kube-system
 
 echo
 echo
 echo "*** Installing Loki ***"
-helm install -f loki-values.yaml loki grafana/loki
-kubectl apply -f loki-network-policy.yaml
+helm install -f files/loki-values.yaml loki grafana/loki
+kubectl apply -f files/loki-network-policy.yaml
 wait_for_pod loki-0
 
 echo
 echo
 echo "*** Installing Promtail ***"
-helm install -f promtail-values.yaml promtail grafana/promtail
-kubectl apply -f promtail-network-policy.yaml
+helm install -f files/promtail-values.yaml promtail grafana/promtail
+kubectl apply -f files/promtail-network-policy.yaml
 wait_for_pod promtail
 
 #echo
