@@ -9,10 +9,12 @@ spec:
     matchLabels:
       app: loki
   policyTypes: [Ingress]
+
+  # Allow promtail to send logs to loki and prometheus to scrape metrics
   ingress:
     - from:
         - podSelector:
-            matchLabels:
-              app: promtail
+            matchExpressions:
+              - {key: app, operator: In, values: [promtail, prometheus]}
       ports:
         - port: 3100
