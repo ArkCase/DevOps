@@ -9,12 +9,38 @@ tmp=$(realpath "$0")
 here=$(dirname "$tmp")
 cd "$here"
 
+
 function add_helm_repo()
 {
     if ! helm repo list | grep -wq ^$1; then
         helm repo add $1 $2
     fi
 }
+
+
+function wait_for_pod()
+{
+    if [ $# -gt 1 ]; then
+        namespace=$2
+    else
+        namespace=default
+    fi
+
+    sleep 10  # Give some time to the controller to create pods
+    while true; do
+        tmp=$(kubectl -n $namespace get pods | grep $1 | tail -1 | awk '{ print $2 }')
+        have=$(echo "$tmp" | cut -d/ -f1)
+        want=$(echo "$tmp" | cut -d/ -f2)
+        if [ "$have" = "$want" ]; then
+            break
+        else
+            sleep 2
+            echo -n .
+        fi
+    done
+    echo
+}
+
 
 echo
 echo
@@ -56,79 +82,27 @@ echo
 echo
 echo "*** Installing Calico ***"
 kubectl apply -f calico.yaml
-sleep 10  # Give some time to the controller to create pods
-while true; do
-    tmp=$(kubectl -n kube-system get pods | grep calico-node | awk '{ print $2 }')
-    have=$(echo "$tmp" | cut -d/ -f1)
-    want=$(echo "$tmp" | cut -d/ -f2)
-    if [ "$have" = "$want" ]; then
-        break
-    else
-        sleep 2
-        echo -n .
-    fi
-done
-echo
-sleep 10
+wait_for_pod calico-node kube-system
 
 echo
 echo
 echo "*** Installing Loki ***"
 helm install -f loki-values.yaml loki grafana/loki
 kubectl apply -f loki-network-policy.yaml
-sleep 10  # Give some time to the controller to create pods
-while true; do
-    tmp=$(kubectl get pods | grep loki-0 | awk '{ print $2 }')
-    have=$(echo "$tmp" | cut -d/ -f1)
-    want=$(echo "$tmp" | cut -d/ -f2)
-    if [ "$have" = "$want" ]; then
-        break
-    else
-        sleep 2
-        echo -n .
-    fi
-done
-echo
-sleep 10
+wait_for_pod loki-0
 
 echo
 echo
 echo "*** Installing Promtail ***"
 helm install -f promtail-values.yaml promtail grafana/promtail
 kubectl apply -f promtail-network-policy.yaml
-sleep 10  # Give some time to the controller to create pods
-while true; do
-    tmp=$(kubectl get pods | grep promtail | tail -1 | awk '{ print $2 }')
-    have=$(echo "$tmp" | cut -d/ -f1)
-    want=$(echo "$tmp" | cut -d/ -f2)
-    if [ "$have" = "$want" ]; then
-        break
-    else
-        sleep 2
-        echo -n .
-    fi
-done
-echo
-sleep 10
+wait_for_pod promtail
 
 #echo
 #echo
 #echo "*** Installing Grafana ***"
 #helm install -f grafana-values.yaml grafana grafana/grafana
-#sleep 10  # Give some time to the controller to create pods
-#while true; do
-#    tmp=$(kubectl get pods | grep grafana | tail -1 | awk '{ print $2 }')
-#    have=$(echo "$tmp" | cut -d/ -f1)
-#    want=$(echo "$tmp" | cut -d/ -f2)
-#    if [ "$have" = "$want" ]; then
-#        break
-#    else
-#        sleep 2
-#        echo -n .
-#    fi
-#done
-#echo
-#sleep 10
+#wait_for_pod grafana
 
 echo
 echo
