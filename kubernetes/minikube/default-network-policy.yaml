@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-np
+  labels:
+    managed-by: setup-cluster.sh
+spec:
+  podSelector: {}  # Select all pods
+  policyTypes: [Ingress, Egress]
+
+  # Deny ingress traffic for all pods
+  ingress: []
+
+  # Allow all egress traffic for all pods, but to the cluster only
+  egress:
+    - to:
+        - namespaceSelector: {}

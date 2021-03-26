@@ -41,10 +41,16 @@ echo "*** Installing Istio ***"
 istioctl install -y --set profile=$ISTIO_PROFILE
 sleep 10
 
+echo
+echo
+echo "*** Setting up cluster-wide stuff ***"
+
 # Add the `istio-injection=enabled` label to the `default` namespace, so that
 # Istio will automatically inject side-car proxies to any pod created in this
 # namespace.
 kubectl label namespace default istio-injection=enabled
+
+kubectl apply -f default-network-policy.yaml
 
 echo
 echo
