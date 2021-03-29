@@ -87,22 +87,23 @@ wait_for_pod calico-node kube-system
 echo
 echo
 echo "*** Installing Loki ***"
-helm install -f files/loki-values.yaml loki grafana/loki
 kubectl apply -f files/loki-network-policy.yaml
-wait_for_pod loki-0
+helm install -f files/loki-values.yaml loki grafana/loki
+wait_for_pod loki
 
 echo
 echo
 echo "*** Installing Promtail ***"
-helm install -f files/promtail-values.yaml promtail grafana/promtail
 kubectl apply -f files/promtail-network-policy.yaml
+helm install -f files/promtail-values.yaml promtail grafana/promtail
 wait_for_pod promtail
 
-#echo
-#echo
-#echo "*** Installing Grafana ***"
-#helm install -f grafana-values.yaml grafana grafana/grafana
-#wait_for_pod grafana
+echo
+echo
+echo "*** Installing Grafana ***"
+kubectl apply -f files/grafana-network-policy.yaml
+helm install -f files/grafana-values.yaml grafana grafana/grafana
+wait_for_pod grafana
 
 echo
 echo

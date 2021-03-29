@@ -20,4 +20,6 @@ spec:
 
   egress:
     - ports:
-        - port: 8443  # Allow promtail to query the Kubernetes API
+        # Allow promtail to query the Kubernetes API
+        - port: 8443
+        - port: 443

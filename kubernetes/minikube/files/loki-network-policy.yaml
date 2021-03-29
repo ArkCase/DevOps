@@ -10,11 +10,13 @@ spec:
       app: loki
   policyTypes: [Ingress]
 
-  # Allow promtail to send logs to loki and prometheus to scrape metrics
+  # Allow Promtail to send logs to loki
+  # Allow Prometheus to scrape metrics
+  # Allow Grafana to read data from loki
   ingress:
     - from:
         - podSelector:
             matchExpressions:
-              - {key: app, operator: In, values: [promtail, prometheus]}
+              - {key: app, operator: In, values: [promtail, prometheus, grafana]}
       ports:
         - port: 3100
