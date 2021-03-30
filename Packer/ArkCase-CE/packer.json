@@ -16,7 +16,7 @@
       "source_ami": "{{ user `base_ami` }}",
       "instance_type": "t3.xlarge",
       "ssh_username": "centos",
-      "ami_name": "ArkCase CE Core {{ user `version` }} [{{isotime \"2006-01-02T15:04:05\"}} | clean_resource_name]",
+      "ami_name": "ArkCase CE Core {{ user `version` }} [{{isotime \"2006-01-02T15:04:05\" | clean_resource_name}}]",
       "ami_description": "ArkCase CE Core version {{ user `version` }}",
       "tags": {
         "Project": "{{ user `project` }}",
