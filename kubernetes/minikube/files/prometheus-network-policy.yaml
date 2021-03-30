@@ -1,28 +1,27 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: promtail-np
+  name: prometheus-np
   labels:
     managed-by: setup-cluster.sh
 spec:
   podSelector:
     matchLabels:
-      app: promtail
+      app: prometheus
   policyTypes: [Ingress, Egress]
 
   ingress:
-    # Allow Prometheus to scrape metrics
-    # NB: Istio is merging the main container metrics with the side-car proxy
-    #     metrics, and make them available on port 15020.
+    # Allow Grafana to read data from Prometheus
     - from:
         - podSelector:
             matchLabels:
-              app: prometheus
+              app: grafana
       ports:
-        - port: 15020
+        - port: 80
 
   egress:
-    # Allow Promtail to query the Kubernetes API
+    # Allow Prometheus (and other components, such as kube-state-metrics) to
+    # query the Kubernetes API
     - ports:
         - port: 8443
         - port: 443

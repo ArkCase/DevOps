@@ -10,13 +10,21 @@ spec:
       app: loki
   policyTypes: [Ingress]
 
-  # Allow Promtail to send logs to loki
-  # Allow Prometheus to scrape metrics
-  # Allow Grafana to read data from loki
   ingress:
+    # Allow Promtail to send logs to Loki, and Grafana to read data from Loki
     - from:
         - podSelector:
             matchExpressions:
-              - {key: app, operator: In, values: [promtail, prometheus, grafana]}
+              - {key: app, operator: In, values: [promtail, grafana]}
       ports:
         - port: 3100
+
+    # Allow Prometheus to scrape metrics
+    # NB: Istio is merging the main container metrics with the side-car proxy
+    #     metrics, and make them available on port 15020.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - port: 15020

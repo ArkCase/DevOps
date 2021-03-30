@@ -8,6 +8,10 @@ spec:
   podSelector:
     matchLabels:
       app: grafana
+  policyTypes: [Ingress]
+
+  # Allow access to the UI from any node in the cluster (for the NodePort
+  # service)
   ingress:
     - from:
         - ipBlock:

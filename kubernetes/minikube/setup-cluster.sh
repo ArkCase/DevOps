@@ -100,6 +100,13 @@ wait_for_pod promtail
 
 echo
 echo
+echo "*** Installing Prometheus ***"
+# kubectl apply -f files/promtail-network-policy.yaml
+helm install -f files/prometheus-values.yaml prometheus prometheus-community/prometheus
+wait_for_pod prometheus-server
+
+echo
+echo
 echo "*** Installing Grafana ***"
 kubectl apply -f files/grafana-network-policy.yaml
 helm install -f files/grafana-values.yaml grafana grafana/grafana
