@@ -32,7 +32,7 @@ cd arkcase-ce/vagrant/provisioning
 move facts.yml .
 git checkout develop
 echo 'localhost ansible_connection=local' > inventory.ini
-ansible-playbook -i inventory.ini -e @facts.yml arkcase-ce-AWS.yml --tags "core"
+ansible-playbook -i inventory.ini -e @facts.yml arkcase-all.yml --tags "marketplace, pki, arkcase-ce"
 cd
 rm -rf arkcase-ce
 
