@@ -65,7 +65,7 @@ sudo systemctl disable pentaho solr snowbound alfresco config-server arkcase fir
 ## Setup ArkCase startup script
 move startup.sh /usr/local/bin
 move startup.service /etc/systemd/system
-chmod 755 /usr/local/bin/startup.sh
+sudo chmod 755 /usr/local/bin/startup.sh
 sudo systemctl daemon-reload
 sudo systemctl enable startup.service
 
@@ -75,8 +75,8 @@ move aws-marketplace-product-code /
 move report-metering.sh /usr/local/bin
 move setup-metering.sh /usr/local/bin
 move setup-metering.service /etc/systemd/system
-chmod 755 /usr/local/bin/setup-metering.sh
-chmod 755 /usr/local/bin/report-metering.sh
+sudo chmod 755 /usr/local/bin/setup-metering.sh
+sudo chmod 755 /usr/local/bin/report-metering.sh
 
 sudo systemctl daemon-reload
 sudo systemctl enable setup-metering.service
