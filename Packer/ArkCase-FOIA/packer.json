@@ -4,9 +4,8 @@
   "variables": {
     "base_ami": "ami-06e5b34e5ddc9fad1",
     "disk_size_gb": "100",
-    "timestamp": "",
     "project": "arkcase-foia",
-    "version": "2020.18.06",
+    "version": "{{ env `version` }}",
     "service": "arkcase-foia"
   },
 
@@ -17,8 +16,7 @@
       "source_ami": "{{ user `base_ami` }}",
       "instance_type": "t3.xlarge",
       "ssh_username": "centos",
-
-      "ami_name": "ArkCase FOIA {{ user `version` }} [{{ user `timestamp` }}]",
+      "ami_name": "ArkCase FOIA {{ user `version` }} [{{isotime \"2006-01-02T15:04:05\" | clean_resource_name}}]",
       "ami_description": "ArkCase FOIA version {{ user `version` }}",
       "tags": {
         "Project": "{{ user `project` }}",
