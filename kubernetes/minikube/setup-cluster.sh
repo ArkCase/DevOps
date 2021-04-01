@@ -76,13 +76,12 @@ echo "*** Setting up cluster-wide stuff ***"
 # namespace.
 kubectl label namespace default istio-injection=enabled
 
-kubectl apply -f files/default-network-policy.yaml
-
 echo
 echo
 echo "*** Installing Calico ***"
 kubectl apply -f files/calico.yaml
 wait_for_pod calico-node kube-system
+kubectl apply -f files/default-network-policy.yaml
 
 echo
 echo
@@ -95,22 +94,22 @@ echo
 echo
 echo "*** Installing Promtail ***"
 kubectl apply -f files/promtail-network-policy.yaml
-helm install -f files/promtail-values.yaml promtail grafana/promtail
-wait_for_pod promtail
+#helm install -f files/promtail-values.yaml promtail grafana/promtail
+#wait_for_pod promtail
 
-echo
-echo
-echo "*** Installing Prometheus ***"
-# kubectl apply -f files/promtail-network-policy.yaml
-helm install -f files/prometheus-values.yaml prometheus prometheus-community/prometheus
-wait_for_pod prometheus-server
-
-echo
-echo
-echo "*** Installing Grafana ***"
-kubectl apply -f files/grafana-network-policy.yaml
-helm install -f files/grafana-values.yaml grafana grafana/grafana
-wait_for_pod grafana
+#echo
+#echo
+#echo "*** Installing Prometheus ***"
+#kubectl apply -f files/prometheus-network-policy.yaml
+#helm install -f files/prometheus-values.yaml prometheus prometheus-community/prometheus
+#wait_for_pod prometheus-server
+#
+#echo
+#echo
+#echo "*** Installing Grafana ***"
+#kubectl apply -f files/grafana-network-policy.yaml
+#helm install -f files/grafana-values.yaml grafana grafana/grafana
+#wait_for_pod grafana
 
 echo
 echo

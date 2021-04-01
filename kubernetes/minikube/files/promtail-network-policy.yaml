@@ -23,6 +23,10 @@ spec:
 
   egress:
     # Allow Promtail to query the Kubernetes API
-    - ports:
+    - to:
+        # Allow traffic to usual Kubernetes IP ranges
+        - ipBlock: {cidr: 10.0.0.0/8}
+        - ipBlock: {cidr: 192.168.0.0/16}
+      ports:
         - port: 8443
         - port: 443
