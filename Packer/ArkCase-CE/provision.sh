@@ -64,6 +64,7 @@ sudo systemctl disable pentaho solr snowbound alfresco config-server arkcase fir
 ## Setup ArkCase startup script
 move startup.sh /usr/local/bin
 move startup.service /etc/systemd/system
+sudo chmod 755 /usr/local/bin/startup.sh
 sudo systemctl daemon-reload
 sudo systemctl enable startup.service
 
