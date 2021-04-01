@@ -101,6 +101,7 @@ sed -i "105s/$DnsName/arkcase-ce.local/g"   "${rootdir}/data/arkcase-home/.arkca
 sed -i "10s/arkcase-ce.local/$DnsName/g"      "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-portal-server.yaml"
 sed -i "11s/arkcase-ce.local/$DnsName/g"      "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-portal-server.yaml"
 sed -i "13s/arkcase-ce.local/$DnsName/g"      "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-portal-server.yaml"
+sed -i "s/arkcase-ce.local\/foia/$DnsName\/foia/g"      "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-FOIA_server.yaml"
 
 rm -f "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-portal-runtime.yaml"
 
