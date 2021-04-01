@@ -75,6 +75,8 @@ move aws-marketplace-product-code /
 move report-metering.sh /usr/local/bin
 move setup-metering.sh /usr/local/bin
 move setup-metering.service /etc/systemd/system
+sudo chmod 755 /usr/local/bin/setup-metering.sh
+sudo chmod 755 /usr/local/bin/report-metering.sh
 
 sudo systemctl daemon-reload
 sudo systemctl enable setup-metering.service

@@ -3,10 +3,9 @@
 
   "variables": {
     "base_ami": "ami-06e5b34e5ddc9fad1",
-    "timestamp": "",
-    "project": "arkcase-core",
-    "version": "x.y",
-    "service": "arkcase-core"
+    "project": "arkcase-ee-core",
+    "version": "{{ env `version` }}",
+    "service": "arkcase-ee-core"
   },
 
   "builders": [
@@ -16,8 +15,7 @@
       "source_ami": "{{ user `base_ami` }}",
       "instance_type": "t3.xlarge",
       "ssh_username": "centos",
-
-      "ami_name": "ArkCase EE Core {{ user `version` }} [{{ user `timestamp` }}]",
+      "ami_name": "ArkCase EE Core {{ user `version` }} [{{isotime \"2006-01-02T15:04:05\" | clean_resource_name}}]",
       "ami_description": "ArkCase EE Core version {{ user `version` }}",
       "tags": {
         "Project": "{{ user `project` }}",
