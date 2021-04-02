@@ -103,13 +103,13 @@ wait_for_pod promtail
 #kubectl apply -f files/prometheus-network-policy.yaml
 #helm install -f files/prometheus-values.yaml prometheus prometheus-community/prometheus
 #wait_for_pod prometheus-server
-#
-#echo
-#echo
-#echo "*** Installing Grafana ***"
-#kubectl apply -f files/grafana-network-policy.yaml
-#helm install -f files/grafana-values.yaml grafana grafana/grafana
-#wait_for_pod grafana
+
+echo
+echo
+echo "*** Installing Grafana ***"
+kubectl apply -f files/grafana-network-policy.yaml
+helm install -f files/grafana-values.yaml grafana grafana/grafana
+wait_for_pod grafana
 
 echo
 echo
