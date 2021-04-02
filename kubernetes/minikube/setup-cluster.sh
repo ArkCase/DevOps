@@ -94,8 +94,8 @@ echo
 echo
 echo "*** Installing Promtail ***"
 kubectl apply -f files/promtail-network-policy.yaml
-#helm install -f files/promtail-values.yaml promtail grafana/promtail
-#wait_for_pod promtail
+helm install -f files/promtail-values.yaml promtail grafana/promtail
+wait_for_pod promtail
 
 #echo
 #echo

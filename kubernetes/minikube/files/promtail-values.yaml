@@ -13,5 +13,6 @@ resources:
 podLabels:
   app: promtail
 
+# Configure URL where to push logs to
 config:
   lokiAddress: http://loki:3100/loki/api/v1/push
