@@ -13,6 +13,14 @@ resources:
 podLabels:
   app: promtail
 
+# Tell the Envoy side-car proxy to leave traffic to the `kubernetes` service
+# untouched. This is necessary, otherwise Promtail can't connect to the
+# `kubernetes` service when starting up, see
+# [this](https://github.com/istio/istio/issues/12187).
+podAnnotations:
+  traffic.sidecar.istio.io/includeOutboundIPRanges: "*"
+  traffic.sidecar.istio.io/excludeOutboundIPRanges: 10.96.0.1/32
+
 # Configure URL where to push logs to
 config:
   lokiAddress: http://loki:3100/loki/api/v1/push
