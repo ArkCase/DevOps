@@ -7,7 +7,7 @@ Requires=samba.service
 Type=simple
 User=root
 Group=root
-ExecStart=/usr/local/bin/startup.sh
+ExecStart=/bin/bash /usr/local/bin/startup.sh
 TimeoutStartSec=0
 
 [Install]
