@@ -17,6 +17,7 @@ spec:
             matchLabels:
               app: grafana
         # Uncomment this to be able to acces Prometheus UI on NodePort 30001
+        # NB: You will also need to edit the `prometheus-values.yaml` file
         #- ipBlock:
         #    cidr: 0.0.0.0/0
       ports:

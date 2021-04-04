@@ -34,9 +34,11 @@ server:
     limits:
       cpu: 500m
       memory: 512Mi
-  service:
-    type: NodePort
-    nodePort: 30001
+  # Uncomment the lines below to allow access to the Prometheus UI
+  # NB: You will also need to edit the `promtheus-network-policy.yaml` file
+  #service:
+  #  type: NodePort
+  #  nodePort: 30001
   strategy:
     type: Recreate  # Two Prometheus pods can't share the same volume on /data
 
