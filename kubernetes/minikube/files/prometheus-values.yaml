@@ -40,6 +40,14 @@ server:
   strategy:
     type: Recreate  # Two Prometheus pods can't share the same volume on /data
 
+  # Tell the Envoy side-car proxy to leave traffic to the `kubernetes` service
+  # untouched. This is necessary, otherwise Prometheus can't connect to the
+  # `kubernetes` service when starting up, see
+  # [this](https://github.com/istio/istio/issues/12187).
+  podAnnotations:
+    traffic.sidecar.istio.io/includeOutboundIPRanges: "*"
+    traffic.sidecar.istio.io/excludeOutboundIPRanges: 10.96.0.1/32
+
 # Disable pushgateway (enable it if some pods want to push data to Prometheus)
 pushgateway:
   enabled: false

@@ -97,12 +97,12 @@ kubectl apply -f files/promtail-network-policy.yaml
 helm install -f files/promtail-values.yaml promtail grafana/promtail
 wait_for_pod promtail
 
-#echo
-#echo
-#echo "*** Installing Prometheus ***"
-#kubectl apply -f files/prometheus-network-policy.yaml
-#helm install -f files/prometheus-values.yaml prometheus prometheus-community/prometheus
-#wait_for_pod prometheus-server
+echo
+echo
+echo "*** Installing Prometheus ***"
+kubectl apply -f files/prometheus-network-policy.yaml
+helm install -f files/prometheus-values.yaml prometheus prometheus-community/prometheus
+wait_for_pod prometheus-server
 
 echo
 echo
