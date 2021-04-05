@@ -28,13 +28,13 @@ datasources:
       - name: Loki
         type: loki
         access: proxy
-        url: http://loki:3100
+        url: http://loki.observability:3100
         jsonData:
           maxLines: 1000
       - name: Prometheus
         type: prometheus
         access: proxy
-        url: http://prometheus-server:80
+        url: http://prometheus-server.observability:80
         # TODO
         #jsonData:
         #  exemplarTraceIdDestinations:

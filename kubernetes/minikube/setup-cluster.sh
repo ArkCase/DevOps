@@ -76,40 +76,44 @@ echo "*** Setting up cluster-wide stuff ***"
 # namespace.
 kubectl label namespace default istio-injection=enabled
 
+kubectl create namespace observability
+kubectl label namespace observability istio-injection=enabled
+
 echo
 echo
 echo "*** Installing Calico ***"
 kubectl apply -f files/calico.yaml
 wait_for_pod calico-node kube-system
 kubectl apply -f files/default-network-policy.yaml
+kubectl -n observability apply -f files/default-network-policy.yaml
 
 echo
 echo
 echo "*** Installing Loki ***"
-kubectl apply -f files/loki-network-policy.yaml
-helm install -f files/loki-values.yaml loki grafana/loki
-wait_for_pod loki
+kubectl -n observability apply -f files/loki-network-policy.yaml
+helm -n observability install -f files/loki-values.yaml loki grafana/loki
+wait_for_pod loki observability
 
 echo
 echo
 echo "*** Installing Promtail ***"
-kubectl apply -f files/promtail-network-policy.yaml
-helm install -f files/promtail-values.yaml promtail grafana/promtail
-wait_for_pod promtail
+kubectl -n observability apply -f files/promtail-network-policy.yaml
+helm -n observability install -f files/promtail-values.yaml promtail grafana/promtail
+wait_for_pod promtail observability
 
 echo
 echo
 echo "*** Installing Prometheus ***"
-kubectl apply -f files/prometheus-network-policy.yaml
-helm install -f files/prometheus-values.yaml prometheus prometheus-community/prometheus
-wait_for_pod prometheus-server
+kubectl -n observability apply -f files/prometheus-network-policy.yaml
+helm -n observability install -f files/prometheus-values.yaml prometheus prometheus-community/prometheus
+wait_for_pod prometheus-server observability
 
 echo
 echo
 echo "*** Installing Grafana ***"
-kubectl apply -f files/grafana-network-policy.yaml
-helm install -f files/grafana-values.yaml grafana grafana/grafana
-wait_for_pod grafana
+kubectl -n observability apply -f files/grafana-network-policy.yaml
+helm -n observability install -f files/grafana-values.yaml grafana grafana/grafana
+wait_for_pod grafana observability
 
 echo
 echo
