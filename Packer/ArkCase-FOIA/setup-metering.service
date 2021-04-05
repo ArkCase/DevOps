@@ -3,7 +3,7 @@ Description=Setup metering reporting
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash /usr/local/bin/setup-metering.sh
+ExecStart=/usr/local/bin/setup-metering.sh
 RemainAfterExit=yes
 
 [Install]
