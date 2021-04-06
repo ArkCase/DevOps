@@ -2,7 +2,6 @@
 
 set -eu -o pipefail
 
-MINIKUBE_MEMORY_MiB=8192
 ISTIO_PROFILE=demo
 
 tmp=$(realpath "$0")
@@ -49,17 +48,6 @@ add_helm_repo grafana https://grafana.github.io/helm-charts
 add_helm_repo prometheus-community https://prometheus-community.github.io/helm-charts
 add_helm_repo kube-state-metrics https://kubernetes.github.io/kube-state-metrics
 helm repo update
-
-echo
-echo
-echo "*** Deleting old minikube ***"
-minikube delete
-
-echo
-echo
-echo "*** Creating new minikube ***"
-minikube start --memory $MINIKUBE_MEMORY_MiB --network-plugin cni
-sleep 10
 
 echo
 echo
@@ -117,4 +105,4 @@ wait_for_pod grafana observability
 
 echo
 echo
-echo "*** Minikube succesfully set up ***"
+echo "*** Cluster succesfully set up ***"
