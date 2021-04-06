@@ -105,4 +105,29 @@ wait_for_pod grafana observability
 
 echo
 echo
+echo "*** Installing Jaeger ***"
+kubectl -n observability apply -f files/jaeger-network-policy.yaml
+kubectl -n observability apply -f files/jaeger-crd.yaml
+kubectl -n observability apply -f files/jaeger-operator.yaml
+wait_for_pod jaeger-operator observability
+
+kubectl -n observability apply -f files/jaeger.yaml
+
+# Wait for Jaeger pod to be available, but ignore the jaeger-operator pod
+sleep 10  # Give some time to the controller to create pods
+while true; do
+    tmp=$(kubectl -n $namespace get pods | grep jaeger | grep -v operator1 | tail -1 | awk '{ print $2 }')
+    have=$(echo "$tmp" | cut -d/ -f1)
+    want=$(echo "$tmp" | cut -d/ -f2)
+    if [ "$have" = "$want" ]; then
+        break
+    else
+        sleep 2
+        echo -n .
+    fi
+done
+echo
+
+echo
+echo
 echo "*** Cluster succesfully set up ***"
