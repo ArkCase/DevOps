@@ -116,7 +116,7 @@ kubectl -n observability apply -f files/jaeger.yaml
 # Wait for Jaeger pod to be available, but ignore the jaeger-operator pod
 sleep 10  # Give some time to the controller to create pods
 while true; do
-    tmp=$(kubectl -n $namespace get pods | grep jaeger | grep -v operator1 | tail -1 | awk '{ print $2 }')
+    tmp=$(kubectl -n observability get pods | grep jaeger | grep -v operator | tail -1 | awk '{ print $2 }')
     have=$(echo "$tmp" | cut -d/ -f1)
     want=$(echo "$tmp" | cut -d/ -f2)
     if [ "$have" = "$want" ]; then
