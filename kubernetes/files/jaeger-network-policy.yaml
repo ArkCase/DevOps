@@ -48,6 +48,24 @@ spec:
       ports:
         - port: 14269
 
+    # Allow Grafana to access Jaeger's query server
+    - from:
+        - podSelector:
+            matchLabels:
+              app: grafana
+      ports:
+        - protocol: TCP
+          port: 16686
+
+    # Uncomment the lines below to allow access to the UI
+    # NB: You will also need to configure some kind of external access, for
+    #     example by changing the service type to `NodePort`: `$ kubectl -n
+    #     observability edit svc/jaeger-query`.
+    # - ports:
+    #     - # query
+    #       protocol: TCP
+    #       port: 16686
+
     # Allow other pods in any namespace to post traces
     - from:
         - namespaceSelector: {}
@@ -83,6 +101,3 @@ spec:
         - # collector: admin-http
           protocol: TCP
           port: 14269
-        - # query
-          protocol: TCP
-          port: 16686

@@ -51,12 +51,6 @@ helm repo update
 
 echo
 echo
-echo "*** Installing Istio ***"
-istioctl install -y --set profile=$ISTIO_PROFILE
-sleep 10
-
-echo
-echo
 echo "*** Setting up cluster-wide stuff ***"
 
 # Add the `istio-injection=enabled` label to the `default` namespace, so that
@@ -74,6 +68,37 @@ kubectl apply -f files/calico.yaml
 wait_for_pod calico-node kube-system
 kubectl apply -f files/default-network-policy.yaml
 kubectl -n observability apply -f files/default-network-policy.yaml
+
+echo
+echo
+echo "*** Installing Jaeger ***"
+kubectl -n observability apply -f files/jaeger-network-policy.yaml
+kubectl -n observability apply -f files/jaeger-crd.yaml
+kubectl -n observability apply -f files/jaeger-operator.yaml
+wait_for_pod jaeger-operator observability
+
+kubectl -n observability apply -f files/jaeger.yaml
+
+# Wait for Jaeger pod to be available, but ignore the jaeger-operator pod
+sleep 10  # Give some time to the controller to create pods
+while true; do
+    tmp=$(kubectl -n observability get pods | grep jaeger | grep -v operator | tail -1 | awk '{ print $2 }')
+    have=$(echo "$tmp" | cut -d/ -f1)
+    want=$(echo "$tmp" | cut -d/ -f2)
+    if [ "$have" = "$want" ]; then
+        break
+    else
+        sleep 2
+        echo -n .
+    fi
+done
+echo
+
+echo
+echo
+echo "*** Installing Istio ***"
+istioctl install -y --set profile=$ISTIO_PROFILE --set values.global.tracer.zipkin.address=jaeger-collector.observability:9411
+sleep 10
 
 echo
 echo
@@ -102,31 +127,6 @@ echo "*** Installing Grafana ***"
 kubectl -n observability apply -f files/grafana-network-policy.yaml
 helm -n observability install -f files/grafana-values.yaml grafana grafana/grafana
 wait_for_pod grafana observability
-
-echo
-echo
-echo "*** Installing Jaeger ***"
-kubectl -n observability apply -f files/jaeger-network-policy.yaml
-kubectl -n observability apply -f files/jaeger-crd.yaml
-kubectl -n observability apply -f files/jaeger-operator.yaml
-wait_for_pod jaeger-operator observability
-
-kubectl -n observability apply -f files/jaeger.yaml
-
-# Wait for Jaeger pod to be available, but ignore the jaeger-operator pod
-sleep 10  # Give some time to the controller to create pods
-while true; do
-    tmp=$(kubectl -n observability get pods | grep jaeger | grep -v operator | tail -1 | awk '{ print $2 }')
-    have=$(echo "$tmp" | cut -d/ -f1)
-    want=$(echo "$tmp" | cut -d/ -f2)
-    if [ "$have" = "$want" ]; then
-        break
-    else
-        sleep 2
-        echo -n .
-    fi
-done
-echo
 
 echo
 echo
