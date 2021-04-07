@@ -86,9 +86,9 @@ spec:
         - # agent: jg-binary-trft
           protocol: UDP
           port: 6832
-        #- # collector: zipkin endpoint - optional
-        #  protocol: TCP
-        #  port: 9411
+        - # collector: zipkin
+          protocol: TCP
+          port: 9411
         - # collector: grpc
           protocol: TCP
           port: 14250
