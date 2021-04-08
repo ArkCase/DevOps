@@ -66,12 +66,9 @@ spec:
     #       protocol: TCP
     #       port: 16686
 
-    # Allow other pods in any namespace to post traces
+    # Allow anyone from within the cluster to post traces
     - from:
         - namespaceSelector: {}
-          podSelector:
-            matchLabels:
-              generate-traces: "true"
       ports:
         # Zipkin trift is deprecated for Jaeger; it's still supported if required
         #- # agent: zk-compact-trft
