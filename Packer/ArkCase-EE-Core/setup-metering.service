@@ -4,6 +4,7 @@ Description=Setup metering reporting
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/setup-metering.sh
+After=network-online.target
 RemainAfterExit=yes
 
 [Install]
