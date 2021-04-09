@@ -97,7 +97,7 @@ echo
 echo
 echo
 echo "*** Installing Istio ***"
-istioctl install -y --set profile=$ISTIO_PROFILE --set values.global.tracer.zipkin.address=jaeger-collector.observability:9411
+istioctl install -y --set profile=$ISTIO_PROFILE --set meshConfig.defaultConfig.tracing.zipkin.address=jaeger-collector.observability:9411
 sleep 10
 
 echo
