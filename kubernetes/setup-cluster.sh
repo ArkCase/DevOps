@@ -130,4 +130,11 @@ wait_for_pod grafana observability
 
 echo
 echo
+echo "*** Installing Kiali ***"
+kubectl -n observability apply -f files/kiali-network-policy.yaml
+helm -n observability install -f files/kiali-values.yaml kiali ../helm-charts/kiali-server
+wait_for_pod kiali observability
+
+echo
+echo
 echo "*** Cluster succesfully set up ***"

@@ -11,11 +11,11 @@ spec:
   policyTypes: [Ingress, Egress]
 
   ingress:
-    # Allow Grafana to read data from Prometheus
+    # Allow Grafana and Kiali to read data from Prometheus
     - from:
         - podSelector:
-            matchLabels:
-              app: grafana
+            matchExpressions:
+              - {key: app, operator: In, values: [grafana, kiali]}
         # Uncomment this to be able to acces Prometheus UI on NodePort 30001
         # NB: You will also need to edit the `prometheus-values.yaml` file
         #- ipBlock:

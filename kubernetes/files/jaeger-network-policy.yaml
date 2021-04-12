@@ -48,11 +48,11 @@ spec:
       ports:
         - port: 14269
 
-    # Allow Grafana to access Jaeger's query server
+    # Allow Grafana and Kiali to access Jaeger's query server
     - from:
         - podSelector:
-            matchLabels:
-              app: grafana
+            matchExpressions:
+              - {key: app, operator: In, values: [grafana, kiali]}
       ports:
         - protocol: TCP
           port: 16686

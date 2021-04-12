@@ -1,0 +1,17 @@
+istio_namespace: istio-system
+
+auth:
+  strategy: anonymous
+
+deployment:
+  ingress_enabled: false
+  service_type: NodePort
+  node_port: 30002
+
+external_services:
+  prometheus:
+    url: http://prometheus-server.observability:80
+  grafana:
+    url: http://grafana.observability:80
+  tracing:
+    url: http://jaeger-query.observability:16686
