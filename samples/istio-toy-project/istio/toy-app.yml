@@ -32,7 +32,8 @@ spec:
   selector:
     app: timeserver
   ports:
-    - port: 9082
+    - name: http
+      port: 9082
       targetPort: 8082
 ---
 apiVersion: apps/v1
@@ -74,7 +75,8 @@ spec:
   selector:
     app: backend
   ports:
-    - port: 9081
+    - name: http
+      port: 9081
       targetPort: 8081
 ---
 apiVersion: apps/v1
@@ -114,5 +116,6 @@ spec:
   selector:
     app: web
   ports:
-    - port: 9080
+    - name: http
+      port: 9080
       targetPort: 8080
