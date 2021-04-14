@@ -3,10 +3,23 @@
 set -eu -o pipefail
 
 ISTIO_PROFILE=demo
+DB_PASSWORD_LENGTH=30
 
 tmp=$(realpath "$0")
 here=$(dirname "$tmp")
 cd "$here"
+
+
+function generate_password()
+{
+    pwgen $DB_PASSWORD_LENGTH 1
+}
+
+
+db_root_password=$(generate_password)
+db_names=(activemq)
+db_usernames=(activemq)
+db_passwords=($(generate_password))
 
 
 function add_helm_repo()
@@ -136,6 +149,23 @@ wait_for_pod grafana observability
 # kubectl -n observability apply -f files/kiali-network-policy.yaml
 # helm -n observability install -f files/kiali-values.yaml kiali ../helm-charts/kiali-server
 # wait_for_pod kiali observability
+
+echo
+echo
+echo "*** Installing MariaDB ***"
+opts="--set rootPassword=$db_root_password"
+i=0
+n=${#db_names[@]}
+while [ $i -lt $n ]; do
+    opts="$opts --set dbconfig[$i].dbname=${db_names[$i]}"
+    opts="$opts --set dbconfig[$i].username=${db_usernames[$i]}"
+    opts="$opts --set dbconfig[$i].password=${db_passwords[$i]}"
+    i=$(( $i + 1 ))
+done
+set -x  # XXX
+helm install $opts mariadb ../helm-charts/mariadb
+set +x  # XXX
+wait_for_pod mariadb
 
 echo
 echo

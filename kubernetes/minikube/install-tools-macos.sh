@@ -29,7 +29,7 @@ fi
 echo
 echo
 echo "*** Installing system utilities ***"
-brew install coreutils
+brew install coreutils pwgen
 
 echo
 echo
