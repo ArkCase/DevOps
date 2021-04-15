@@ -17,3 +17,11 @@ spec:
               mariadb-client: enabled
       ports:
         - port: 3306
+    {{- if .Values.enableMetrics }}
+    - from:
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - port: {{ .Values.metricsPort }}
+    {{- end }}

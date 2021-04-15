@@ -153,7 +153,7 @@ wait_for_pod grafana observability
 echo
 echo
 echo "*** Installing MariaDB ***"
-opts="--set rootPassword=$db_root_password"
+opts="--set rootPassword=$db_root_password --set metricsPort=15020"
 i=0
 n=${#db_names[@]}
 while [ $i -lt $n ]; do

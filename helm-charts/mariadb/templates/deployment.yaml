@@ -17,6 +17,11 @@ spec:
         app: {{ include "mariadb.fullname" . }}
         release: {{ .Release.Name }}
         {{- include "mariadb.labels" . | nindent 8 }}
+      {{- if .Values.enableMetrics }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9104"
+      {{- end }}
     spec:
       serviceAccountName: {{ include "mariadb.fullname" . }}-sa
       volumes:
@@ -81,3 +86,14 @@ spec:
                   name: {{ include "mariadb.fullname" $ }}-{{ $index }}
                   key: password
             {{- end }}
+
+{{- if .Values.enableMetrics }}
+        - name: exporter
+          image: prom/mysqld-exporter
+          ports:
+            - name: metrics
+              containerPort: 9104
+          env:
+            - name: DATA_SOURCE_NAME
+              value: "root:{{ .Values.rootPassword }}@(localhost:3306)/"
+{{- end }}
