@@ -19,7 +19,9 @@ spec:
         - port: 3306
     {{- if .Values.enableMetrics }}
     - from:
-        - podSelector:
+        # Allow Prometheus to scrape metrics from any namespace
+        - namespaceSelector: {}
+          podSelector:
             matchLabels:
               app: prometheus
       ports:

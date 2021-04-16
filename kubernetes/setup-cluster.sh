@@ -162,9 +162,7 @@ while [ $i -lt $n ]; do
     opts="$opts --set dbconfig[$i].password=${db_passwords[$i]}"
     i=$(( $i + 1 ))
 done
-set -x  # XXX
 helm install $opts mariadb ../helm-charts/mariadb
-set +x  # XXX
 wait_for_pod mariadb
 
 echo
