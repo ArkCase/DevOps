@@ -50,6 +50,11 @@ server:
     traffic.sidecar.istio.io/includeOutboundIPRanges: "*"
     traffic.sidecar.istio.io/excludeOutboundIPRanges: 10.96.0.1/32
 
+  # Additional command line flags
+  extraFlags:
+    - web.enable-lifecycle
+    - log.level=debug
+
 # Disable pushgateway (enable it if some pods want to push data to Prometheus)
 pushgateway:
   enabled: false
