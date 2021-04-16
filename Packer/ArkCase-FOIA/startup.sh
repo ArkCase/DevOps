@@ -20,8 +20,6 @@ if [ ! -e /var/lib/admin-password-changed ]; then
     ldap_bind_user=$(grep ldap.synchronization.java.naming.security.principal "$ldap_prop" | sed 's/^[^=]*=//')
     ldap_bind_password=$(grep ldap.synchronization.java.naming.security.credentials "$ldap_prop" | sed 's/^[^=]*=//')
 
-    foia_analytical_reports_version=$(find ${rootdir}/install/pentaho/ -type d -name "foia*" -exec basename {} \;)
-
     echo "Set password of admin user to: \"A$instance_id\""
     sleep 30  # Wait for Samba to be up and running
     clear_password="A$instance_id"
