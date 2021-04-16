@@ -6,6 +6,7 @@ rootdir=/opt/app/arkcase
 
 sleep 10  # Sometimes, the metadata is not available immediately at boot...
 instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+foia_analytical_reports_version=$(find ${rootdir}/install/pentaho/ -type d -name "foia*" -exec basename {} \;)
 
 # Restore ArkCase admin user if this is the first time this EC2 instances is
 # booted up
@@ -18,6 +19,8 @@ if [ ! -e /var/lib/admin-password-changed ]; then
     ldap_url=$(grep ldap.authentication.java.naming.provider.url "$ldap_prop" | sed 's/^[^=]*=//')
     ldap_bind_user=$(grep ldap.synchronization.java.naming.security.principal "$ldap_prop" | sed 's/^[^=]*=//')
     ldap_bind_password=$(grep ldap.synchronization.java.naming.security.credentials "$ldap_prop" | sed 's/^[^=]*=//')
+
+    foia_analytical_reports_version=$(find ${rootdir}/install/pentaho/ -type d -name "foia*" -exec basename {} \;)
 
     echo "Set password of admin user to: \"A$instance_id\""
     sleep 30  # Wait for Samba to be up and running
@@ -42,6 +45,10 @@ if [ ! -e /var/lib/admin-password-changed ]; then
 
     # Update the password in the portal configuration
     sed -i "19s/@rKc@3e/$clear_password/g" "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-portal-server.yaml"
+
+    # Update the password in the foia analytical reports configuration
+    sed -i "s/ARKCASE_PASS=.*/ARKCASE_PASS=$clear_password/g" "${rootdir}/install/pentaho/foia-reports-dw-2021.01/config/arkcase_config.properties"
+    touch /var/lib/kitchen-job
 
     touch /var/lib/admin-password-changed
 fi
@@ -78,6 +85,7 @@ ref "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-po
 DnsName="$(curl -sf http://169.254.169.254/latest/meta-data/public-hostname || curl -sf http://169.254.169.254/latest/meta-data/local-hostname)"
 pentaho_url1="PENTAHO_SERVER_URL:\ \"https://acm-arkcase\""
 pentaho_url2="PENTAHO_SERVER_URL:\ \"https://$DnsName\""
+foia_analytical_reports_version=$(find ${rootdir}/install/pentaho/ -type d -name "foia*" -exec basename {} \;)
 
 echo "127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4" > /etc/hosts
 echo "::1         localhost6 localhost6.localdomain6" >> /etc/hosts
@@ -114,3 +122,31 @@ systemctl start alfresco
 systemctl start config-server
 systemctl start arkcase
 systemctl start haproxy
+
+## Wait for ArkCase to fully start
+timeout_min=60  # Timeout: 1h
+timer_min=0
+echo "Wait for ArkCase to fully start..."
+while true; do
+    sleep 60  # Wait for 1'
+    if sudo grep 'org.apache.catalina.startup.Catalina.start Server startup in \[.*\] milliseconds' /opt/app/arkcase/log/arkcase/catalina.out > /dev/null 2>&1; then
+        break
+    else
+        timer_min=$[ $timer_min + 1 ]
+        if [ "$timer_min" -gt "$timeout_min" ]; then
+            echo "ERROR: ArkCase didn't start within $timeout_min minutes"
+            exit 1
+        fi
+        echo -n .
+    fi
+done
+echo
+echo "ArkCase fully started"
+
+# Run kitchen scipt for foia analytical reports
+if [ -e /var/lib/kitchen-job ]; then
+    cd ${rootdir}/app/pentaho-pdi/data-integration
+    sudo su -s /bin/bash pentaho-pdi
+    ./kitchen.sh -file://${rootdir}/install/pentaho/${foia_analytical_reports_version}/foia-dw1.kjb
+    rm -rf /var/lib/kitchen-job
+fi
