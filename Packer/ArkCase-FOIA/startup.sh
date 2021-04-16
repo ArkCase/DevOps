@@ -126,7 +126,7 @@ timer_min=0
 echo "Wait for ArkCase to fully start..."
 while true; do
     sleep 60  # Wait for 1'
-    if sudo grep 'org.apache.catalina.startup.Catalina.start Server startup in \[.*\] milliseconds' /opt/app/arkcase/log/arkcase/catalina.out > /dev/null 2>&1; then
+    if sudo grep 'org.apache.catalina.startup.Catalina.start Server startup in \[.*\] milliseconds' ${rootdir}/log/arkcase/catalina.out > /dev/null 2>&1; then
         break
     else
         timer_min=$[ $timer_min + 1 ]
