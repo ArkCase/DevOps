@@ -83,7 +83,6 @@ ref "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-po
 DnsName="$(curl -sf http://169.254.169.254/latest/meta-data/public-hostname || curl -sf http://169.254.169.254/latest/meta-data/local-hostname)"
 pentaho_url1="PENTAHO_SERVER_URL:\ \"https://acm-arkcase\""
 pentaho_url2="PENTAHO_SERVER_URL:\ \"https://$DnsName\""
-foia_analytical_reports_version=$(find ${rootdir}/install/pentaho/ -type d -name "foia*" -exec basename {} \;)
 
 echo "127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4" > /etc/hosts
 echo "::1         localhost6 localhost6.localdomain6" >> /etc/hosts
