@@ -45,7 +45,7 @@ if [ ! -e /var/lib/admin-password-changed ]; then
     sed -i "19s/@rKc@3e/$clear_password/g" "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-portal-server.yaml"
 
     # Update the password in the foia analytical reports configuration
-    sed -i "s/ARKCASE_PASS=.*/ARKCASE_PASS=$clear_password/g" "${rootdir}/install/pentaho/foia-reports-dw-2021.01/config/arkcase_config.properties"
+    sed -i "s/ARKCASE_PASS=.*/ARKCASE_PASS=$clear_password/g" "${rootdir}/install/pentaho/${foia_analytical_reports_version}/config/arkcase_config.properties"
     touch /var/lib/kitchen-job
 
     touch /var/lib/admin-password-changed
@@ -120,27 +120,10 @@ systemctl start config-server
 systemctl start arkcase
 systemctl start haproxy
 
-## Wait for ArkCase to fully start
-timeout_min=60  # Timeout: 1h
-timer_min=0
-echo "Wait for ArkCase to fully start..."
-while true; do
-    sleep 60  # Wait for 1'
-    if sudo grep 'org.apache.catalina.startup.Catalina.start Server startup in \[.*\] milliseconds' ${rootdir}/log/arkcase/catalina.out > /dev/null 2>&1; then
-        break
-    else
-        timer_min=$[ $timer_min + 1 ]
-        if [ "$timer_min" -gt "$timeout_min" ]; then
-            echo "ERROR: ArkCase didn't start within $timeout_min minutes"
-            exit 1
-        fi
-        echo -n .
-    fi
-done
-echo
-echo "ArkCase fully started"
+## Wait for ArkCase to become available on /arkcase
+timeout 600 bash -c 'while [[ "$(curl --insecure -s -o /dev/null -w ''%{http_code}'' https://localhost/arkcase/login)" != "200" ]]; do sleep 5; done'
 
-# Run kitchen scipt for foia analytical reports
+# Run kitchen script for foia analytical reports
 if [ -e /var/lib/kitchen-job ]; then
     cd ${rootdir}/app/pentaho-pdi/data-integration
     sudo su -s /bin/bash pentaho-pdi
