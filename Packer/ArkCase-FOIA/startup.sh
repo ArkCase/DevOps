@@ -126,7 +126,6 @@ timeout 600 bash -c 'while [[ "$(curl --insecure -s -o /dev/null -w ''%{http_cod
 # Run kitchen script for foia analytical reports
 if [ -e /var/lib/kitchen-job ]; then
     cd ${rootdir}/app/pentaho-pdi/data-integration
-    sudo su -s /bin/bash pentaho-pdi
-    ./kitchen.sh -file://${rootdir}/install/pentaho/${foia_analytical_reports_version}/foia-dw1.kjb
+    sudo -u pentaho-pdi ./kitchen.sh -file://${rootdir}/install/pentaho/${foia_analytical_reports_version}/foia-dw1.kjb
     rm -rf /var/lib/kitchen-job
 fi
