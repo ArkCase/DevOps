@@ -6,6 +6,7 @@ rootdir=/opt/app/arkcase
 
 sleep 10  # Sometimes, the metadata is not available immediately at boot...
 instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+foia_analytical_reports_version=$(find ${rootdir}/install/pentaho/ -type d -name "foia*" -exec basename {} \;)
 
 # Restore ArkCase admin user if this is the first time this EC2 instances is
 # booted up
@@ -42,6 +43,10 @@ if [ ! -e /var/lib/admin-password-changed ]; then
 
     # Update the password in the portal configuration
     sed -i "19s/@rKc@3e/$clear_password/g" "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-portal-server.yaml"
+
+    # Update the password in the foia analytical reports configuration
+    sed -i "s/ARKCASE_PASS=.*/ARKCASE_PASS=$clear_password/g" "${rootdir}/install/pentaho/${foia_analytical_reports_version}/config/arkcase_config.properties"
+    touch /var/lib/kitchen-job
 
     touch /var/lib/admin-password-changed
 fi
@@ -114,3 +119,13 @@ systemctl start alfresco
 systemctl start config-server
 systemctl start arkcase
 systemctl start haproxy
+
+## Wait for ArkCase to become available on /arkcase
+timeout 600 bash -c 'while [[ "$(curl --insecure -s -o /dev/null -w ''%{http_code}'' https://localhost/arkcase/login)" != "200" ]]; do sleep 5; done'
+
+# Run kitchen script for foia analytical reports
+if [ -e /var/lib/kitchen-job ]; then
+    cd ${rootdir}/app/pentaho-pdi/data-integration
+    sudo -u pentaho-pdi ./kitchen.sh -file://${rootdir}/install/pentaho/${foia_analytical_reports_version}/foia-dw1.kjb
+    rm -rf /var/lib/kitchen-job
+fi
