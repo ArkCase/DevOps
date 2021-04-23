@@ -8,13 +8,17 @@ spec:
   podSelector:
     matchLabels:
       app: grafana
-  policyTypes: [Ingress]
+  policyTypes: [Ingress, Egress]
 
   # Allow access to the UI from any node in the cluster (for the NodePort
   # service)
   ingress:
-    - from:
-        - ipBlock:
-            cidr: 0.0.0.0/0
-      ports:
+    - ports:
         - port: 3000
+
+  # Allow all egress traffic to the internet to allow Grafana to download
+  # dashboards
+  egress:
+    - ports:
+        - port: 80
+        - port: 443
