@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "activemq.fullname" . }}-pvc
+  labels:
+    app: {{ include "activemq.fullname" . }}
+    release: {{ .Release.Name }}
+spec:
+  storageClassName: {{ .Values.persistence.storageClass }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: "{{ .Values.persistence.storageSizeGb }}G"
