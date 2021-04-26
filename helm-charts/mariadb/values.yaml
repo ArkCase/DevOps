@@ -38,8 +38,5 @@ resources: {}
   #   cpu: 1
   #   memory: 512Mi
 
-# Set `enableMetrics` to `true` to get the pods to export Prometheus metrics
+# Set `enableMetrics` to `true` to get the pods to export Prometheus metrics on port 9104
 enableMetrics: true
-
-# `metricsPort` is the port Prometheus can use to scrape metrics
-metricsPort: 9104

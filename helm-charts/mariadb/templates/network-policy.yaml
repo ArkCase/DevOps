@@ -25,5 +25,5 @@ spec:
             matchLabels:
               app: prometheus
       ports:
-        - port: {{ .Values.metricsPort }}
+        - port: 9104
     {{- end }}
