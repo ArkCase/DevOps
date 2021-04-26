@@ -79,5 +79,5 @@ spec:
       volumes:
       - name: data
         persistentVolumeClaim:
-          claimName: {{ template "activemq.fullname" . }}-pvc
+          claimName: {{ .Values.persistence.existingClaim }}
 {{- end }}
