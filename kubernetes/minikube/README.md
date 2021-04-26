@@ -1,6 +1,8 @@
 Scripts to setup a Minikube cluster
 ===================================
 
+You will need a machine with at least 16 GiB of RAM to run this.
+
 To ensure you have all the necessary tools installed, run the
 `install-tools-YOUROS.sh` script (replace `YOUROS` with the name of
 your OS).
