@@ -19,6 +19,11 @@ spec:
       labels:
         app: {{ template "activemq.fullname" . }}
         release: {{ .Release.Name }}
+      {{- if .Values.enableMetrics }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: 5556
+      {{- end }}
     spec:
       containers:
       - name: activemq
@@ -64,6 +69,16 @@ spec:
           subPath: {{ .Values.persistence.subPath }}
         resources:
 {{ toYaml .Values.resources | indent 12 }}
+
+{{- if .Values.enableMetrics }}
+      - name: jmx-exporter
+        image: sscaling/jmx-prometheus-exporter
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+          - name: metrics
+            containerPort: 5556
+{{- end }}
+
       initContainers:
         - name: init-fs
           image: "{{ .Values.initContainer.image.repository }}:{{ .Values.initContainer.image.tag }}"
