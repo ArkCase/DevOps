@@ -1,0 +1,20 @@
+image:
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    memory: 50Mi
+  limits:
+    memory: 250Mi
+
+initContainer:
+  image:
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: 5Mi
+    limits:
+      memory: 128Mi
+
+persistence:
+  existingClaim: activemq-pvc

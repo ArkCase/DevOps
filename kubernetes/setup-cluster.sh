@@ -167,4 +167,12 @@ wait_for_pod mariadb
 
 echo
 echo
+echo "*** Installing ActiveMQ ***"
+kubectl apply -f files/activemq-network-policy.yaml
+kubectl apply -f files/alfresco-activemq-persistent-volume-claim.yaml
+helm install -f files/alfresco-activemq-values.yaml activemq ../helm-charts/activemq
+wait_for_pod activemq
+
+echo
+echo
 echo "*** Cluster succesfully set up ***"
