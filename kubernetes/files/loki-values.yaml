@@ -1,0 +1,26 @@
+# Values file for the Loki helm chart located
+# [here](https://github.com/grafana/helm-charts/tree/main/charts/loki).
+
+# Automatic metrics scraping by Prometheus
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "3100"
+  prometheus.io/path: /metrics
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 10Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+persistence:
+  enabled: true
+  accessModes: [ReadWriteOnce]
+  size: 2G
+  storageClassName: standard
+
+# TODO
+#tracing:
+#  jaegerAgentHost: ?

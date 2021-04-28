@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "mariadb.fullname" . }}-np
+  labels:
+    {{- include "mariadb.labels" . | nindent 4 }}
+spec:
+  podSelector: 
+    matchLabels:
+      app: {{ include "mariadb.fullname" . }}
+  policyTypes: [Ingress, Egress]
+
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              mariadb-client: enabled
+      ports:
+        - port: 3306
+    {{- if .Values.enableMetrics }}
+    - from:
+        # Allow Prometheus to scrape metrics from any namespace
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - port: 9104
+    {{- end }}

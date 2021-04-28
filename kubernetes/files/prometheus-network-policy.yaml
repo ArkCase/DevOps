@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prometheus-np
+  labels:
+    managed-by: setup-cluster.sh
+spec:
+  podSelector:
+    matchLabels:
+      app: prometheus
+  policyTypes: [Ingress, Egress]
+
+  ingress:
+    # Allow Grafana and Kiali to read data from Prometheus
+    - from:
+        - podSelector:
+            matchExpressions:
+              - {key: app, operator: In, values: [grafana, kiali]}
+        # Uncomment this to be able to acces Prometheus UI on NodePort 30001
+        # NB: You will also need to edit the `prometheus-values.yaml` file
+        #- ipBlock:
+        #    cidr: 0.0.0.0/0
+      ports:
+        - port: 9090
+
+  egress:
+    # Allow Prometheus (and other components, such as kube-state-metrics) to
+    # query the Kubernetes API
+    - ports:
+        - port: 8443
+        - port: 443

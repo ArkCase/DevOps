@@ -1,0 +1,26 @@
+version: "3.7"
+
+services:
+  mariadb:
+    image: arkcase/mariadb:10.4-ark1
+    build:
+      context: .
+    environment:
+      OLD_MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: pass
+      MARIADB_DATABASE_0: db0
+      MARIADB_USERNAME_0: user0
+      MARIADB_PASSWORD_0: pass0
+      MARIADB_DATABASE_1: db1
+      MARIADB_USERNAME_1: user1
+      MARIADB_PASSWORD_1: pass1
+      MARIADB_DATABASE_2: db2
+      MARIADB_USERNAME_2: user2
+      MARIADB_PASSWORD_2: pass2
+    volumes:
+      - data:/var/lib/mysql
+    ports:
+      - 3306:3306
+
+volumes:
+  data:

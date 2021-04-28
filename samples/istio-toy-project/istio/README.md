@@ -28,12 +28,12 @@ Get the IP address of the minikube cluster:
     $ minikube ip
 
 The following tools are available at the minikube IP address:
-  - Port 31001: Kiali
-  - Port 31002: Jaeger
-  - Port 31003: Grafana
+  - Port 32001: Kiali
+  - Port 32002: Jaeger
+  - Port 32003: Grafana
 
-To access the toy app, check the exported port for the Istio ingress
-gateway:
+To access the toy app, check the exported port for the internal port
+80 for the Istio ingress gateway:
 
     $ kubectl get services -n istio-system
 

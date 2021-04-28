@@ -1,0 +1,19 @@
+apiVersion: v2
+appVersion: v1.32.0
+description: Sanitized kiali-server helm chart from https://github.com/kiali/helm-charts/tree/master/kiali-server
+home: https://github.com/kiali/kiali
+icon: https://raw.githubusercontent.com/kiali/kiali.io/master/themes/kiali/static/img/kiali_logo_masthead.png
+keywords:
+- istio
+- kiali
+maintainers:
+- email: kiali-users@googlegroups.com
+  name: Kiali
+  url: https://kiali.io
+name: kiali-server
+sources:
+- https://github.com/kiali/kiali
+- https://github.com/kiali/kiali-ui
+- https://github.com/kiali/kiali-operator
+- https://github.com/kiali/helm-charts
+version: 1.32.0

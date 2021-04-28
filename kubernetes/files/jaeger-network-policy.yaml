@@ -1,0 +1,100 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jaeger-operator-np
+  labels:
+    managed-by: setup-cluster.sh
+spec:
+  podSelector:
+    matchLabels:
+      app: jaeger-operator
+  policyTypes: [Ingress, Egress]
+
+  ingress:
+    # Allow Prometheus to scrape metrics
+    # NB: Istio is merging the main container metrics with the side-car proxy
+    #     metrics, and make them available on port 15020.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - port: 15020
+
+  egress:
+    # Allow the Jaeger operator to query the Kubernetes API
+    - ports:
+        - port: 8443
+        - port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jaeger-np
+  labels:
+    managed-by: setup-cluster.sh
+spec:
+  podSelector:
+    matchLabels:
+      app: jaeger
+  policyTypes: [Ingress, Egress]
+
+  ingress:
+    # Allow Prometheus to scrape metrics
+    - from:
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - port: 14269
+
+    # Allow Grafana and Kiali to access Jaeger's query server
+    - from:
+        - podSelector:
+            matchExpressions:
+              - {key: app, operator: In, values: [grafana, kiali]}
+      ports:
+        - protocol: TCP
+          port: 16686
+
+    # Uncomment the lines below to allow access to the UI
+    # NB: You will also need to configure some kind of external access, for
+    #     example by changing the service type to `NodePort`: `$ kubectl -n
+    #     observability edit svc/jaeger-query`.
+    # - ports:
+    #     - # query
+    #       protocol: TCP
+    #       port: 16686
+
+    # Allow anyone from within the cluster to post traces
+    - from:
+        - namespaceSelector: {}
+      ports:
+        # Zipkin trift is deprecated for Jaeger; it's still supported if required
+        #- # agent: zk-compact-trft
+        #  protocol: UDP
+        #  port: 5775
+        - # agent: config-rest
+          protocol: TCP
+          port: 5778
+        - # agent: jg-compact-trft
+          protocol: UDP
+          port: 6831
+        - # agent: jg-binary-trft
+          protocol: UDP
+          port: 6832
+        - # collector: zipkin
+          protocol: TCP
+          port: 9411
+        - # collector: grpc
+          protocol: TCP
+          port: 14250
+        - # collector: c-tchan-trft
+          protocol: TCP
+          port: 14627
+        - # collector: c-binary-trft
+          protocol: TCP
+          port: 14268
+        - # collector: admin-http
+          protocol: TCP
+          port: 14269

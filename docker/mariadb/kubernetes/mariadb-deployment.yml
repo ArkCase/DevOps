@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mariadb-deployment
+spec:
+  selector:
+    matchLabels:
+      app: mariadb
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: mariadb
+    spec:
+      volumes:
+        - name: mariadb-storage
+          persistentVolumeClaim:
+            claimName: mariadb-pvc
+      containers:
+        - name: mariadb
+          image: arkcase/mariadb:10.4-ark1
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: mariadb-storage
+              mountPath: /var/lib/mysql
+          ports:
+            - containerPort: 3306
+              protocol: TCP
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: root
+
+            - name: MARIADB_DATABASE_0
+              valueFrom:
+                secretKeyRef:
+                  name: mariadb-setup-secret
+                  key: MARIADB_DATABASE_0
+
+            - name: MARIADB_USERNAME_0
+              valueFrom:
+                secretKeyRef:
+                  name: mariadb-setup-secret
+                  key: MARIADB_USERNAME_0
+
+            - name: MARIADB_PASSWORD_0
+              valueFrom:
+                secretKeyRef:
+                  name: mariadb-setup-secret
+                  key: MARIADB_PASSWORD_0
+
+            - name: MARIADB_DATABASE_1
+              valueFrom:
+                secretKeyRef:
+                  name: mariadb-setup-secret
+                  key: MARIADB_DATABASE_1
+
+            - name: MARIADB_USERNAME_1
+              valueFrom:
+                secretKeyRef:
+                  name: mariadb-setup-secret
+                  key: MARIADB_USERNAME_1
+
+            - name: MARIADB_PASSWORD_1
+              valueFrom:
+                secretKeyRef:
+                  name: mariadb-setup-secret
+                  key: MARIADB_PASSWORD_1
+
+            - name: MARIADB_DATABASE_2
+              valueFrom:
+                secretKeyRef:
+                  name: mariadb-setup-secret
+                  key: MARIADB_DATABASE_2
+
+            - name: MARIADB_USERNAME_2
+              valueFrom:
+                secretKeyRef:
+                  name: mariadb-setup-secret
+                  key: MARIADB_USERNAME_2
+
+            - name: MARIADB_PASSWORD_2
+              valueFrom:
+                secretKeyRef:
+                  name: mariadb-setup-secret
+                  key: MARIADB_PASSWORD_2

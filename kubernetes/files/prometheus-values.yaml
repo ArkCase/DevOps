@@ -1,0 +1,76 @@
+# Values file for the Prometheus helm chart located
+# [here](https://github.com/grafana/helm-charts/tree/main/charts/prometheus).
+
+# No need for Alert Manager on Minikube
+alertmanager:
+  enabled: false
+
+# Disable container that monitors for ConfigMap changes
+configmapReload:
+  prometheus:
+    enabled: false
+  alertmanager:
+    enabled: false
+
+# Configuration for the node exporter
+nodeExporter:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 10Mi
+    limits:
+      cpu: 100m
+      memory: 50Mi
+
+# Configuration for Prometheus server itself
+server:
+  persistentVolume:
+    size: 2G
+    storageClass: standard
+  resources:
+    requests:
+      cpu: 10m
+      memory: 10Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # Uncomment the lines below to allow access to the Prometheus UI
+  # NB: You will also need to edit the `promtheus-network-policy.yaml` file
+  #service:
+  #  type: NodePort
+  #  nodePort: 30001
+  strategy:
+    type: Recreate  # Two Prometheus pods can't share the same volume on /data
+
+  # Tell the Envoy side-car proxy to leave traffic to the `kubernetes` service
+  # untouched. This is necessary, otherwise Prometheus can't connect to the
+  # `kubernetes` service when starting up, see
+  # [this](https://github.com/istio/istio/issues/12187).
+  podAnnotations:
+    traffic.sidecar.istio.io/includeOutboundIPRanges: "*"
+    traffic.sidecar.istio.io/excludeOutboundIPRanges: 10.96.0.1/32
+
+  # Additional command line flags
+  extraFlags:
+    - web.enable-lifecycle
+    - log.level=debug
+
+# Disable pushgateway (enable it if some pods want to push data to Prometheus)
+pushgateway:
+  enabled: false
+
+# Configuration for the sub-chart KubeStateMetrics located
+# [here](https://github.com/kubernetes/kube-state-metrics/tree/master/charts/kube-state-metrics).
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 10Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  customLabels:
+    app: prometheus
+
+# Static scrape configurations
+extraScrapeConfigs:

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mariadb.fullname" . }}
+  labels:
+    {{- include "mariadb.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: {{ include "mariadb.fullname" . }}
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: 3306
