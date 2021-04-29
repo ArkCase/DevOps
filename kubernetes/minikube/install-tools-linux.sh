@@ -2,7 +2,7 @@
 
 set -eu -o pipefail
 
-HELM_VERSION="v3.5.3"
+HELM_VERSION="3.5.3"
 ISTIO_VERSION="1.8.4"
 
 function myinstall()
@@ -31,21 +31,21 @@ echo "*** Installing VirtualBox ***"
 if [ -e /etc/debian_version ]; then
     sudo apt-get -y update
     sudo apt-get -y install virtualbox virtualbox-ext-pack pwgen
-elif
+else
     echo "OS not supported yet; please implement me"
     exit 1
 fi
 
 echo
 echo
-echo "*** Install kubectl ***"
+echo "*** Installing kubectl ***"
 curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 myinstall kubectl
 
 echo
 echo
 echo "*** Installing Helm ***"
-curl -LO "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
+curl -LO "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz"
 tar xf "helm-v${HELM_VERSION}-linux-amd64.tar.gz"
 mv linux-amd64/helm helm
 rm -r "helm-v${HELM_VERSION}-linux-amd64.tar.gz" linux-amd64
