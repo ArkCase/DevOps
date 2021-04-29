@@ -41,5 +41,5 @@ resources: {}
 # Set `enableMetrics` to `true` to get the pods to export Prometheus metrics
 enableMetrics: true
 
-# `metricsPort` is the port Prometheus can use to scrape metrics
+# `metricsPort` is the port to open to allow Prometheus to scrape metrics
 metricsPort: 9104

@@ -4,9 +4,8 @@
   "variables": {
     "base_ami": "ami-05afa634116a37d03",
     "disk_size_gb": "100",
-    "timestamp": "",
     "project": "arkcase-ce-core",
-    "version": "x.y",
+    "version": "{{ env `version` }}",
     "service": "arkcase-ce-core"
   },
 
@@ -17,7 +16,7 @@
       "source_ami": "{{ user `base_ami` }}",
       "instance_type": "t3.xlarge",
       "ssh_username": "centos",
-      "ami_name": "ArkCase CE Core {{ user `version` }} [{{ user `timestamp` }}]",
+      "ami_name": "ArkCase CE Core {{ user `version` }} [{{isotime \"2006-01-02T15:04:05\" | clean_resource_name}}]",
       "ami_description": "ArkCase CE Core version {{ user `version` }}",
       "tags": {
         "Project": "{{ user `project` }}",
