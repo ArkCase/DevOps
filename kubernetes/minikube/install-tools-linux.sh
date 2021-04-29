@@ -30,7 +30,7 @@ echo
 echo "*** Installing VirtualBox ***"
 if [ -e /etc/debian_version ]; then
     sudo apt-get -y update
-    sudo apt-get -y install virtualbox virtualbox-ext-pack pwgen
+    sudo apt-get -y install virtualbox virtualbox-ext-pack pwgen curl
 else
     echo "OS not supported yet; please implement me"
     exit 1
