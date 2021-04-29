@@ -11,13 +11,16 @@ function myinstall()
     case "$PATH" in
         *"$HOME"/.local/bin*)
             mv -f "$1" "$HOME/.local/bin/$1"
+            chmod 755 "$HOME/.local/bin/$1"
             ;;
         *"$HOME"/bin*)
             mv -f "$1" "$HOME/bin/$1"
+            chmod 755 "$HOME/bin/$1"
             ;;
         *)
             sudo chown root:root "$1"
             sudo mv "$1" "/usr/local/bin/$1"
+            sudo chmod 755 "/usr/local/bin/$1"
             ;;
     esac
 }
