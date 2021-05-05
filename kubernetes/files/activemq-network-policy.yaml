@@ -37,11 +37,11 @@ spec:
       ports:
         - port: 61616
 
-#    - from:
-#        # Allow Prometheus to scrape metrics from any namespace
-#        - namespaceSelector: {}
-#          podSelector:
-#            matchLabels:
-#              app: prometheus
-#      ports:
-#        - port: {{ .Values.metricsPort }}
+    - from:
+        # Allow Prometheus to scrape metrics from any namespace
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - port: 15020

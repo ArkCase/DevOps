@@ -1,5 +1,8 @@
 image:
   pullPolicy: IfNotPresent
+  # TODO: Use real image when available
+  repository: fabricetriboix/activemq
+  tag: 1
 
 resources:
   requests:
