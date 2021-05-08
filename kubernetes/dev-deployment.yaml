@@ -1,0 +1,7 @@
+# This deployment file describes a deployment suitable for a developer's
+# desktop machine
+
+# Istio profile
+istio_profile: demo
+
+# 
