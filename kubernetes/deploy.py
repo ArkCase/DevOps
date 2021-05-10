@@ -167,3 +167,11 @@ run([   "istioctl",
         "--set",
         f"meshConfig.defaultConfig.tracing.zipkin.address=jaeger-collector.observability:9411"])
 wait_for_pod("istiod", "istio-system")
+
+
+# Loki
+
+info("*** Installing/Updating Loki ***")
+run("kubectl -n observability apply -f loki-network-policy.yaml")
+run("helm -n observability upgrade --install -f loki-values.yaml loki grafana/loki")
+wait_for_pod("loki", "observability")
