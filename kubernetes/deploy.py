@@ -67,13 +67,17 @@ def run(args):
 
 def wait_for_pod(start_of_podname: str,
                  namespace: str = "default",
-                 timeout_seconds: int = 600):
+                 timeout_seconds: int = 600,
+                 exclude: str=""):
     start_time = int(time.time())
+    printed_dot = False
     time.sleep(10)  # Give some time to the controller to create pods
     while int(time.time()) - start_time <= timeout_seconds:
         output = run(["kubectl", "-n", namespace, "get", "pods"])
         lines = output.splitlines()[1:]  # Remove header line
         for line in lines:
+            if exclude and line.startswith(exclude):
+                continue  # Do not check this pod
             if line.startswith(start_of_podname):
                 # We found the pod. Now check whether all its containers are
                 # started.
@@ -82,19 +86,20 @@ def wait_for_pod(start_of_podname: str,
                 have = int(tmp[0])
                 want = int(tmp[1])
                 if have == want:
-                    # All containers are stared, hooray!
-                    sys.stdout.write("\n")
-                    sys.stdout.flush()
+                    # All containers are started, hooray!
+                    if printed_dot:
+                        sys.stdout.write("\n")
+                        sys.stdout.flush()
                     return
         sys.stdout.write(".")
         sys.stdout.flush()
+        printed_dot = True
         time.sleep(2)
     raise RuntimeError(f"Pod {start_of_podname} not started in {timeout_seconds} seconds")
 
 
 # Helm repos
 
-info("")
 info("*** Adding Helm repositories ***")
 
 def add_helm_repo(name: str, url: str):
@@ -115,7 +120,6 @@ add_helm_repo("kube-state-metrics",
 
 # Cluster-wide stuff
 
-info("")
 info("*** Setting up cluster-wide stuff ***")
 
 output = run("kubectl get namespace")
@@ -132,7 +136,21 @@ run("kubectl label namespace observability istio-injection=enabled --overwrite")
 
 # Calico
 
-info("")
 info("*** Installing/Updating Calico ***")
 run("kubectl apply -f calico.yaml")
 wait_for_pod("calico-node", "kube-system")
+
+
+# Jaeger
+
+info("*** Installing/Updating Jaeger ***")
+run("kubectl -n observability apply -f jaeger-network-policy.yaml")
+run("kubectl -n observability apply -f jaeger-crd.yaml")
+
+info("  Installing/Updating Jaeger operator")
+run("kubectl -n observability apply -f jaeger-operator.yaml")
+wait_for_pod("jaeger-operator", "observability")
+
+info("  Installing/Updating Jaeger")
+run("kubectl -n observability apply -f jaeger.yaml")
+wait_for_pod("jaeger", "observability", exclude="jaeger-operator")
