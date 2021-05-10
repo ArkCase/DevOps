@@ -47,7 +47,7 @@ def err(msg: str):
     print(f"ERROR: {msg}", file=sys.stderr, flush=True)
 
 
-def run(args):
+def run(args, notrace: bool=False):
     """
     Run a command and return the output. The output returned by the command
     must be a human-readable string. If the command fails, exits immediately.
@@ -55,7 +55,11 @@ def run(args):
     `args` can be either a string or a list. Examples:
         "kubectl get pods"
         ["kubectl", "get", "pods"]
+
+    `notrace` don't print the command, even if debug is enabled
     """
+    if not notrace:
+        dbg(f"Running command: {args}")
     if isinstance(args, str):
         args = args.split()
     try:
@@ -73,7 +77,7 @@ def wait_for_pod(start_of_podname: str,
     printed_dot = False
     time.sleep(10)  # Give some time to the controller to create pods
     while int(time.time()) - start_time <= timeout_seconds:
-        output = run(["kubectl", "-n", namespace, "get", "pods"])
+        output = run(["kubectl", "-n", namespace, "get", "pods"], notrace=True)
         lines = output.splitlines()[1:]  # Remove header line
         for line in lines:
             if exclude and line.startswith(exclude):
@@ -103,7 +107,7 @@ def wait_for_pod(start_of_podname: str,
 info("*** Adding Helm repositories ***")
 
 def add_helm_repo(name: str, url: str):
-    output = run("helm repo list")
+    output = run("helm repo list", notrace=True)
     for line in output.splitlines():
         if line.startswith(name + " ") or line.startswith(name + "\t"):
             dbg(f"Helm repo already there: {name}")
@@ -139,6 +143,8 @@ run("kubectl label namespace observability istio-injection=enabled --overwrite")
 info("*** Installing/Updating Calico ***")
 run("kubectl apply -f calico.yaml")
 wait_for_pod("calico-node", "kube-system")
+run("kubectl apply -f default-network-policy.yaml")
+run("kubectl -n observability apply -f default-network-policy.yaml")
 
 
 # Jaeger
@@ -175,3 +181,11 @@ info("*** Installing/Updating Loki ***")
 run("kubectl -n observability apply -f loki-network-policy.yaml")
 run("helm -n observability upgrade --install -f loki-values.yaml loki grafana/loki")
 wait_for_pod("loki", "observability")
+
+
+# Promtail
+
+info("*** Installing/Updating Promtail ***")
+run("kubectl -n observability apply -f promtail-network-policy.yaml")
+run("helm -n observability upgrade --install -f promtail-values.yaml promtail grafana/promtail")
+wait_for_pod("promtail", "observability")
