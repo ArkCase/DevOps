@@ -154,3 +154,16 @@ wait_for_pod("jaeger-operator", "observability")
 info("  Installing/Updating Jaeger")
 run("kubectl -n observability apply -f jaeger.yaml")
 wait_for_pod("jaeger", "observability", exclude="jaeger-operator")
+
+
+# Istio
+
+info("*** Installing/Updating Istio ***")
+run([   "istioctl",
+        "install",
+        "-y",
+        "--set",
+        f"profile={cfg['istio_profile']}",
+        "--set",
+        f"meshConfig.defaultConfig.tracing.zipkin.address=jaeger-collector.observability:9411"])
+wait_for_pod("istiod", "istio-system")
