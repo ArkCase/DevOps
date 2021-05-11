@@ -74,6 +74,10 @@ def wait_for_pod(start_of_podname: str,
                  timeout_seconds: int = 600,
                  exclude: str=""):
     start_time = int(time.time())
+
+    # Wait for the controller to potentially terminate existing pods
+    time.sleep(2)
+
     printed_dot = False
     while int(time.time()) - start_time <= timeout_seconds:
         output = run(["kubectl", "-n", namespace, "get", "pods"], notrace=True)
@@ -196,3 +200,21 @@ info("*** Installing/Updating Prometheus ***")
 run("kubectl -n observability apply -f prometheus-network-policy.yaml")
 run("helm -n observability upgrade --install -f prometheus-values.yaml prometheus prometheus-community/prometheus")
 wait_for_pod("prometheus-server", "observability")
+
+
+# Grafana
+
+info("*** Installing/Updating Grafana ***")
+run("kubectl -n observability apply -f grafana-network-policy.yaml")
+run("helm -n observability upgrade --install -f grafana-values.yaml grafana grafana/grafana")
+wait_for_pod("grafana", "observability")
+
+
+# Kiali
+
+# NB: I can't get Kiali to work. The UI always shows "Empty Graph" no matter
+#     what I try...
+#info("*** Installing/Updating Kiali ***")
+#run("kubectl -n observability apply -f kiali-network-policy.yaml")
+#run("helm -n observability install -f kiali-values kiali ../helm-charts/kiali-server")
+#wait_for_pod("kiali", "observability")
