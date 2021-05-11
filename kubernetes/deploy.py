@@ -75,7 +75,6 @@ def wait_for_pod(start_of_podname: str,
                  exclude: str=""):
     start_time = int(time.time())
     printed_dot = False
-    time.sleep(10)  # Give some time to the controller to create pods
     while int(time.time()) - start_time <= timeout_seconds:
         output = run(["kubectl", "-n", namespace, "get", "pods"], notrace=True)
         lines = output.splitlines()[1:]  # Remove header line
@@ -189,3 +188,11 @@ info("*** Installing/Updating Promtail ***")
 run("kubectl -n observability apply -f promtail-network-policy.yaml")
 run("helm -n observability upgrade --install -f promtail-values.yaml promtail grafana/promtail")
 wait_for_pod("promtail", "observability")
+
+
+# Prometheus
+
+info("*** Installing/Updating Prometheus ***")
+run("kubectl -n observability apply -f prometheus-network-policy.yaml")
+run("helm -n observability upgrade --install -f prometheus-values.yaml prometheus prometheus-community/prometheus")
+wait_for_pod("prometheus-server", "observability")
