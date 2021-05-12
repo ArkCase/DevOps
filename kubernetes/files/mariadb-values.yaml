@@ -1,0 +1,7 @@
+rootPasswordSecret: mariadb-root-password
+
+dbconfigSecrets:
+  - db1-config
+  - db2-config
+
+metricsPort: 15020

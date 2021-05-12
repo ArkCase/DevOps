@@ -31,6 +31,11 @@ spec:
         - name: init-scripts
           configMap:
             name: {{ include "mariadb.fullname" . }}-init-cm
+        {{- range $index, $secret_name := .Values.dbconfigSecrets }}
+        - name: db{{ $index }}
+          secret:
+            secretName: {{ $secret_name }}
+        {{- end }}
       containers:
         - name: mariadb
           image: "mariadb:{{ .Chart.AppVersion }}"
@@ -42,6 +47,11 @@ spec:
             - name: init-scripts
               mountPath: /docker-entrypoint-initdb.d
               readOnly: true
+            {{- range $index, $secret_name := .Values.dbconfigSecrets }}
+            - name: db{{ $index }}
+              mountPath: /secrets/db{{ $index }}
+              readOnly: true
+            {{- end }}
           livenessProbe:
             exec:
               command: ["sh", "-c", "mysqladmin ping -u root \"-p$MYSQL_ROOT_PASSWORD\""]
@@ -58,34 +68,13 @@ spec:
             - name: MYSQL_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "mariadb.fullname" . }}-root-password-secret
+                  name: {{ .Values.rootPasswordSecret }}
                   key: rootPassword
-
-            {{- if .Values.oldRootPassword }}
             - name: OLD_MYSQL_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "mariadb.fullname" . }}-root-password-secret
+                  name: {{ .Values.rootPasswordSecret }}
                   key: oldRootPassword
-            {{- end }}
-
-            {{- range $index, $cfg := .Values.dbconfig }}
-            - name: MARIADB_DATABASE_{{ $index }}
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "mariadb.fullname" $ }}-{{ $index }}
-                  key: dbname
-            - name: MARIADB_USERNAME_{{ $index }}
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "mariadb.fullname" $ }}-{{ $index }}
-                  key: username
-            - name: MARIADB_PASSWORD_{{ $index }}
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "mariadb.fullname" $ }}-{{ $index }}
-                  key: password
-            {{- end }}
 
 {{- if .Values.enableMetrics }}
         - name: exporter
@@ -95,5 +84,8 @@ spec:
               containerPort: 9104
           env:
             - name: DATA_SOURCE_NAME
-              value: "root:{{ .Values.rootPassword }}@(localhost:3306)/"
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.rootPasswordSecret }}
+                  key: rootPassword
 {{- end }}
