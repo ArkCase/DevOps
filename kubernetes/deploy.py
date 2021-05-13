@@ -216,5 +216,17 @@ wait_for_pod("grafana", "observability")
 #     what I try...
 #info("*** Installing/Updating Kiali ***")
 #run("kubectl -n observability apply -f kiali-network-policy.yaml")
-#run("helm -n observability install -f kiali-values kiali ../helm-charts/kiali-server")
+#run("helm -n observability install -f kiali-values kiali ../../helm-charts/kiali-server")
 #wait_for_pod("kiali", "observability")
+
+
+# MariaDB
+
+info("*** Installing/Updating MariaDB ***")
+run("helm upgrade --install -f mariadb-values.yaml mariadb ../../helm-charts/mariadb")
+wait_for_pod("mariadb")
+
+
+# Finished!
+
+#info("*** ArkCase successfully deployed ***")
