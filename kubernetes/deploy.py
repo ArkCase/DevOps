@@ -223,7 +223,13 @@ wait_for_pod("grafana", "observability")
 # MariaDB
 
 info("*** Installing/Updating MariaDB ***")
-run("helm upgrade --install -f mariadb-values.yaml mariadb ../../helm-charts/mariadb")
+cmd = "helm upgrade --install -f mariadb-values.yaml"
+cmd += f" --version {cfg['mariadb_version']}"
+cmd += f" --set storageSizeGb={cfg['mariadb_storage_size_GB']}"
+cmd += f" --set resources.limits.cpu={cfg['mariadb_max_cpu']}"
+cmd += f" --set resources.limits.memory={cfg['mariadb_max_ram']}"
+cmd += " mariadb ../../helm-charts/mariadb"
+run(cmd)
 wait_for_pod("mariadb")
 
 

@@ -3,3 +3,15 @@
 
 # Istio profile
 istio_profile: demo
+
+# MariaDB version (this is the version of our Helm chart)
+mariadb_version: 10.4-ark1
+
+# Size of the permanent storage for MariaDB
+mariadb_storage_size_GB: 2
+
+# Max CPUs to allocate to MariaDB (in k8s notation for resources)
+mariadb_max_cpu: 500m
+
+# Max RAM to allocate to MariaDB (in k8s notation for resources)
+mariadb_max_ram: 512Mi

@@ -2,7 +2,7 @@ apiVersion: v2
 name: mariadb
 description: Helm chart for MariaDB as used by ArkCase
 type: application
-version: 0.1.0
+version: "10.4-ark1"
 
 # appVersion must match the tag of the Docker image
 appVersion: "10.4"
