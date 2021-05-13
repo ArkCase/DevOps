@@ -11,5 +11,7 @@ After that, you can set up a minikube cluster by running the following
 commands:
 
     $ ./create-minikube.sh
-    $ ../setup-cluster.sh
+    $ cd ..
+    $ kubectl create secret ...  # Create the necessary secrets
+    $ ./deploy.py dev-deployment.yaml
 
