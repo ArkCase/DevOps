@@ -1,25 +1,34 @@
-# `namespace` is the namespace where MariaDB should be deployed
-namespace: arkcase
+# `rootPasswordSecret` is the name of the secret that holds the root password
+#
+# Note: If a password already exists, you must specify the `oldRootPassword` in
+# the secret as well to ensure the root password gets changed.
+#
+# The secret must be formatted like so (in YAML manifest format):
+#
+#    apiVersion: v1
+#    kind: Secret
+#    type: Opaque
+#    stringData:
+#      rootPassword: superpassword
+#      oldRootPassword: oldpass  # Set to empty string "" if there is no existing root password
+#
+rootPasswordSecret: changeme
 
-# `rootPassword` is the password for the MariaDB root user. If a password already exists, specify it as the `oldRootPassword` variable to ensure it gets changed to `rootPassword`.
-rootPassword: superpass
-
-# `oldRootPassword` is the existing password for the MariaDB root user
-# oldRootPassword: root
-
-# `dbconfig` is the list of databases, usernames and passwords
-# NB: `dbname` should be formed only of lowercase alphanumeric characters, or
-#     in regex terms: [a-z0-9]+
-dbconfig:
-  - dbname: db1
-    username: user1
-    password: pass1
-  - dbname: db2
-    username: user2
-    password: pass2
-  - dbname: db3
-    username: user3
-    password: pass3
+# `dbconfigSecrets` is the list of the names of the secrets that hold the database name, username and password for each database.
+#
+# Each secret must be formatted like so (in YAML manifest format):
+#
+#    apiVersion: v1
+#    kind: Secret
+#    type: Opaque
+#    stringData:
+#      dbname: mydb  # Should be formed only of lowercase alphanumeric characters, or in regex terms: [a-z0-9]+
+#      username: alice
+#      password: cheshirecat
+#
+dbconfigSecrets:
+  - changeme
+  - changemetoo
 
 # `storageClass` is the name of the storage class to use for MariaDB's persistent volume
 storageClass: standard
@@ -27,16 +36,13 @@ storageClass: standard
 # `storageSizeGb` is the size of the storage for MariaDB's persistent volume, in GiB
 storageSizeGb: 2
 
-resources: {}
-  # If you want to specify resources, uncomment the following lines, adjust
-  # them as necessary, and remove the curly braces after 'resources:'.
-  #
-  # limits:
-  #   cpu: 2
-  #   memory: 1Gi
-  # requests:
-  #   cpu: 1
-  #   memory: 512Mi
+resources:
+  limits:
+    cpu: 2
+    memory: 1Gi
+  requests:
+    cpu: 200m
+    memory: 256Mi
 
 # Set `enableMetrics` to `true` to get the pods to export Prometheus metrics
 enableMetrics: true
