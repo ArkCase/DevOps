@@ -36,6 +36,7 @@ repos = ['ark_base',
          'ark_grafana_reporter',
          'ark_grafana_imagerend',
          'ark_grafana',
+         'ark_arkcase_core',
          ]
 
 for repo in repos:
