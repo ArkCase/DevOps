@@ -1,0 +1,25 @@
+version: "3.7"
+
+services:
+  activemq:
+    image: activemq:5.16.2-dev9
+    build:
+      context: .
+    init: true
+    environment:
+      JVM_INITIAL_RAM: 128M
+      JVM_MAX_RAM: 2G
+      ACTIVEMQ_ADMIN_PORT: 8161
+      ACTIVEMQ_OPENWIRE_PORT: 61616
+#      ACTIVEMQ_AMQP_PORT: 5672
+#      ACTIVEMQ_STOMP_PORT: 61613
+#      ACTIVEMQ_MQTT: 1883
+#      ACTIVEMQ_WS: 61614
+    ports:
+      - 8161:8161
+      - 61616:61616
+    volumes:
+      - activemqdata:/app/data
+
+volumes:
+  activemqdata:
