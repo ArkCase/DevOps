@@ -2,3 +2,4 @@
 .*.swp
 *.zip
 __pycache__
+scripts/setenv.sh
