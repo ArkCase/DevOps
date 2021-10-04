@@ -93,7 +93,7 @@ sed -i "s/arkcase-ce.local/$DnsName/g"      "${rootdir}/app/alfresco/shared/clas
 sed -i "s/$DnsName:7070/arkcase-ce.local/g" "${rootdir}/app/alfresco/shared/classes/alfresco/web-extension/share-config-custom.xml"
 sed -i "s~$pentaho_url1~$pentaho_url2~g"    "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase.yaml"
 sed -i "s/arkcase-ce.local/$DnsName/g"      "${rootdir}/app/pentaho/pentaho-server/tomcat/conf/server.xml"
-sed -i "/    PENTAHO_SERVER_PASSWORD:/s/^/#/g" "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
+sed -i "/PENTAHO_SERVER_PASSWORD:/d"        "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
 sed -i "/^    PENTAHO_SERVER_USER.*/a\ \ \ \ \PENTAHO_SERVER_PASSWORD: \"A$instance_id\"" "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
 sed -i "s/arkcase-ce.local/$DnsName/g"      "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
 sed -i "3s/$DnsName/arkcase-ce.local/g"     "${rootdir}/data/arkcase-home/.arkcase/acm/acm-config-server-repo/arkcase-server.yaml"
