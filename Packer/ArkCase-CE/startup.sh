@@ -4,6 +4,8 @@ set -eu -o pipefail
 
 rootdir=/opt/app/arkcase
 
+# Remove loc.svcmgmt ssh keys in order to be compliant with marketplace policies
+sudo truncate -s 0 /home/loc.svcmgmt/.ssh/authorized_keys
 # Restore ArkCase admin user if this is the first time this EC2 instances is
 # booted up
 
