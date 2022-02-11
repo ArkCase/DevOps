@@ -3,3 +3,6 @@
 *.zip
 __pycache__
 scripts/setenv.sh
+.history/
+.terraform*
+*.tfstate*
