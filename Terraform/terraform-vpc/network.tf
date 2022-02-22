@@ -15,6 +15,10 @@ resource "aws_route_table" "public-rt" {
     Name = "Armedia-RT"
 	}
 }
+resource "aws_route_table_association" "armedia-bond" {
+  subnet_id      = aws_subnet.subnet-public.id
+  route_table_id = aws_route_table.public-rt.id
+}
 
 resource "aws_security_group" "ssh-allowed" {
 
