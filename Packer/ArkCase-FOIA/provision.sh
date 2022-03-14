@@ -19,6 +19,8 @@ sudo yum -y install \
         python3-pip
 sudo pip3 install --upgrade awscli
 
+ansible-galaxy collection install community.postgresql
+
 function move()
 {
     sudo cp "/tmp/$1" "$2/$1"
