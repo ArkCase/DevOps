@@ -1,0 +1,42 @@
+---
+Parameters:
+  ArkCaseKeyName:
+    Description: SSH Keypair to login to the instance
+    Type: "AWS::EC2::KeyPair::KeyName"
+    Default: foia-hud-arkcase-demo
+  ImageId:
+    Type: String
+    Description: 'AMI for North Virginia Region'
+    Default: 'ami-006fb5010961a9979'
+  InstanceType:
+    Type: String
+    Description: Choosing  t2 micro because it is free
+    Default: t2.xlarge
+  AvailabilityZone:
+    Type: String
+    Description: Availability Zone into which instance will launch
+    Default: us-east-1a
+  EC2InstanceName:
+    Type: String
+    Description: EC2 Instance Name
+    Default: ArkCase Metering Test  
+
+Resources:
+  ArkcaseCEInstance:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      AvailabilityZone: !Ref AvailabilityZone
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref ArkCaseInstanceProfile
+      Tags: 
+        - Key: Name
+          Value: !Ref EC2InstanceName
+      SecurityGroups: ["default"]
+      KeyName: !Ref ArkCaseKeyName
+  ArkCaseInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      InstanceProfileName: arkcase-instance-profile
+      Path: /
+      Roles: ["metering-role-test"]
