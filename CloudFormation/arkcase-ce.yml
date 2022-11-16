@@ -40,3 +40,4 @@ Resources:
       InstanceProfileName: arkcase-instance-profile
       Path: /
       Roles: ["metering-role-test"]
+      
