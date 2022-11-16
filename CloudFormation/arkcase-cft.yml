@@ -1,0 +1,124 @@
+---
+    Parameters:
+      ArkCaseKeyName:
+        Description: SSH Keypair to login to the instance
+        Type: AWS::EC2::KeyPair::KeyName
+        Default: foia-hud-arkcase-demo
+      AMIImageId:
+        Type: String
+        Description: 'AMI ArkCase-CE for North Virginia Region'
+        Default: ArkCase-CE
+        AllowedValues:
+          - ArkCase-EE
+          - ArkCase-CE
+          - ArkCase-FOIA
+      InstanceType:
+        Type: String
+        Description: Enter instance type for the EC2 Instance
+        Default: t2.micro
+        AllowedValues: 
+          - t2.xlarge
+          - t2.micro
+      AvailabilityZone:
+        Type: String
+        Description: Availability Zone into which instance will launch
+        Default: us-east-1a
+      EC2InstanceName:
+        Type: String
+        Description: EC2 Instance Name
+        Default: ArkCase CFT
+      VpcId:
+        Type: String
+        Description: VPC id
+        Default: vpc-7f38af04
+      SubnetId:
+        Type: String
+        Description: Subnet in which to launch an EC2
+        Default: subnet-338f9257
+    
+    Mappings:
+      AMIMap: 
+        ArkCase-EE: 
+          imageId: "ami-05ff2dcc385609f5a"
+          name: "ArkCase-EE"
+        ArkCase-CE: 
+          imageId: "ami-006fb5010961a9979"
+          name: "ArkCase-CE"
+        ArkCase-FOIA: 
+          imageId: "ami-07b3b6e1464caffd9"
+          name: "ArkCase-FOIA"
+    
+    Resources:
+      SSHSecurityGroup:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+          VpcId: !Ref VpcId
+          GroupDescription: Enable SSH access 
+          SecurityGroupIngress:
+            - CidrIp: 0.0.0.0/0
+              IpProtocol: tcp
+              FromPort: 22
+              ToPort: 22
+            - Description: http
+              IpProtocol: tcp
+              FromPort: 80
+              ToPort: 80
+            - Description: https
+              IpProtocol: tcp
+              FromPort: 443
+              ToPort: 443
+      
+      ArkCaseKeyPair:
+        Type: AWS::EC2::KeyPair
+        Properties:
+          KeyName: arkcase-cft-keypair
+    
+      ArkcaseCEInstance:
+        Type: AWS::EC2::Instance
+        Properties:
+          AvailabilityZone: !Ref AvailabilityZone
+          ImageId: !FindInMap [AMIMap, !Ref AMIImageId, imageId]
+          InstanceType: !Ref InstanceType
+          IamInstanceProfile: !Ref ArkCaseInstanceProfile
+          Tags: 
+            - Key: Name
+              Value: !Ref EC2InstanceName
+          SecurityGroupIds:
+            - !Ref SSHSecurityGroup
+          KeyName: !Ref ArkCaseKeyPair
+          KeyName: !Ref ArkCaseKeyName
+          SubnetId: !Ref SubnetId
+    
+      ArkCaseInstanceProfile:
+        Type: AWS::IAM::InstanceProfile
+        Properties:
+          InstanceProfileName: arkcase-instance-profile
+          Path: /
+          # Roles: ["metering-role-test"] //already created/reusing
+          Roles: 
+            - !Ref ArkCaseInstanceRole
+            
+      ArkCaseInstanceRole:
+        Type: AWS::IAM::Role
+        Properties:
+          RoleName: arkcase-metering
+          AssumeRolePolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Principal:
+                  Service:
+                    - ec2.amazonaws.com
+                Action:
+                  - sts:AssumeRole
+          Path: "/"
+          ManagedPolicyArns: 
+            - arn:aws:iam::aws:policy/AWSMarketplaceMeteringFullAccess
+          Policies:
+            - PolicyName: AWSMarketplaceMeteringFullAccess
+              PolicyDocument:
+                Version: 2012-10-17
+                Statement:
+                  - Effect: Allow
+                    Action: aws-marketplace:MeterUsage
+                    Resource: "*"
