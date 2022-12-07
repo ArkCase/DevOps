@@ -1,0 +1,112 @@
+---
+Parameters:
+  AMIImageId:
+    Type: String
+    Description: AMI ArkCase-EE
+    Default: ArkCase-EE
+  InstanceType:
+    Type: String
+    Description: Enter instance type for the EC2 Instance
+    Default: t2.xlarge
+    AllowedValues: 
+      - t2.xlarge
+      - t2.2xlarge
+  EC2InstanceName:
+    Type: String
+    Description: EC2 Instance Name
+    Default: ArkCase EE
+  VpcId:
+    Type: String
+    Description: Enter VPC id
+  SubnetId:
+    Type: String
+    Description: Enter Subnet in which to launch an EC2
+
+Mappings:
+  AMIMap: 
+    ArkCase-EE: 
+      imageId: "ami-05ff2dcc385609f5a"
+      name: "ArkCase-EE"
+
+Resources:
+  SSHSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VpcId
+      GroupDescription: Enable SSH access 
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+
+  ServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VpcId
+      GroupDescription: Allow connections from specified ranges 
+      SecurityGroupIngress:
+        - Description: http
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - Description: https
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+  
+  ArkCaseKeyPair:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: arkcase-cft-keypair
+
+  ArkcaseCEInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs ]
+      ImageId: !FindInMap [AMIMap, !Ref AMIImageId, imageId]
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref ArkCaseInstanceProfile
+      Tags: 
+        - Key: Name
+          Value: !Ref EC2InstanceName
+      SecurityGroupIds:
+        - !Ref SSHSecurityGroup
+        - !Ref ServerSecurityGroup
+      KeyName: !Ref ArkCaseKeyPair
+      SubnetId: !Ref SubnetId
+
+  ArkCaseInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: arkcase-instance-profile
+      Path: /
+      Roles: 
+        - !Ref ArkCaseInstanceRole
+        
+  ArkCaseInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ArkCaseCFTMetering
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/AWSMarketplaceMeteringFullAccess
+      Policies:
+        - PolicyName: AWSMarketplaceMeteringFullAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: aws-marketplace:MeterUsage
+                Resource: "*"
