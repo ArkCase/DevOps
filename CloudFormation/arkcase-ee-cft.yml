@@ -62,7 +62,7 @@ Resources:
     Properties:
       KeyName: arkcase-cft-keypair
 
-  ArkcaseCEInstance:
+  ArkcaseEEInstance:
     Type: AWS::EC2::Instance
     Properties:
       AvailabilityZone: !Select [ 0, !GetAZs ]
@@ -89,7 +89,7 @@ Resources:
   ArkCaseInstanceRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: ArkCaseCFTMetering
+      RoleName: ArkCaseEECFTMetering
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -102,11 +102,3 @@ Resources:
       Path: "/"
       ManagedPolicyArns: 
         - arn:aws:iam::aws:policy/AWSMarketplaceMeteringFullAccess
-      Policies:
-        - PolicyName: AWSMarketplaceMeteringFullAccess
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action: aws-marketplace:MeterUsage
-                Resource: "*"
