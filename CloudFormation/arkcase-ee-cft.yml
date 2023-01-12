@@ -7,10 +7,10 @@ Parameters:
   InstanceType:
     Type: String
     Description: Enter instance type for the EC2 Instance
-    Default: t2.xlarge
+    Default: t3.xlarge
     AllowedValues: 
-      - t2.xlarge
-      - t2.2xlarge
+      - t3.xlarge
+      - t3.2xlarge
   EC2InstanceName:
     Type: String
     Description: EC2 Instance Name
