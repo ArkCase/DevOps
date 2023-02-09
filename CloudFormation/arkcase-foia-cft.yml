@@ -3,7 +3,7 @@ Parameters:
   AMIImageId:
     Type: String
     Description: AMI ArkCase-FOIA
-    Default: ArkCase-FOIA
+    Default: ami-07b3b6e1464caffd9
   InstanceType:
     Type: String
     Description: Enter instance type for the EC2 Instance
@@ -15,24 +15,54 @@ Parameters:
     Type: String
     Description: EC2 Instance Name
     Default: ArkCase FOIA
-  VpcId:
-    Type: String
-    Description: Enter VPC id
-  SubnetId:
-    Type: String
-    Description: Enter Subnet in which to launch an EC2
 
 Mappings:
-  AMIMap: 
-    ArkCase-FOIA: 
-      imageId: "ami-07b3b6e1464caffd9"
-      name: "ArkCase-FOIA"
+  RegionMap: 
+    us-east-1: 
+      AMI: ami-07b3b6e1464caffd9
+    us-east-2: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    af-south-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    ap-east-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    ap-northeast-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    ap-northeast-2: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    ap-south-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    ap-southeast-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    ap-southeast-2: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    ca-central-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    eu-central-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    eu-north-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    eu-south-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    eu-west-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    eu-west-2: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    eu-west-3: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    me-south-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    sa-east-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    us-west-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    us-west-2: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
 
 Resources:
   SSHSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      VpcId: !Ref VpcId
       GroupDescription: Enable SSH access 
       SecurityGroupIngress:
         - CidrIp: 0.0.0.0/0
@@ -43,7 +73,6 @@ Resources:
   ServerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      VpcId: !Ref VpcId
       GroupDescription: Allow connections from specified ranges 
       SecurityGroupIngress:
         - Description: http
@@ -56,27 +85,19 @@ Resources:
           FromPort: 443
           ToPort: 443
           CidrIp: 0.0.0.0/0
-  
-  ArkCaseFoiaKeyPair:
-    Type: AWS::EC2::KeyPair
-    Properties:
-      KeyName: arkcase-foia-cft-keypair
 
   ArkcaseFOIAInstance:
     Type: AWS::EC2::Instance
     Properties:
-      AvailabilityZone: !Select [ 0, !GetAZs ]
-      ImageId: !FindInMap [AMIMap, !Ref AMIImageId, imageId]
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
       InstanceType: !Ref InstanceType
       IamInstanceProfile: !Ref ArkCaseInstanceProfile
       Tags: 
         - Key: Name
           Value: !Ref EC2InstanceName
       SecurityGroupIds:
-        - !Ref SSHSecurityGroup
         - !Ref ServerSecurityGroup
-      KeyName: !Ref ArkCaseFoiaKeyPair
-      SubnetId: !Ref SubnetId
 
   ArkCaseInstanceProfile:
     Type: AWS::IAM::InstanceProfile
