@@ -1,0 +1,125 @@
+---
+Parameters:
+  AMIImageId:
+    Type: String
+    Description: AMI ArkCase-FOIA
+    Default: ami-07b3b6e1464caffd9
+  InstanceType:
+    Type: String
+    Description: Enter instance type for the EC2 Instance
+    Default: t3.xlarge
+    AllowedValues: 
+      - t3.xlarge
+      - t3.2xlarge
+  EC2InstanceName:
+    Type: String
+    Description: EC2 Instance Name
+    Default: ArkCase FOIA
+
+Mappings:
+  RegionMap: 
+    us-east-1: 
+      AMI: ami-07b3b6e1464caffd9
+    us-east-2: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    af-south-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    ap-east-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    ap-northeast-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    ap-northeast-2: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    ap-south-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    ap-southeast-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    ap-southeast-2: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    ca-central-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    eu-central-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    eu-north-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    eu-south-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    eu-west-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    eu-west-2: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    eu-west-3: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    me-south-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    sa-east-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    us-west-1: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+    us-west-2: 
+      AMI: ami-xxxxxxxxxxxxxxxxx
+
+Resources:
+  SSHSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH access 
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+
+  ServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow connections from specified ranges 
+      SecurityGroupIngress:
+        - Description: http
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - Description: https
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  ArkcaseFOIAInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref ArkCaseInstanceProfile
+      Tags: 
+        - Key: Name
+          Value: !Ref EC2InstanceName
+      SecurityGroupIds:
+        - !Ref ServerSecurityGroup
+
+  ArkCaseInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: arkcase-foia-instance-profile
+      Path: /
+      Roles: 
+        - !Ref ArkCaseInstanceRole
+        
+  ArkCaseInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ArkCaseFOIACFTMetering
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/AWSMarketplaceMeteringFullAccess
